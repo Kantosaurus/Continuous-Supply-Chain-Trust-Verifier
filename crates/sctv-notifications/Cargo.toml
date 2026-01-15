@@ -1,0 +1,32 @@
+[package]
+name = "sctv-notifications"
+description = "Alert notifications for Supply Chain Trust Verifier"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+sctv-core = { path = "../sctv-core" }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+futures = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+reqwest = { workspace = true }
+url = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+sha1 = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+hmac = "0.12"
+lettre = { version = "0.11", default-features = false, features = ["tokio1-rustls-tls", "smtp-transport", "builder"] }
+
+[dev-dependencies]
+wiremock = { workspace = true }
+tokio = { workspace = true, features = ["test-util", "macros"] }
+
+[lints]
+workspace = true

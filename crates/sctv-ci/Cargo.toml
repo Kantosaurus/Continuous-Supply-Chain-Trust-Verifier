@@ -1,0 +1,16 @@
+[package]
+name = "sctv-ci"
+description = "CI/CD integrations for Supply Chain Trust Verifier"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+sctv-core = { path = "../sctv-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+
+[lints]
+workspace = true

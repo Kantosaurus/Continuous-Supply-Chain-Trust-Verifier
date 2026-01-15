@@ -1,0 +1,44 @@
+[package]
+name = "sctv-registries"
+description = "Package registry clients for Supply Chain Trust Verifier"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+sctv-core = { path = "../sctv-core" }
+
+# HTTP
+reqwest = { workspace = true }
+
+# Async
+tokio = { workspace = true }
+async-trait = { workspace = true }
+futures = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+quick-xml = { workspace = true }
+
+# Utilities
+url = { workspace = true }
+semver = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+bytes = { workspace = true }
+dashmap = { workspace = true }
+
+# Crypto
+sha2 = { workspace = true }
+sha1 = { workspace = true }
+base64 = { workspace = true }
+hex = { workspace = true }
+
+[dev-dependencies]
+wiremock = { workspace = true }
+tokio = { workspace = true }
+
+[lints]
+workspace = true

@@ -1,0 +1,24 @@
+# Cargo configuration for Windows builds
+# Fixes linker issues with large projects (STATUS_STACK_BUFFER_OVERRUN)
+
+[target.x86_64-pc-windows-msvc]
+# Use rust-lld linker which handles large symbol tables better than MSVC link.exe
+linker = "rust-lld"
+
+[profile.dev]
+# Reduce codegen units to decrease linker pressure
+codegen-units = 16
+# Enable incremental compilation
+incremental = true
+# Split debuginfo to reduce linker memory usage
+split-debuginfo = "packed"
+
+[profile.test]
+# Same settings for test builds
+codegen-units = 16
+incremental = true
+split-debuginfo = "packed"
+
+[build]
+# Use multiple jobs but not too many to avoid memory pressure
+jobs = 4

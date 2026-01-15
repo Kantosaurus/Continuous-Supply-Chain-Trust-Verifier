@@ -1,0 +1,47 @@
+[package]
+name = "sctv-worker"
+description = "Background job processor for Supply Chain Trust Verifier"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "sctv-worker"
+path = "src/main.rs"
+
+[dependencies]
+sctv-core = { path = "../sctv-core" }
+sctv-db = { path = "../sctv-db" }
+sctv-registries = { path = "../sctv-registries" }
+sctv-detectors = { path = "../sctv-detectors" }
+sctv-notifications = { path = "../sctv-notifications" }
+
+# Database
+sqlx = { workspace = true }
+
+# Async runtime
+tokio = { workspace = true, features = ["rt-multi-thread", "sync", "time", "macros"] }
+async-trait = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# HTTP client
+reqwest = { workspace = true }
+
+# Utilities
+uuid = { workspace = true }
+chrono = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+anyhow = { workspace = true }
+
+[dev-dependencies]
+tokio-test = "0.4"
+serde_json = { workspace = true }
+futures = { workspace = true }
+
+[lints]
+workspace = true

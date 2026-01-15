@@ -1,0 +1,77 @@
+[package]
+name = "sctv-dashboard"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Web dashboard for Supply Chain Trust Verifier"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "sctv-dashboard"
+path = "src/main.rs"
+required-features = ["ssr"]
+
+[dependencies]
+# Leptos framework
+leptos = { workspace = true }
+leptos_meta = { workspace = true }
+leptos_router = { workspace = true }
+leptos_axum = { workspace = true, optional = true }
+
+# Server-side dependencies
+axum = { workspace = true, optional = true }
+tower = { workspace = true, optional = true }
+tower-http = { workspace = true, features = ["fs"], optional = true }
+tokio = { workspace = true, optional = true }
+tracing-subscriber = { workspace = true, optional = true }
+
+# Shared dependencies
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+
+# WASM dependencies
+wasm-bindgen = { workspace = true, optional = true }
+console_error_panic_hook = { workspace = true, optional = true }
+web-sys = { workspace = true, features = ["Window", "Document", "Element"], optional = true }
+
+[features]
+default = ["csr"]
+csr = ["leptos/csr", "wasm-bindgen", "console_error_panic_hook", "web-sys"]
+ssr = ["leptos/ssr", "leptos_meta/ssr", "leptos_axum", "axum", "tower", "tower-http", "tokio", "tracing-subscriber"]
+hydrate = ["leptos/hydrate"]
+
+[package.metadata.leptos]
+output-name = "sctv-dashboard"
+site-root = "target/site"
+site-pkg-dir = "pkg"
+style-file = "style/main.css"
+assets-dir = "public"
+site-addr = "127.0.0.1:3000"
+reload-port = 3001
+browserquery = "defaults"
+watch = false
+env = "DEV"
+bin-features = ["ssr"]
+bin-default-features = false
+lib-features = ["hydrate"]
+lib-default-features = false
+
+# Disable strict lints for Leptos-generated code
+[lints.rust]
+unsafe_code = "forbid"
+
+[lints.clippy]
+all = "warn"
+# Relax some pedantic lints that conflict with Leptos patterns
+pedantic = { level = "warn", priority = -1 }
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"
+must_use_candidate = "allow"
+module_name_repetitions = "allow"
+too_many_lines = "allow"

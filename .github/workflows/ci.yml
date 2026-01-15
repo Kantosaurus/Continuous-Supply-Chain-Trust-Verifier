@@ -1,0 +1,257 @@
+# =============================================================================
+# CI Workflow - Continuous Integration
+# =============================================================================
+# Runs on every push and pull request to ensure code quality.
+#
+# Jobs:
+#   - lint: Check formatting and run clippy
+#   - test: Run test suite with PostgreSQL
+#   - build: Verify release builds compile
+#   - security: Run security audit on dependencies
+# =============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+# Cancel in-progress runs for the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Lint - Format and Clippy checks
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-lint-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-lint-
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+  # ---------------------------------------------------------------------------
+  # Test - Run test suite
+  # ---------------------------------------------------------------------------
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: sctv_test
+          POSTGRES_PASSWORD: sctv_test
+          POSTGRES_DB: sctv_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-test-
+
+      - name: Install sqlx-cli
+        run: cargo install sqlx-cli --no-default-features --features postgres
+
+      - name: Run database migrations
+        env:
+          DATABASE_URL: postgres://sctv_test:sctv_test@localhost:5432/sctv_test
+        run: sqlx migrate run
+
+      - name: Run tests
+        env:
+          DATABASE_URL: postgres://sctv_test:sctv_test@localhost:5432/sctv_test
+          RUST_LOG: debug
+        run: cargo test --workspace --all-features
+
+  # ---------------------------------------------------------------------------
+  # Build - Verify compilation
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - x86_64-unknown-linux-gnu
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-build-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-build-${{ matrix.target }}-
+
+      - name: Build release binaries
+        run: cargo build --release --workspace
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries-${{ matrix.target }}
+          path: |
+            target/release/sctv-api
+            target/release/sctv-worker
+            target/release/sctv
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # Security Audit - Check for vulnerabilities
+  # ---------------------------------------------------------------------------
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+
+      - name: Run security audit
+        run: cargo audit
+
+  # ---------------------------------------------------------------------------
+  # Documentation - Verify docs build
+  # ---------------------------------------------------------------------------
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-docs-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-docs-
+
+      - name: Build documentation
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --workspace --no-deps
+
+  # ---------------------------------------------------------------------------
+  # Coverage - Code coverage report
+  # ---------------------------------------------------------------------------
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: sctv_test
+          POSTGRES_PASSWORD: sctv_test
+          POSTGRES_DB: sctv_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-action@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Install sqlx-cli
+        run: cargo install sqlx-cli --no-default-features --features postgres
+
+      - name: Run database migrations
+        env:
+          DATABASE_URL: postgres://sctv_test:sctv_test@localhost:5432/sctv_test
+        run: sqlx migrate run
+
+      - name: Generate code coverage
+        env:
+          DATABASE_URL: postgres://sctv_test:sctv_test@localhost:5432/sctv_test
+        run: cargo llvm-cov --workspace --lcov --output-path lcov.info
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          files: lcov.info
+          fail_ci_if_error: false

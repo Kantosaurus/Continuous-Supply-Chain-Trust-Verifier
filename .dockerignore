@@ -1,0 +1,74 @@
+# =============================================================================
+# Docker Build Ignore File
+# =============================================================================
+# Files and directories to exclude from Docker build context.
+# This speeds up builds and reduces the size of the build context.
+# =============================================================================
+
+# Build artifacts
+target/
+*.pdb
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation (not needed in container)
+*.md
+!README.md
+docs/
+
+# Environment files (use Docker secrets or env vars instead)
+.env
+.env.*
+!.env.example
+
+# Test files
+**/tests/
+**/*_test.rs
+**/test_*.rs
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+azure-pipelines.yml
+Jenkinsfile
+
+# Local development
+docker-compose.override.yml
+*.local
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+
+# Rust specific
+**/*.rs.bk
+Cargo.lock.bak
+
+# Benchmarks (not needed in production)
+benches/
+
+# Examples (not needed in production)
+examples/
+
+# Coverage reports
+*.profraw
+coverage/
+tarpaulin-report.html

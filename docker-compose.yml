@@ -1,0 +1,165 @@
+# =============================================================================
+# Docker Compose for SCTV (Supply Chain Trust Verifier)
+# =============================================================================
+# Full stack deployment configuration.
+#
+# Services:
+#   - postgres: PostgreSQL database
+#   - api: REST/GraphQL API server
+#   - worker: Background job processor
+#   - dashboard: Web UI (optional)
+#
+# Usage:
+#   # Start all services
+#   docker-compose up -d
+#
+#   # Start specific services
+#   docker-compose up -d postgres api worker
+#
+#   # View logs
+#   docker-compose logs -f api
+#
+#   # Scale workers
+#   docker-compose up -d --scale worker=3
+#
+#   # Stop all services
+#   docker-compose down
+#
+#   # Stop and remove volumes (DESTRUCTIVE)
+#   docker-compose down -v
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # PostgreSQL Database
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    container_name: sctv-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sctv}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sctv_secure_password}
+      POSTGRES_DB: ${POSTGRES_DB:-sctv}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sctv} -d ${POSTGRES_DB:-sctv}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - sctv-network
+
+  # ---------------------------------------------------------------------------
+  # SCTV API Server
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+    container_name: sctv-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-sctv}:${POSTGRES_PASSWORD:-sctv_secure_password}@postgres:5432/${POSTGRES_DB:-sctv}
+      SCTV_HOST: 0.0.0.0
+      SCTV_PORT: 3000
+      SCTV_JWT_SECRET: ${SCTV_JWT_SECRET:-change-this-in-production}
+      SCTV_ENABLE_CORS: ${SCTV_ENABLE_CORS:-true}
+      SCTV_ENABLE_GRAPHQL_PLAYGROUND: ${SCTV_ENABLE_GRAPHQL_PLAYGROUND:-true}
+      SCTV_LOG_FORMAT: ${SCTV_LOG_FORMAT:-json}
+      RUST_LOG: ${RUST_LOG:-info,sctv_api=debug,tower_http=debug}
+    ports:
+      - "${API_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+    networks:
+      - sctv-network
+
+  # ---------------------------------------------------------------------------
+  # SCTV Background Worker
+  # ---------------------------------------------------------------------------
+  worker:
+    build:
+      context: .
+      dockerfile: docker/worker.Dockerfile
+    container_name: sctv-worker
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-sctv}:${POSTGRES_PASSWORD:-sctv_secure_password}@postgres:5432/${POSTGRES_DB:-sctv}
+      SCTV_WORKER_COUNT: ${SCTV_WORKER_COUNT:-4}
+      SCTV_POLL_INTERVAL_MS: ${SCTV_POLL_INTERVAL_MS:-1000}
+      SCTV_SHUTDOWN_TIMEOUT_SECS: ${SCTV_SHUTDOWN_TIMEOUT_SECS:-30}
+      SCTV_LOG_FORMAT: ${SCTV_LOG_FORMAT:-json}
+      RUST_LOG: ${RUST_LOG:-info,sctv_worker=debug}
+      # SMTP configuration for notifications
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-noreply@sctv.local}
+    networks:
+      - sctv-network
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+
+  # ---------------------------------------------------------------------------
+  # SCTV Dashboard (Optional - Web UI)
+  # ---------------------------------------------------------------------------
+  dashboard:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: sctv-dashboard
+    container_name: sctv-dashboard
+    restart: unless-stopped
+    profiles:
+      - full
+      - dashboard
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      SCTV_API_URL: http://api:3000
+      SCTV_HOST: 0.0.0.0
+      SCTV_PORT: 3000
+      RUST_LOG: ${RUST_LOG:-info,sctv_dashboard=debug}
+    ports:
+      - "${DASHBOARD_PORT:-8080}:3000"
+    networks:
+      - sctv-network
+
+# -----------------------------------------------------------------------------
+# Networks
+# -----------------------------------------------------------------------------
+networks:
+  sctv-network:
+    driver: bridge
+    name: sctv-network
+
+# -----------------------------------------------------------------------------
+# Volumes
+# -----------------------------------------------------------------------------
+volumes:
+  postgres_data:
+    name: sctv-postgres-data

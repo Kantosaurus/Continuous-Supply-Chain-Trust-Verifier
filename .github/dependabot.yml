@@ -1,0 +1,57 @@
+# =============================================================================
+# Dependabot Configuration
+# =============================================================================
+# Automatically creates pull requests for dependency updates.
+# =============================================================================
+
+version: 2
+
+updates:
+  # Rust dependencies (Cargo)
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "maintainers"
+    labels:
+      - "dependencies"
+      - "rust"
+    commit-message:
+      prefix: "deps(rust)"
+    groups:
+      # Group minor and patch updates together
+      rust-minor:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "ci"
+    commit-message:
+      prefix: "ci(deps)"
+
+  # Docker dependencies
+  - package-ecosystem: "docker"
+    directory: "/docker"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "docker(deps)"

@@ -1,0 +1,95 @@
+# =============================================================================
+# Docker Compose for Production Deployment
+# =============================================================================
+# Production-optimized configuration with:
+#   - Secure defaults
+#   - Resource limits
+#   - Logging configuration
+#   - Health checks
+#
+# Usage:
+#   docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Required environment variables (use .env or environment):
+#   - POSTGRES_PASSWORD (secure password)
+#   - SCTV_JWT_SECRET (secure secret key)
+# =============================================================================
+
+services:
+  postgres:
+    restart: always
+    environment:
+      # MUST be overridden in production
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  api:
+    restart: always
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-sctv}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-sctv}
+      SCTV_JWT_SECRET: ${SCTV_JWT_SECRET:?SCTV_JWT_SECRET is required}
+      SCTV_ENABLE_CORS: "false"
+      SCTV_ENABLE_GRAPHQL_PLAYGROUND: "false"
+      SCTV_LOG_FORMAT: json
+      RUST_LOG: info,sctv_api=info,tower_http=warn
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+      rollback_config:
+        parallelism: 1
+        delay: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "10"
+
+  worker:
+    restart: always
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-sctv}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-sctv}
+      SCTV_WORKER_COUNT: "4"
+      SCTV_LOG_FORMAT: json
+      RUST_LOG: info,sctv_worker=info
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '2'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "10"
+
+volumes:
+  postgres_data:
+    driver: local

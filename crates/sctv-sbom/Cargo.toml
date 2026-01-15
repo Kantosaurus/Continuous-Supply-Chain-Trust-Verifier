@@ -1,0 +1,24 @@
+[package]
+name = "sctv-sbom"
+description = "SBOM generation for Supply Chain Trust Verifier"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+sctv-core = { path = "../sctv-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+url = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+semver = { workspace = true }
+
+[lints]
+workspace = true
