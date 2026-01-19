@@ -33,8 +33,8 @@ tower = "0.5"
 tower-http = { version = "0.6", features = ["cors", "trace", "compression-gzip"] }
 
 # GraphQL
-async-graphql = { version = "7.0", features = ["chrono", "uuid", "tracing"] }
-async-graphql-axum = "7.0"
+async-graphql = { version = "7.2", features = ["chrono", "uuid", "tracing"] }
+async-graphql-axum = "7.2"
 
 # Database
 sqlx = { version = "0.8", features = ["runtime-tokio", "postgres", "uuid", "chrono", "json", "migrate"] }
