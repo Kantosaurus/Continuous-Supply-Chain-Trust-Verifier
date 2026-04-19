@@ -79,10 +79,7 @@ pub fn GridItem(
     #[prop(optional)] class: Option<String>,
     children: Children,
 ) -> impl IntoView {
-    let style = format!(
-        "grid-column: span {}; grid-row: span {};",
-        col_span, row_span
-    );
+    let style = format!("grid-column: span {col_span}; grid-row: span {row_span};");
 
     view! {
         <div class=format!("grid-item {}", class.unwrap_or_default()) style=style>
@@ -119,7 +116,7 @@ pub fn StatCard(
                         "stat-card__trend stat-card__trend--down"
                     }>
                         {if is_positive { "+" } else { "" }}
-                        {format!("{:.1}%", change)}
+                        {format!("{change:.1}%")}
                     </span>
                 }
             })}

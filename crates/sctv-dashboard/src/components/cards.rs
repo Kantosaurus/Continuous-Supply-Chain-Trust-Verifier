@@ -103,21 +103,21 @@ pub fn AlertCard(
     #[prop(into)] created_at: String,
     #[prop(into)] status: String,
 ) -> impl IntoView {
-    let severity_level = match severity.to_lowercase().as_str() {
-        "critical" => StatusLevel::Critical,
-        "high" => StatusLevel::Critical,
+    let severity_lower = severity.to_lowercase();
+    let severity_level = match severity_lower.as_str() {
+        "critical" | "high" => StatusLevel::Critical,
         "medium" => StatusLevel::Warning,
         "low" => StatusLevel::Info,
         _ => StatusLevel::Neutral,
     };
 
     view! {
-        <article class=format!("alert-card alert-card--{}", severity.to_lowercase())>
+        <article class=format!("alert-card alert-card--{severity_lower}")>
             <div class="alert-card__severity-bar"></div>
 
             <div class="alert-card__content">
                 <div class="alert-card__header">
-                    <SeverityTag severity=severity.clone()/>
+                    <SeverityTag severity=severity/>
                     <span class="alert-card__type">{alert_type}</span>
                     <span class="alert-card__time">{created_at}</span>
                 </div>
@@ -229,7 +229,7 @@ pub fn DependencyCard(
     #[prop(optional)] alert_count: Option<u32>,
     #[prop(optional)] registry_url: Option<String>,
 ) -> impl IntoView {
-    let has_alerts = alert_count.map_or(false, |c| c > 0);
+    let has_alerts = alert_count.is_some_and(|c| c > 0);
 
     view! {
         <div class=format!("dependency-card {}", if has_alerts { "dependency-card--has-alerts" } else { "" })>
@@ -280,7 +280,7 @@ pub fn SummaryCard(
                 <span class="summary-card__subtitle">{subtitle}</span>
                 {trend.map(|(change, positive)| view! {
                     <span class=format!("summary-card__trend {}", if positive { "summary-card__trend--up" } else { "summary-card__trend--down" })>
-                        {if positive { "+" } else { "" }}{format!("{:.1}%", change)}
+                        {if positive { "+" } else { "" }}{format!("{change:.1}%")}
                     </span>
                 })}
             </div>

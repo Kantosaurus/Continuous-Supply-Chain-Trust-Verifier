@@ -94,7 +94,7 @@ pub fn ProgressBar(
                     style=format!("width: {}%", percentage)
                 ></div>
             </div>
-            <span class="progress-bar__value">{format!("{:.0}%", percentage)}</span>
+            <span class="progress-bar__value">{format!("{percentage:.0}%")}</span>
         </div>
     }
 }
@@ -121,8 +121,7 @@ pub fn TrustScore(#[prop(into)] score: u8) -> impl IntoView {
 #[component]
 pub fn SeverityTag(#[prop(into)] severity: String) -> impl IntoView {
     let level = match severity.to_lowercase().as_str() {
-        "critical" => StatusLevel::Critical,
-        "high" => StatusLevel::Critical,
+        "critical" | "high" => StatusLevel::Critical,
         "medium" => StatusLevel::Warning,
         "low" => StatusLevel::Info,
         _ => StatusLevel::Neutral,
@@ -149,9 +148,7 @@ pub fn EcosystemBadge(#[prop(into)] ecosystem: String) -> impl IntoView {
 /// SLSA level indicator.
 #[component]
 pub fn SlsaLevel(#[prop(into)] level: Option<u8>) -> impl IntoView {
-    let display = level
-        .map(|l| format!("L{}", l))
-        .unwrap_or_else(|| "—".to_string());
+    let display = level.map_or_else(|| "—".to_string(), |l| format!("L{l}"));
     let status = match level {
         Some(3..=4) => StatusLevel::Success,
         Some(2) => StatusLevel::Info,

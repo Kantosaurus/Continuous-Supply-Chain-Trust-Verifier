@@ -72,6 +72,15 @@ pub fn Select(
     #[prop(into)] options: Vec<(String, String)>,
     #[prop(optional)] value: Option<String>,
 ) -> impl IntoView {
+    // Pre-mark each option as selected; `value` is compared by reference then dropped.
+    let options_with_selected: Vec<(String, String, bool)> = options
+        .into_iter()
+        .map(|(opt_value, opt_label)| {
+            let selected = value.as_deref() == Some(opt_value.as_str());
+            (opt_value, opt_label, selected)
+        })
+        .collect();
+    drop(value);
     view! {
         <div class="select">
             <label class="select__label" for=name.clone()>
@@ -83,10 +92,9 @@ pub fn Select(
                     name=name
                     class="select__field"
                 >
-                    {options
+                    {options_with_selected
                         .into_iter()
-                        .map(|(opt_value, opt_label)| {
-                            let selected = value.as_ref().map_or(false, |v| v == &opt_value);
+                        .map(|(opt_value, opt_label, selected)| {
                             view! {
                                 <option value=opt_value selected=selected>
                                     {opt_label}

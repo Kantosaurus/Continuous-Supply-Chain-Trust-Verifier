@@ -105,7 +105,7 @@ pub fn AlertsPage() -> impl IntoView {
                         || a.title.to_lowercase().contains(&query)
                         || a.package_name
                             .as_ref()
-                            .map_or(false, |p| p.to_lowercase().contains(&query));
+                            .is_some_and(|p| p.to_lowercase().contains(&query));
                     tab_match && search_match
                 })
                 .cloned()

@@ -34,10 +34,10 @@ pub fn Sidebar() -> impl IntoView {
             </div>
 
             <nav class="sidebar__nav">
-                <NavLinkProjects current_path=current_path.clone()/>
-                <NavLinkAlerts current_path=current_path.clone()/>
-                <NavLinkPolicies current_path=current_path.clone()/>
-                <NavLinkSettings current_path=current_path.clone()/>
+                <NavLinkProjects current_path=current_path/>
+                <NavLinkAlerts current_path=current_path/>
+                <NavLinkPolicies current_path=current_path/>
+                <NavLinkSettings current_path=current_path/>
             </nav>
 
             <div class="sidebar__footer">
