@@ -7,9 +7,7 @@ use base64::Engine;
 use sctv_core::{Dependency, PackageEcosystem, ProvenanceDetails};
 use tracing::debug;
 
-use super::{
-    AttestationParser, ProvenanceConfig, ProvenanceVerificationResult, SigstoreVerifier,
-};
+use super::{AttestationParser, ProvenanceConfig, ProvenanceVerificationResult, SigstoreVerifier};
 use crate::DetectorResult;
 
 /// Orchestrates provenance verification.
@@ -38,7 +36,10 @@ impl ProvenanceVerifier {
     }
 
     /// Verifies provenance for a dependency.
-    pub async fn verify(&self, dependency: &Dependency) -> DetectorResult<ProvenanceVerificationResult> {
+    pub async fn verify(
+        &self,
+        dependency: &Dependency,
+    ) -> DetectorResult<ProvenanceVerificationResult> {
         debug!(
             package = %dependency.package_name,
             version = %dependency.resolved_version,
@@ -183,7 +184,9 @@ impl ProvenanceVerifier {
         // Decode and parse the payload
         let payload_bytes = base64::engine::general_purpose::STANDARD
             .decode(&dsse.payload)
-            .map_err(|e| crate::DetectorError::AnalysisFailed(format!("Base64 decode error: {e}")))?;
+            .map_err(|e| {
+                crate::DetectorError::AnalysisFailed(format!("Base64 decode error: {e}"))
+            })?;
 
         let statement: super::attestation::InTotoStatement = serde_json::from_slice(&payload_bytes)
             .map_err(|e| crate::DetectorError::AnalysisFailed(format!("JSON parse error: {e}")))?;
@@ -260,10 +263,7 @@ impl ProvenanceVerifier {
         // - Level 2 requirements
         // - Non-falsifiable (inclusion proof in transparency log)
         // - Source tracked
-        if level >= 2
-            && verification.inclusion_verified
-            && parsed.source_digest.is_some()
-        {
+        if level >= 2 && verification.inclusion_verified && parsed.source_digest.is_some() {
             level = 3;
         }
 
@@ -386,7 +386,8 @@ mod tests {
     fn test_is_hosted_build_service() {
         let verifier = ProvenanceVerifier::new();
 
-        assert!(verifier.is_hosted_build_service("https://github.com/slsa-framework/slsa-github-generator"));
+        assert!(verifier
+            .is_hosted_build_service("https://github.com/slsa-framework/slsa-github-generator"));
         assert!(verifier.is_hosted_build_service("https://gitlab.com/runner"));
         assert!(verifier.is_hosted_build_service("https://cloud.google.com/build"));
         assert!(!verifier.is_hosted_build_service("local-builder"));
@@ -421,6 +422,9 @@ mod tests {
         assert!(result.has_provenance);
         assert_eq!(result.slsa_level, Some(2));
         assert!(result.builder_trusted);
-        assert_eq!(result.source_uri, Some("https://github.com/test/repo".to_string()));
+        assert_eq!(
+            result.source_uri,
+            Some("https://github.com/test/repo".to_string())
+        );
     }
 }

@@ -67,7 +67,10 @@ impl MavenClient {
 
         tracing::debug!("Fetching Maven metadata from {}", url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::PackageNotFound(coord.to_string()));
@@ -99,7 +102,10 @@ impl MavenClient {
 
         tracing::debug!("Fetching POM from {}", url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::VersionNotFound(
@@ -127,7 +133,10 @@ impl MavenClient {
             .join(&format!("{}.sha1", artifact_path))
             .map_err(|e| RegistryError::Parse(e.to_string()))?;
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if !response.status().is_success() {
             return Ok(None);
@@ -146,7 +155,10 @@ impl MavenClient {
             .join(&format!("{}.sha256", artifact_path))
             .map_err(|e| RegistryError::Parse(e.to_string()))?;
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if !response.status().is_success() {
             return Ok(None);
@@ -161,11 +173,7 @@ impl MavenClient {
     pub async fn search(&self, query: &str, limit: usize) -> RegistryResult<Vec<MavenSearchDoc>> {
         let url = format!("{}?q={}&rows={}&wt=json", self.search_url, query, limit);
 
-        let response = self
-            .http
-            .get(&url)
-            .send()
-            .await?;
+        let response = self.http.get(&url).send().await?;
 
         if !response.status().is_success() {
             return Err(RegistryError::Unavailable(format!(
@@ -179,7 +187,11 @@ impl MavenClient {
     }
 
     /// Verifies the integrity of downloaded artifact bytes.
-    pub fn verify_integrity(&self, bytes: &Bytes, expected: &PackageChecksums) -> MavenIntegrityResult {
+    pub fn verify_integrity(
+        &self,
+        bytes: &Bytes,
+        expected: &PackageChecksums,
+    ) -> MavenIntegrityResult {
         let mut result = MavenIntegrityResult {
             sha1_match: None,
             sha256_match: None,
@@ -298,34 +310,33 @@ impl RegistryClient for MavenClient {
             .and_then(|s| parse_maven_timestamp(s));
 
         // Try to get more info from the latest POM
-        let (description, homepage, repository, maintainers) =
-            if let Some(ref version) = latest {
-                match self.fetch_pom(&coord, version).await {
-                    Ok(pom) => {
-                        let desc = pom.description.clone().or_else(|| pom.name.clone());
-                        let home = pom.url.as_ref().and_then(|u| Url::parse(u).ok());
-                        let repo = pom
-                            .scm
-                            .as_ref()
-                            .and_then(|s| s.url.as_ref())
-                            .and_then(|u| Url::parse(u).ok());
-                        let maintainers: Vec<String> = pom
-                            .developers
-                            .as_ref()
-                            .map(|d| {
-                                d.developer
-                                    .iter()
-                                    .filter_map(|dev| dev.name.clone().or_else(|| dev.id.clone()))
-                                    .collect()
-                            })
-                            .unwrap_or_default();
-                        (desc, home, repo, maintainers)
-                    }
-                    Err(_) => (None, None, None, Vec::new()),
+        let (description, homepage, repository, maintainers) = if let Some(ref version) = latest {
+            match self.fetch_pom(&coord, version).await {
+                Ok(pom) => {
+                    let desc = pom.description.clone().or_else(|| pom.name.clone());
+                    let home = pom.url.as_ref().and_then(|u| Url::parse(u).ok());
+                    let repo = pom
+                        .scm
+                        .as_ref()
+                        .and_then(|s| s.url.as_ref())
+                        .and_then(|u| Url::parse(u).ok());
+                    let maintainers: Vec<String> = pom
+                        .developers
+                        .as_ref()
+                        .map(|d| {
+                            d.developer
+                                .iter()
+                                .filter_map(|dev| dev.name.clone().or_else(|| dev.id.clone()))
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    (desc, home, repo, maintainers)
                 }
-            } else {
-                (None, None, None, Vec::new())
-            };
+                Err(_) => (None, None, None, Vec::new()),
+            }
+        } else {
+            (None, None, None, Vec::new())
+        };
 
         let package = Package {
             id: PackageId::new(),
@@ -357,7 +368,10 @@ impl RegistryClient for MavenClient {
 
     async fn get_version(&self, name: &str, version: &str) -> RegistryResult<VersionMetadata> {
         // Check cache first
-        if let Some(cached) = self.cache.get_version(PackageEcosystem::Maven, name, version) {
+        if let Some(cached) = self
+            .cache
+            .get_version(PackageEcosystem::Maven, name, version)
+        {
             tracing::debug!("Cache hit for {}:{}", name, version);
             return Ok(cached);
         }
@@ -388,10 +402,7 @@ impl RegistryClient for MavenClient {
             integrity: None,
         };
 
-        let download_url = self
-            .base_url
-            .join(&artifact_path)
-            .ok();
+        let download_url = self.base_url.join(&artifact_path).ok();
 
         // Parse dependencies
         let dependencies = Self::parse_dependencies(&pom);
@@ -427,7 +438,10 @@ impl RegistryClient for MavenClient {
 
         tracing::debug!("Downloading {}:{} from {}", name, version, url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if !response.status().is_success() {
             return Err(RegistryError::Unavailable(format!(

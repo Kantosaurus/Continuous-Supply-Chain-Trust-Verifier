@@ -5,11 +5,11 @@
 use async_trait::async_trait;
 use std::time::Instant;
 
-use sctv_core::{
-    Alert, AlertId, AlertMetadata, AlertStatus, AlertType,
-    ProvenanceFailureDetails, ProvenanceStatus, Remediation, Severity,
-};
 use sctv_core::traits::{AlertRepository, DependencyRepository};
+use sctv_core::{
+    Alert, AlertId, AlertMetadata, AlertStatus, AlertType, ProvenanceFailureDetails,
+    ProvenanceStatus, Remediation, Severity,
+};
 use sctv_db::repositories::{PgAlertRepository, PgDependencyRepository};
 
 use crate::error::{WorkerError, WorkerResult};

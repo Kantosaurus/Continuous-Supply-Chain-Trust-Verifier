@@ -376,7 +376,10 @@ impl AttestationParser {
             AttestationSignature::new(String::new())
         };
 
-        let attestation_type = if statement.predicate_type.starts_with("https://slsa.dev/provenance") {
+        let attestation_type = if statement
+            .predicate_type
+            .starts_with("https://slsa.dev/provenance")
+        {
             AttestationType::SlsaProvenance
         } else {
             AttestationType::InToto

@@ -46,10 +46,7 @@ impl SpdxGenerator {
             doc_uuid
         );
 
-        let mut doc = Document::new(
-            format!("{} SBOM", project.name),
-            namespace.clone(),
-        );
+        let mut doc = Document::new(format!("{} SBOM", project.name), namespace.clone());
 
         // Build creation info
         let creation_info = self.build_creation_info(config)?;
@@ -140,8 +137,8 @@ impl SpdxGenerator {
     fn build_project_package(&self, project: &Project) -> SbomResult<Package> {
         let spdx_id = format!("SPDXRef-Package-{}", sanitize_spdx_id(&project.name));
 
-        let mut pkg = Package::new(&spdx_id, &project.name)
-            .with_purpose(PackagePurpose::Application);
+        let mut pkg =
+            Package::new(&spdx_id, &project.name).with_purpose(PackagePurpose::Application);
 
         if let Some(desc) = &project.description {
             pkg.description = Some(desc.clone());
@@ -191,14 +188,16 @@ impl SpdxGenerator {
         if let Some(provenance) = &dep.integrity.provenance_details {
             if let Some(source_uri) = &provenance.source_uri {
                 pkg.add_external_ref(
-                    ExternalRef::new("OTHER", "vcs", source_uri)
-                        .with_comment("Source repository"),
+                    ExternalRef::new("OTHER", "vcs", source_uri).with_comment("Source repository"),
                 );
             }
         }
 
         // Set supplier based on ecosystem
-        pkg.supplier = Some(format!("Organization: {} Registry", dep.ecosystem.purl_type()));
+        pkg.supplier = Some(format!(
+            "Organization: {} Registry",
+            dep.ecosystem.purl_type()
+        ));
 
         Ok(pkg)
     }
@@ -220,7 +219,10 @@ impl SpdxGenerator {
                 format!(
                     "https://registry.npmjs.org/{}/-/{}-{}.tgz",
                     dep.package_name,
-                    dep.package_name.rsplit('/').next().unwrap_or(&dep.package_name),
+                    dep.package_name
+                        .rsplit('/')
+                        .next()
+                        .unwrap_or(&dep.package_name),
                     dep.resolved_version
                 )
             }
@@ -290,8 +292,11 @@ impl SpdxGenerator {
         output.push_str(&format!("DocumentNamespace: {}\n", doc.document_namespace));
 
         // Creation info
-        output.push_str(&format!("Creator: Tool: {}\n",
-            doc.creation_info.creators.iter()
+        output.push_str(&format!(
+            "Creator: Tool: {}\n",
+            doc.creation_info
+                .creators
+                .iter()
                 .find(|c| c.starts_with("Tool:"))
                 .map(|s| s.trim_start_matches("Tool: "))
                 .unwrap_or("unknown")
@@ -322,7 +327,10 @@ impl SpdxGenerator {
                 output.push_str(&format!("PackageSupplier: {}\n", supplier));
             }
 
-            output.push_str(&format!("PackageDownloadLocation: {}\n", pkg.download_location));
+            output.push_str(&format!(
+                "PackageDownloadLocation: {}\n",
+                pkg.download_location
+            ));
 
             if let Some(files_analyzed) = pkg.files_analyzed {
                 output.push_str(&format!("FilesAnalyzed: {}\n", files_analyzed));
@@ -358,9 +366,7 @@ impl SpdxGenerator {
             for ext_ref in &pkg.external_refs {
                 output.push_str(&format!(
                     "ExternalRef: {} {} {}\n",
-                    ext_ref.reference_category,
-                    ext_ref.reference_type,
-                    ext_ref.reference_locator
+                    ext_ref.reference_category, ext_ref.reference_type, ext_ref.reference_locator
                 ));
             }
 
@@ -509,9 +515,13 @@ mod tests {
         assert!(generator.get_download_location(&dep).contains("crates.io"));
 
         dep.ecosystem = PackageEcosystem::RubyGems;
-        assert!(generator.get_download_location(&dep).contains("rubygems.org"));
+        assert!(generator
+            .get_download_location(&dep)
+            .contains("rubygems.org"));
 
         dep.ecosystem = PackageEcosystem::GoModules;
-        assert!(generator.get_download_location(&dep).contains("proxy.golang.org"));
+        assert!(generator
+            .get_download_location(&dep)
+            .contains("proxy.golang.org"));
     }
 }

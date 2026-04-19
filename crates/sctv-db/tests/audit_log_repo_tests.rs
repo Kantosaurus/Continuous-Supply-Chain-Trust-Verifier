@@ -15,17 +15,18 @@ async fn test_create_and_find_audit_log_by_id() {
     let audit_repo = PgAuditLogRepository::new(db.pool.clone());
 
     let tenant = create_test_tenant();
-    tenant_repo.create(&tenant).await.expect("Failed to create tenant");
+    tenant_repo
+        .create(&tenant)
+        .await
+        .expect("Failed to create tenant");
 
-    let audit_log = AuditLog::new(
-        tenant.id,
-        None,
-        AuditAction::Created,
-        ResourceType::Project,
-    )
-    .with_resource_id(uuid::Uuid::new_v4());
+    let audit_log = AuditLog::new(tenant.id, None, AuditAction::Created, ResourceType::Project)
+        .with_resource_id(uuid::Uuid::new_v4());
 
-    audit_repo.create(&audit_log).await.expect("Failed to create audit log");
+    audit_repo
+        .create(&audit_log)
+        .await
+        .expect("Failed to create audit log");
 
     let found = audit_repo
         .find_by_id(audit_log.id)
@@ -46,13 +47,22 @@ async fn test_audit_log_with_user() {
     let audit_repo = PgAuditLogRepository::new(db.pool.clone());
 
     let tenant = create_test_tenant();
-    tenant_repo.create(&tenant).await.expect("Failed to create tenant");
+    tenant_repo
+        .create(&tenant)
+        .await
+        .expect("Failed to create tenant");
 
     let user = create_test_user(tenant.id);
-    user_repo.create(&user).await.expect("Failed to create user");
+    user_repo
+        .create(&user)
+        .await
+        .expect("Failed to create user");
 
     let audit_log = AuditLog::login(tenant.id, user.id);
-    audit_repo.create(&audit_log).await.expect("Failed to create audit log");
+    audit_repo
+        .create(&audit_log)
+        .await
+        .expect("Failed to create audit log");
 
     let found = audit_repo
         .find_by_id(audit_log.id)
@@ -71,7 +81,10 @@ async fn test_audit_log_with_request_context() {
     let audit_repo = PgAuditLogRepository::new(db.pool.clone());
 
     let tenant = create_test_tenant();
-    tenant_repo.create(&tenant).await.expect("Failed to create tenant");
+    tenant_repo
+        .create(&tenant)
+        .await
+        .expect("Failed to create tenant");
 
     let ip = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100));
     let user_agent = "Mozilla/5.0 Test Browser".to_string();
@@ -84,7 +97,10 @@ async fn test_audit_log_with_request_context() {
     )
     .with_request_context(ip, user_agent.clone());
 
-    audit_repo.create(&audit_log).await.expect("Failed to create audit log");
+    audit_repo
+        .create(&audit_log)
+        .await
+        .expect("Failed to create audit log");
 
     let found = audit_repo
         .find_by_id(audit_log.id)
@@ -103,12 +119,18 @@ async fn test_find_audit_logs_by_tenant() {
     let audit_repo = PgAuditLogRepository::new(db.pool.clone());
 
     let tenant = create_test_tenant();
-    tenant_repo.create(&tenant).await.expect("Failed to create tenant");
+    tenant_repo
+        .create(&tenant)
+        .await
+        .expect("Failed to create tenant");
 
     // Create multiple audit logs
     for _ in 0..5 {
         let log = AuditLog::new(tenant.id, None, AuditAction::Created, ResourceType::Project);
-        audit_repo.create(&log).await.expect("Failed to create audit log");
+        audit_repo
+            .create(&log)
+            .await
+            .expect("Failed to create audit log");
     }
 
     let logs = audit_repo
@@ -127,10 +149,16 @@ async fn test_find_audit_logs_with_action_filter() {
     let audit_repo = PgAuditLogRepository::new(db.pool.clone());
 
     let tenant = create_test_tenant();
-    tenant_repo.create(&tenant).await.expect("Failed to create tenant");
+    tenant_repo
+        .create(&tenant)
+        .await
+        .expect("Failed to create tenant");
 
     let user = create_test_user(tenant.id);
-    user_repo.create(&user).await.expect("Failed to create user");
+    user_repo
+        .create(&user)
+        .await
+        .expect("Failed to create user");
 
     // Create different types of audit logs
     audit_repo
@@ -138,11 +166,21 @@ async fn test_find_audit_logs_with_action_filter() {
         .await
         .unwrap();
     audit_repo
-        .create(&AuditLog::new(tenant.id, Some(user.id), AuditAction::Created, ResourceType::Project))
+        .create(&AuditLog::new(
+            tenant.id,
+            Some(user.id),
+            AuditAction::Created,
+            ResourceType::Project,
+        ))
         .await
         .unwrap();
     audit_repo
-        .create(&AuditLog::new(tenant.id, Some(user.id), AuditAction::Updated, ResourceType::Project))
+        .create(&AuditLog::new(
+            tenant.id,
+            Some(user.id),
+            AuditAction::Updated,
+            ResourceType::Project,
+        ))
         .await
         .unwrap();
 
@@ -169,7 +207,10 @@ async fn test_find_audit_logs_with_user_filter() {
     let audit_repo = PgAuditLogRepository::new(db.pool.clone());
 
     let tenant = create_test_tenant();
-    tenant_repo.create(&tenant).await.expect("Failed to create tenant");
+    tenant_repo
+        .create(&tenant)
+        .await
+        .expect("Failed to create tenant");
 
     let user1 = create_test_user(tenant.id);
     let user2 = create_test_user(tenant.id);
@@ -214,19 +255,37 @@ async fn test_find_audit_logs_with_resource_type_filter() {
     let audit_repo = PgAuditLogRepository::new(db.pool.clone());
 
     let tenant = create_test_tenant();
-    tenant_repo.create(&tenant).await.expect("Failed to create tenant");
+    tenant_repo
+        .create(&tenant)
+        .await
+        .expect("Failed to create tenant");
 
     // Create logs for different resource types
     audit_repo
-        .create(&AuditLog::new(tenant.id, None, AuditAction::Created, ResourceType::Project))
+        .create(&AuditLog::new(
+            tenant.id,
+            None,
+            AuditAction::Created,
+            ResourceType::Project,
+        ))
         .await
         .unwrap();
     audit_repo
-        .create(&AuditLog::new(tenant.id, None, AuditAction::Created, ResourceType::Policy))
+        .create(&AuditLog::new(
+            tenant.id,
+            None,
+            AuditAction::Created,
+            ResourceType::Policy,
+        ))
         .await
         .unwrap();
     audit_repo
-        .create(&AuditLog::new(tenant.id, None, AuditAction::Created, ResourceType::Project))
+        .create(&AuditLog::new(
+            tenant.id,
+            None,
+            AuditAction::Created,
+            ResourceType::Project,
+        ))
         .await
         .unwrap();
 
@@ -251,7 +310,10 @@ async fn test_audit_log_pagination() {
     let audit_repo = PgAuditLogRepository::new(db.pool.clone());
 
     let tenant = create_test_tenant();
-    tenant_repo.create(&tenant).await.expect("Failed to create tenant");
+    tenant_repo
+        .create(&tenant)
+        .await
+        .expect("Failed to create tenant");
 
     // Create 10 audit logs
     for _ in 0..10 {
@@ -290,7 +352,10 @@ async fn test_count_by_tenant() {
     let audit_repo = PgAuditLogRepository::new(db.pool.clone());
 
     let tenant = create_test_tenant();
-    tenant_repo.create(&tenant).await.expect("Failed to create tenant");
+    tenant_repo
+        .create(&tenant)
+        .await
+        .expect("Failed to create tenant");
 
     // Initially zero
     let count = audit_repo
@@ -319,7 +384,10 @@ async fn test_cleanup_old_logs() {
     let audit_repo = PgAuditLogRepository::new(db.pool.clone());
 
     let tenant = create_test_tenant();
-    tenant_repo.create(&tenant).await.expect("Failed to create tenant");
+    tenant_repo
+        .create(&tenant)
+        .await
+        .expect("Failed to create tenant");
 
     // Create a log
     let log = AuditLog::new(tenant.id, None, AuditAction::Created, ResourceType::Project);
@@ -343,10 +411,16 @@ async fn test_audit_log_with_details() {
     let audit_repo = PgAuditLogRepository::new(db.pool.clone());
 
     let tenant = create_test_tenant();
-    tenant_repo.create(&tenant).await.expect("Failed to create tenant");
+    tenant_repo
+        .create(&tenant)
+        .await
+        .expect("Failed to create tenant");
 
     let user = create_test_user(tenant.id);
-    user_repo.create(&user).await.expect("Failed to create user");
+    user_repo
+        .create(&user)
+        .await
+        .expect("Failed to create user");
 
     let resource_id = uuid::Uuid::new_v4();
     let changes = serde_json::json!({
@@ -355,8 +429,17 @@ async fn test_audit_log_with_details() {
         "new_value": "New Name"
     });
 
-    let audit_log = AuditLog::updated(tenant.id, user.id, ResourceType::Project, resource_id, changes.clone());
-    audit_repo.create(&audit_log).await.expect("Failed to create audit log");
+    let audit_log = AuditLog::updated(
+        tenant.id,
+        user.id,
+        ResourceType::Project,
+        resource_id,
+        changes.clone(),
+    );
+    audit_repo
+        .create(&audit_log)
+        .await
+        .expect("Failed to create audit log");
 
     let found = audit_repo
         .find_by_id(audit_log.id)

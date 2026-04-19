@@ -38,8 +38,8 @@ use sctv_core::{Dependency, Project};
 use thiserror::Error;
 
 pub use common::{
-    ExternalReference, ExternalReferenceType, GeneratorConfig, Hash, HashAlgorithm,
-    LicenseChoice, LicenseExpression, OrganizationalContact, OrganizationalEntity,
+    ExternalReference, ExternalReferenceType, GeneratorConfig, Hash, HashAlgorithm, LicenseChoice,
+    LicenseExpression, OrganizationalContact, OrganizationalEntity,
 };
 pub use cyclonedx::CycloneDxGenerator;
 pub use spdx::SpdxGenerator;

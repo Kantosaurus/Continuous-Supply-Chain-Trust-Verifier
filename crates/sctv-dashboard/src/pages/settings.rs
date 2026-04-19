@@ -6,8 +6,8 @@
 use leptos::prelude::*;
 
 use crate::components::{
-    Button, ButtonVariant, Checkbox, Divider, FieldGroup, FormActions, PageHeader,
-    Section, Select, TabNav, TextInput, Textarea, Toggle,
+    Button, ButtonVariant, Checkbox, Divider, FieldGroup, FormActions, PageHeader, Section, Select,
+    TabNav, TextInput, Textarea, Toggle,
 };
 
 /// Application settings page.

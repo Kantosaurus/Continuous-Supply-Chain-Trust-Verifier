@@ -7,8 +7,8 @@ use async_trait::async_trait;
 use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use sctv_core::{
-    Alert, AlertType, Dependency, PackageEcosystem, TyposquattingDetails, TyposquattingMethod,
-    normalize_package_name,
+    normalize_package_name, Alert, AlertType, Dependency, PackageEcosystem, TyposquattingDetails,
+    TyposquattingMethod,
 };
 use serde::Serialize;
 use std::collections::HashMap;
@@ -64,11 +64,38 @@ impl PopularPackagesStore {
         packages.insert(
             PackageEcosystem::Npm,
             vec![
-                "lodash", "chalk", "react", "express", "axios", "moment", "uuid",
-                "commander", "debug", "fs-extra", "async", "request", "underscore",
-                "bluebird", "webpack", "typescript", "jest", "mocha", "eslint",
-                "prettier", "next", "vue", "angular", "rxjs", "ramda", "inquirer",
-                "yargs", "glob", "minimist", "semver", "dotenv", "cross-env",
+                "lodash",
+                "chalk",
+                "react",
+                "express",
+                "axios",
+                "moment",
+                "uuid",
+                "commander",
+                "debug",
+                "fs-extra",
+                "async",
+                "request",
+                "underscore",
+                "bluebird",
+                "webpack",
+                "typescript",
+                "jest",
+                "mocha",
+                "eslint",
+                "prettier",
+                "next",
+                "vue",
+                "angular",
+                "rxjs",
+                "ramda",
+                "inquirer",
+                "yargs",
+                "glob",
+                "minimist",
+                "semver",
+                "dotenv",
+                "cross-env",
             ]
             .into_iter()
             .map(String::from)
@@ -79,10 +106,31 @@ impl PopularPackagesStore {
         packages.insert(
             PackageEcosystem::PyPi,
             vec![
-                "requests", "numpy", "pandas", "boto3", "django", "flask", "pytest",
-                "pyyaml", "cryptography", "pillow", "setuptools", "pip", "wheel",
-                "urllib3", "certifi", "idna", "chardet", "six", "python-dateutil",
-                "pytz", "packaging", "attrs", "click", "jinja2", "markupsafe",
+                "requests",
+                "numpy",
+                "pandas",
+                "boto3",
+                "django",
+                "flask",
+                "pytest",
+                "pyyaml",
+                "cryptography",
+                "pillow",
+                "setuptools",
+                "pip",
+                "wheel",
+                "urllib3",
+                "certifi",
+                "idna",
+                "chardet",
+                "six",
+                "python-dateutil",
+                "pytz",
+                "packaging",
+                "attrs",
+                "click",
+                "jinja2",
+                "markupsafe",
             ]
             .into_iter()
             .map(String::from)
@@ -93,9 +141,26 @@ impl PopularPackagesStore {
         packages.insert(
             PackageEcosystem::Cargo,
             vec![
-                "serde", "tokio", "rand", "clap", "log", "regex", "chrono", "reqwest",
-                "futures", "hyper", "lazy_static", "serde_json", "thiserror", "anyhow",
-                "tracing", "bytes", "syn", "quote", "proc-macro2", "itertools",
+                "serde",
+                "tokio",
+                "rand",
+                "clap",
+                "log",
+                "regex",
+                "chrono",
+                "reqwest",
+                "futures",
+                "hyper",
+                "lazy_static",
+                "serde_json",
+                "thiserror",
+                "anyhow",
+                "tracing",
+                "bytes",
+                "syn",
+                "quote",
+                "proc-macro2",
+                "itertools",
             ]
             .into_iter()
             .map(String::from)
@@ -196,7 +261,8 @@ impl TyposquattingDetector {
             if distance > 0 && distance <= self.config.levenshtein_threshold {
                 let max_len = normalized.len().max(popular_normalized.len());
                 let similarity = 1.0 - (distance as f64 / max_len as f64);
-                let confidence = self.calculate_confidence(distance, &normalized, &popular_normalized);
+                let confidence =
+                    self.calculate_confidence(distance, &normalized, &popular_normalized);
 
                 candidates.push(TyposquatCandidate {
                     suspicious_name: name.to_string(),
@@ -245,12 +311,7 @@ impl TyposquattingDetector {
     }
 
     /// Calculates confidence based on edit distance and name characteristics.
-    fn calculate_confidence(
-        &self,
-        distance: usize,
-        suspicious: &str,
-        popular: &str,
-    ) -> Confidence {
+    fn calculate_confidence(&self, distance: usize, suspicious: &str, popular: &str) -> Confidence {
         // Single character difference is very suspicious
         if distance == 1 {
             // Check if it's a common typo pattern

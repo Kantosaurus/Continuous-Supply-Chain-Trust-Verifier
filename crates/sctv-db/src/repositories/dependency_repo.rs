@@ -4,8 +4,8 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sctv_core::traits::{DependencyRepository, RepositoryError, RepositoryResult};
 use sctv_core::{
-    Dependency, DependencyId, DependencyIntegrity, PackageEcosystem, ProjectId,
-    ProvenanceDetails, ProvenanceStatus, SignatureStatus, TenantId,
+    Dependency, DependencyId, DependencyIntegrity, PackageEcosystem, ProjectId, ProvenanceDetails,
+    ProvenanceStatus, SignatureStatus, TenantId,
 };
 use semver::Version;
 use sqlx::{PgPool, Row};
@@ -42,9 +42,9 @@ impl PgDependencyRepository {
         let first_seen_at: DateTime<Utc> = row.get("first_seen_at");
         let last_verified_at: DateTime<Utc> = row.get("last_verified_at");
 
-        let ecosystem: PackageEcosystem = ecosystem
-            .parse()
-            .map_err(|_| RepositoryError::InvalidData(format!("Invalid ecosystem: {}", ecosystem)))?;
+        let ecosystem: PackageEcosystem = ecosystem.parse().map_err(|_| {
+            RepositoryError::InvalidData(format!("Invalid ecosystem: {}", ecosystem))
+        })?;
 
         let resolved_version = Version::parse(&resolved_version)
             .map_err(|e| RepositoryError::InvalidData(format!("Invalid version: {}", e)))?;
@@ -65,8 +65,8 @@ impl PgDependencyRepository {
             _ => ProvenanceStatus::Unknown,
         };
 
-        let provenance_details: Option<ProvenanceDetails> = provenance_details
-            .and_then(|v| serde_json::from_value(v).ok());
+        let provenance_details: Option<ProvenanceDetails> =
+            provenance_details.and_then(|v| serde_json::from_value(v).ok());
 
         let integrity = DependencyIntegrity {
             hash_sha256,
@@ -241,7 +241,10 @@ impl DependencyRepository for PgDependencyRepository {
         }
 
         // Use a transaction for batch insert
-        let mut tx = self.pool.begin().await
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
         for dependency in dependencies {
@@ -298,7 +301,8 @@ impl DependencyRepository for PgDependencyRepository {
             .map_err(|e| RepositoryError::Database(e.to_string()))?;
         }
 
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
         Ok(())
@@ -339,8 +343,12 @@ impl DependencyRepository for PgDependencyRepository {
         .bind(dependency.parent_id.map(|p| p.0))
         .bind(&dependency.integrity.hash_sha256)
         .bind(&dependency.integrity.hash_sha512)
-        .bind(Self::signature_status_to_str(dependency.integrity.signature_status))
-        .bind(Self::provenance_status_to_str(dependency.integrity.provenance_status))
+        .bind(Self::signature_status_to_str(
+            dependency.integrity.signature_status,
+        ))
+        .bind(Self::provenance_status_to_str(
+            dependency.integrity.provenance_status,
+        ))
         .bind(provenance_details)
         .bind(dependency.last_verified_at)
         .execute(&self.pool)

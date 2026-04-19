@@ -194,7 +194,8 @@ impl DowngradeDetector {
         };
 
         // Update history with current version
-        self.history_store.record_version(&key, &dependency.resolved_version);
+        self.history_store
+            .record_version(&key, &dependency.resolved_version);
 
         // Enhance result with additional analysis
         self.enhance_result(result, dependency)
@@ -277,10 +278,8 @@ impl DowngradeDetector {
                 let version_gap = self.calculate_version_gap(&prev, &dependency.resolved_version);
                 if version_gap > 5 {
                     result.is_suspicious = true;
-                    result.suspicious_reason = Some(format!(
-                        "Large version gap of {} versions",
-                        version_gap
-                    ));
+                    result.suspicious_reason =
+                        Some(format!("Large version gap of {} versions", version_gap));
                 }
 
                 // Suspicious: Downgrade crosses a major security release boundary
@@ -371,7 +370,9 @@ impl Detector for DowngradeDetector {
                     ecosystem: dependency.ecosystem,
                     previous_version: previous.clone(),
                     current_version: dependency.resolved_version.clone(),
-                    lock_file_version: analysis.lock_file_version.and_then(|v| Version::parse(&v).ok()),
+                    lock_file_version: analysis
+                        .lock_file_version
+                        .and_then(|v| Version::parse(&v).ok()),
                 };
 
                 let severity_text = match analysis.severity {
@@ -655,9 +656,18 @@ mod tests {
 
     #[test]
     fn test_severity_conversion() {
-        assert_eq!(DowngradeSeverity::Major.to_alert_severity(), Severity::Critical);
+        assert_eq!(
+            DowngradeSeverity::Major.to_alert_severity(),
+            Severity::Critical
+        );
         assert_eq!(DowngradeSeverity::Minor.to_alert_severity(), Severity::High);
-        assert_eq!(DowngradeSeverity::Patch.to_alert_severity(), Severity::Medium);
-        assert_eq!(DowngradeSeverity::Prerelease.to_alert_severity(), Severity::Low);
+        assert_eq!(
+            DowngradeSeverity::Patch.to_alert_severity(),
+            Severity::Medium
+        );
+        assert_eq!(
+            DowngradeSeverity::Prerelease.to_alert_severity(),
+            Severity::Low
+        );
     }
 }

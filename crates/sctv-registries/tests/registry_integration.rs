@@ -179,7 +179,9 @@ mod npm_client {
         let cache = Arc::new(RegistryCache::new());
         let client = NpmClient::with_config(&server.uri(), cache);
 
-        let result = client.package_exists("fake-package-that-does-not-exist").await;
+        let result = client
+            .package_exists("fake-package-that-does-not-exist")
+            .await;
 
         assert!(result.is_ok());
         assert!(!result.unwrap());
@@ -371,9 +373,7 @@ mod npm_client {
 
         Mock::given(method("GET"))
             .and(path("/malformed-pkg"))
-            .respond_with(
-                ResponseTemplate::new(200).set_body_string("this is not valid json {{{"),
-            )
+            .respond_with(ResponseTemplate::new(200).set_body_string("this is not valid json {{{"))
             .mount(&server)
             .await;
 
@@ -682,7 +682,10 @@ mod concurrent_tests {
         // Due to caching, we might have fewer actual HTTP requests
         // (first request caches, subsequent ones use cache)
         let actual_requests = request_count.load(Ordering::SeqCst);
-        assert!(actual_requests >= 1, "At least one HTTP request should be made");
+        assert!(
+            actual_requests >= 1,
+            "At least one HTTP request should be made"
+        );
     }
 
     /// Test concurrent requests to different packages.

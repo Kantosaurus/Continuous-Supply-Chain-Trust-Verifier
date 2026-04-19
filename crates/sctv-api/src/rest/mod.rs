@@ -21,11 +21,17 @@ pub fn routes(_state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/projects/{id}", put(handlers::update_project))
         .route("/projects/{id}", delete(handlers::delete_project))
         .route("/projects/{id}/scan", post(handlers::trigger_scan))
-        .route("/projects/{id}/dependencies", get(handlers::list_project_dependencies))
+        .route(
+            "/projects/{id}/dependencies",
+            get(handlers::list_project_dependencies),
+        )
         // Alerts
         .route("/alerts", get(handlers::list_alerts))
         .route("/alerts/{id}", get(handlers::get_alert))
-        .route("/alerts/{id}/acknowledge", post(handlers::acknowledge_alert))
+        .route(
+            "/alerts/{id}/acknowledge",
+            post(handlers::acknowledge_alert),
+        )
         .route("/alerts/{id}/resolve", post(handlers::resolve_alert))
         .route("/alerts/{id}/suppress", post(handlers::suppress_alert))
         // Policies
@@ -36,7 +42,10 @@ pub fn routes(_state: Arc<AppState>) -> Router<Arc<AppState>> {
         .route("/policies/{id}", delete(handlers::delete_policy))
         // Dependencies
         .route("/dependencies/{id}", get(handlers::get_dependency))
-        .route("/dependencies/{id}/verify", post(handlers::verify_dependency))
+        .route(
+            "/dependencies/{id}/verify",
+            post(handlers::verify_dependency),
+        )
         // Scans
         .route("/scans", get(handlers::list_scans))
         .route("/scans/{id}", get(handlers::get_scan))

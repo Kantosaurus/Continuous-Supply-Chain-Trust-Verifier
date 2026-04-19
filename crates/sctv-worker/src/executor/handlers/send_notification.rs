@@ -133,9 +133,7 @@ impl SendNotificationExecutor {
     ) -> WorkerResult<serde_json::Value> {
         // Parse email configuration from channel_config
         let config: EmailConfig = serde_json::from_value(payload.channel_config.clone())
-            .map_err(|e| {
-                WorkerError::Notification(format!("Invalid email configuration: {e}"))
-            })?;
+            .map_err(|e| WorkerError::Notification(format!("Invalid email configuration: {e}")))?;
 
         // Ensure the channel is enabled for this send
         let config = EmailConfig {
@@ -150,9 +148,10 @@ impl SendNotificationExecutor {
             WorkerError::Notification(format!("Email configuration validation failed: {e}"))
         })?;
 
-        let result = channel.send(notification).await.map_err(|e| {
-            WorkerError::Notification(format!("Email delivery failed: {e}"))
-        })?;
+        let result = channel
+            .send(notification)
+            .await
+            .map_err(|e| WorkerError::Notification(format!("Email delivery failed: {e}")))?;
 
         if result.success {
             Ok(serde_json::json!({
@@ -163,7 +162,9 @@ impl SendNotificationExecutor {
             }))
         } else {
             Err(WorkerError::Notification(
-                result.error.unwrap_or_else(|| "Unknown email error".to_string()),
+                result
+                    .error
+                    .unwrap_or_else(|| "Unknown email error".to_string()),
             ))
         }
     }
@@ -176,9 +177,7 @@ impl SendNotificationExecutor {
     ) -> WorkerResult<serde_json::Value> {
         // Parse Slack configuration
         let config: SlackConfig = serde_json::from_value(payload.channel_config.clone())
-            .map_err(|e| {
-                WorkerError::Notification(format!("Invalid Slack configuration: {e}"))
-            })?;
+            .map_err(|e| WorkerError::Notification(format!("Invalid Slack configuration: {e}")))?;
 
         let config = SlackConfig {
             enabled: true,
@@ -191,9 +190,10 @@ impl SendNotificationExecutor {
             WorkerError::Notification(format!("Slack configuration validation failed: {e}"))
         })?;
 
-        let result = channel.send(notification).await.map_err(|e| {
-            WorkerError::Notification(format!("Slack delivery failed: {e}"))
-        })?;
+        let result = channel
+            .send(notification)
+            .await
+            .map_err(|e| WorkerError::Notification(format!("Slack delivery failed: {e}")))?;
 
         if result.success {
             Ok(serde_json::json!({
@@ -204,7 +204,9 @@ impl SendNotificationExecutor {
             }))
         } else {
             Err(WorkerError::Notification(
-                result.error.unwrap_or_else(|| "Unknown Slack error".to_string()),
+                result
+                    .error
+                    .unwrap_or_else(|| "Unknown Slack error".to_string()),
             ))
         }
     }
@@ -217,9 +219,7 @@ impl SendNotificationExecutor {
     ) -> WorkerResult<serde_json::Value> {
         // Parse Teams configuration
         let config: TeamsConfig = serde_json::from_value(payload.channel_config.clone())
-            .map_err(|e| {
-                WorkerError::Notification(format!("Invalid Teams configuration: {e}"))
-            })?;
+            .map_err(|e| WorkerError::Notification(format!("Invalid Teams configuration: {e}")))?;
 
         let config = TeamsConfig {
             enabled: true,
@@ -232,9 +232,10 @@ impl SendNotificationExecutor {
             WorkerError::Notification(format!("Teams configuration validation failed: {e}"))
         })?;
 
-        let result = channel.send(notification).await.map_err(|e| {
-            WorkerError::Notification(format!("Teams delivery failed: {e}"))
-        })?;
+        let result = channel
+            .send(notification)
+            .await
+            .map_err(|e| WorkerError::Notification(format!("Teams delivery failed: {e}")))?;
 
         if result.success {
             Ok(serde_json::json!({
@@ -245,7 +246,9 @@ impl SendNotificationExecutor {
             }))
         } else {
             Err(WorkerError::Notification(
-                result.error.unwrap_or_else(|| "Unknown Teams error".to_string()),
+                result
+                    .error
+                    .unwrap_or_else(|| "Unknown Teams error".to_string()),
             ))
         }
     }
@@ -273,9 +276,10 @@ impl SendNotificationExecutor {
             WorkerError::Notification(format!("PagerDuty configuration validation failed: {e}"))
         })?;
 
-        let result = channel.send(notification).await.map_err(|e| {
-            WorkerError::Notification(format!("PagerDuty delivery failed: {e}"))
-        })?;
+        let result = channel
+            .send(notification)
+            .await
+            .map_err(|e| WorkerError::Notification(format!("PagerDuty delivery failed: {e}")))?;
 
         if result.success {
             Ok(serde_json::json!({
@@ -286,7 +290,9 @@ impl SendNotificationExecutor {
             }))
         } else {
             Err(WorkerError::Notification(
-                result.error.unwrap_or_else(|| "Unknown PagerDuty error".to_string()),
+                result
+                    .error
+                    .unwrap_or_else(|| "Unknown PagerDuty error".to_string()),
             ))
         }
     }
@@ -314,9 +320,10 @@ impl SendNotificationExecutor {
             WorkerError::Notification(format!("Webhook configuration validation failed: {e}"))
         })?;
 
-        let result = channel.send(notification).await.map_err(|e| {
-            WorkerError::Notification(format!("Webhook delivery failed: {e}"))
-        })?;
+        let result = channel
+            .send(notification)
+            .await
+            .map_err(|e| WorkerError::Notification(format!("Webhook delivery failed: {e}")))?;
 
         if result.success {
             Ok(serde_json::json!({
@@ -327,7 +334,9 @@ impl SendNotificationExecutor {
             }))
         } else {
             Err(WorkerError::Notification(
-                result.error.unwrap_or_else(|| "Unknown webhook error".to_string()),
+                result
+                    .error
+                    .unwrap_or_else(|| "Unknown webhook error".to_string()),
             ))
         }
     }

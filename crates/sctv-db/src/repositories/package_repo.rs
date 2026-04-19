@@ -34,9 +34,9 @@ impl PgPackageRepository {
         let last_updated: Option<DateTime<Utc>> = row.get("last_updated");
         let cached_at: DateTime<Utc> = row.get("cached_at");
 
-        let ecosystem: PackageEcosystem = ecosystem
-            .parse()
-            .map_err(|_| RepositoryError::InvalidData(format!("Invalid ecosystem: {}", ecosystem)))?;
+        let ecosystem: PackageEcosystem = ecosystem.parse().map_err(|_| {
+            RepositoryError::InvalidData(format!("Invalid ecosystem: {}", ecosystem))
+        })?;
 
         let homepage = homepage.and_then(|u| Url::parse(&u).ok());
         let repository = repository.and_then(|u| Url::parse(&u).ok());
@@ -266,11 +266,13 @@ impl PgPackageVersionRepository {
 
                 let download_url = download_url.and_then(|u| Url::parse(&u).ok());
 
-                let attestations: Vec<sctv_core::Attestation> = serde_json::from_value(attestations)
-                    .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
+                let attestations: Vec<sctv_core::Attestation> =
+                    serde_json::from_value(attestations)
+                        .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
-                let dependencies: Vec<sctv_core::PackageDependency> = serde_json::from_value(dependencies)
-                    .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
+                let dependencies: Vec<sctv_core::PackageDependency> =
+                    serde_json::from_value(dependencies)
+                        .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
                 Ok(Some(sctv_core::PackageVersion {
                     package_id: PackageId(package_id),
@@ -381,11 +383,13 @@ impl PgPackageVersionRepository {
 
                 let download_url = download_url.and_then(|u| Url::parse(&u).ok());
 
-                let attestations: Vec<sctv_core::Attestation> = serde_json::from_value(attestations)
-                    .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
+                let attestations: Vec<sctv_core::Attestation> =
+                    serde_json::from_value(attestations)
+                        .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
-                let dependencies: Vec<sctv_core::PackageDependency> = serde_json::from_value(dependencies)
-                    .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
+                let dependencies: Vec<sctv_core::PackageDependency> =
+                    serde_json::from_value(dependencies)
+                        .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
                 versions.push(sctv_core::PackageVersion {
                     package_id: PackageId(package_id),

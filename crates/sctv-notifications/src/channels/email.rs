@@ -158,9 +158,7 @@ impl EmailChannel {
     }
 
     /// Creates the SMTP transport.
-    fn create_transport(
-        &self,
-    ) -> NotificationResult<AsyncSmtpTransport<Tokio1Executor>> {
+    fn create_transport(&self) -> NotificationResult<AsyncSmtpTransport<Tokio1Executor>> {
         let creds = Credentials::new(
             self.config.smtp_username.clone(),
             self.config.smtp_password.clone(),
@@ -184,26 +182,27 @@ impl EmailChannel {
 
     /// Builds the email message.
     fn build_message(&self, notification: &Notification) -> NotificationResult<Message> {
-        let from_mailbox: Mailbox = format!(
-            "{} <{}>",
-            self.config.from_name, self.config.from_address
-        )
-        .parse()
-        .map_err(|e: lettre::address::AddressError| {
-            NotificationError::InvalidConfig(format!("Invalid from address: {e}"))
-        })?;
+        let from_mailbox: Mailbox =
+            format!("{} <{}>", self.config.from_name, self.config.from_address)
+                .parse()
+                .map_err(|e: lettre::address::AddressError| {
+                    NotificationError::InvalidConfig(format!("Invalid from address: {e}"))
+                })?;
 
-        let mut builder = Message::builder()
-            .from(from_mailbox)
-            .subject(format!(
-                "[{}] {}",
-                notification.severity, notification.title
-            ));
+        let mut builder = Message::builder().from(from_mailbox).subject(format!(
+            "[{}] {}",
+            notification.severity, notification.title
+        ));
 
         for to_addr in &self.config.to_addresses {
-            let to_mailbox: Mailbox = to_addr.parse().map_err(|e: lettre::address::AddressError| {
-                NotificationError::InvalidConfig(format!("Invalid to address {to_addr}: {e}"))
-            })?;
+            let to_mailbox: Mailbox =
+                to_addr
+                    .parse()
+                    .map_err(|e: lettre::address::AddressError| {
+                        NotificationError::InvalidConfig(format!(
+                            "Invalid to address {to_addr}: {e}"
+                        ))
+                    })?;
             builder = builder.to(to_mailbox);
         }
 
@@ -327,14 +326,11 @@ impl NotificationChannel for EmailChannel {
         }
 
         // Validate the from address format
-        let _: Mailbox = format!(
-            "{} <{}>",
-            self.config.from_name, self.config.from_address
-        )
-        .parse()
-        .map_err(|e: lettre::address::AddressError| {
-            NotificationError::InvalidConfig(format!("Invalid from address: {e}"))
-        })?;
+        let _: Mailbox = format!("{} <{}>", self.config.from_name, self.config.from_address)
+            .parse()
+            .map_err(|e: lettre::address::AddressError| {
+                NotificationError::InvalidConfig(format!("Invalid from address: {e}"))
+            })?;
 
         // Validate all to addresses
         for addr in &self.config.to_addresses {

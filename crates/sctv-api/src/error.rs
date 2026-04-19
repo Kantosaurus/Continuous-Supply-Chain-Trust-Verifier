@@ -116,7 +116,9 @@ impl From<sctv_core::traits::RepositoryError> for ApiError {
             RepositoryError::NotFound => Self::NotFound("Resource not found".to_string()),
             RepositoryError::AlreadyExists => Self::Conflict("Resource already exists".to_string()),
             RepositoryError::Database(msg) => Self::Database(msg),
-            RepositoryError::Serialization(msg) => Self::Internal(format!("Serialization error: {}", msg)),
+            RepositoryError::Serialization(msg) => {
+                Self::Internal(format!("Serialization error: {}", msg))
+            }
             RepositoryError::InvalidData(msg) => Self::Validation(msg),
         }
     }

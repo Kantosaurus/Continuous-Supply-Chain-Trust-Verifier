@@ -62,8 +62,8 @@ impl PgAlertRepository {
         // Parse alert type from type string and details JSON
         let alert_type = Self::parse_alert_type(&alert_type_str, alert_details)?;
 
-        let remediation: Option<Remediation> = remediation_json
-            .and_then(|v| serde_json::from_value(v).ok());
+        let remediation: Option<Remediation> =
+            remediation_json.and_then(|v| serde_json::from_value(v).ok());
 
         let metadata: AlertMetadata = serde_json::from_value(metadata_json)
             .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
@@ -88,10 +88,7 @@ impl PgAlertRepository {
         })
     }
 
-    fn parse_alert_type(
-        type_str: &str,
-        details: serde_json::Value,
-    ) -> RepositoryResult<AlertType> {
+    fn parse_alert_type(type_str: &str, details: serde_json::Value) -> RepositoryResult<AlertType> {
         match type_str {
             "dependency_tampering" => {
                 let details = serde_json::from_value(details)

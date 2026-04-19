@@ -53,14 +53,9 @@ pub enum JobType {
         channel_type: String,
     },
     /// Generate an SBOM for a project.
-    GenerateSbom {
-        project_id: Uuid,
-        format: String,
-    },
+    GenerateSbom { project_id: Uuid, format: String },
     /// Cleanup old scan data.
-    Cleanup {
-        older_than_days: u32,
-    },
+    Cleanup { older_than_days: u32 },
 }
 
 impl JobType {

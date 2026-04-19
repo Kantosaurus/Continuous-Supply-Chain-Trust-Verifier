@@ -149,7 +149,9 @@ pub fn EcosystemBadge(#[prop(into)] ecosystem: String) -> impl IntoView {
 /// SLSA level indicator.
 #[component]
 pub fn SlsaLevel(#[prop(into)] level: Option<u8>) -> impl IntoView {
-    let display = level.map(|l| format!("L{}", l)).unwrap_or_else(|| "—".to_string());
+    let display = level
+        .map(|l| format!("L{}", l))
+        .unwrap_or_else(|| "—".to_string());
     let status = match level {
         Some(3..=4) => StatusLevel::Success,
         Some(2) => StatusLevel::Info,
@@ -179,7 +181,11 @@ pub fn ActivityPulse(#[prop(optional)] active: bool) -> impl IntoView {
 /// Count badge for notifications/alerts.
 #[component]
 pub fn CountBadge(#[prop(into)] count: u32) -> impl IntoView {
-    let display = if count > 99 { "99+".to_string() } else { count.to_string() };
+    let display = if count > 99 {
+        "99+".to_string()
+    } else {
+        count.to_string()
+    };
     let visible = count > 0;
 
     view! {

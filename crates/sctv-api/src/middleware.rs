@@ -1,10 +1,6 @@
 //! Custom middleware for the API server.
 
-use axum::{
-    extract::Request,
-    middleware::Next,
-    response::Response,
-};
+use axum::{extract::Request, middleware::Next, response::Response};
 use std::time::Instant;
 
 /// Logging middleware that records request duration.
@@ -36,7 +32,9 @@ pub struct RateLimiter {
 
 impl RateLimiter {
     pub fn new(requests_per_minute: u32) -> Self {
-        Self { requests_per_minute }
+        Self {
+            requests_per_minute,
+        }
     }
 
     /// Checks if a request should be rate limited.

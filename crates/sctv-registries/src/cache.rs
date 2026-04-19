@@ -92,11 +92,7 @@ impl RegistryCache {
     }
 
     /// Gets a cached package if not expired.
-    pub fn get_package(
-        &self,
-        ecosystem: PackageEcosystem,
-        name: &str,
-    ) -> Option<PackageMetadata> {
+    pub fn get_package(&self, ecosystem: PackageEcosystem, name: &str) -> Option<PackageMetadata> {
         let key = PackageCacheKey {
             ecosystem,
             name: name.to_string(),
@@ -112,12 +108,7 @@ impl RegistryCache {
     }
 
     /// Caches package metadata.
-    pub fn set_package(
-        &self,
-        ecosystem: PackageEcosystem,
-        name: &str,
-        metadata: PackageMetadata,
-    ) {
+    pub fn set_package(&self, ecosystem: PackageEcosystem, name: &str, metadata: PackageMetadata) {
         let key = PackageCacheKey {
             ecosystem,
             name: name.to_string(),
@@ -174,7 +165,8 @@ impl RegistryCache {
         self.packages.remove(&key);
 
         // Also remove all version entries for this package
-        self.versions.retain(|k, _| !(k.ecosystem == ecosystem && k.name == name));
+        self.versions
+            .retain(|k, _| !(k.ecosystem == ecosystem && k.name == name));
     }
 
     /// Clears all expired entries.

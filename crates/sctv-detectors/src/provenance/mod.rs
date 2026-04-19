@@ -50,7 +50,8 @@ impl Default for ProvenanceConfig {
     fn default() -> Self {
         let mut trusted_builders = HashSet::new();
         // GitHub Actions builders
-        trusted_builders.insert("https://github.com/slsa-framework/slsa-github-generator".to_string());
+        trusted_builders
+            .insert("https://github.com/slsa-framework/slsa-github-generator".to_string());
         trusted_builders.insert("https://github.com/actions/runner".to_string());
         // npm provenance builders
         trusted_builders.insert("https://github.com/npm/cli".to_string());
@@ -140,7 +141,9 @@ impl ProvenanceVerificationResult {
             return config.allow_missing_provenance;
         }
 
-        let level_ok = self.slsa_level.map_or(false, |l| l >= config.minimum_slsa_level);
+        let level_ok = self
+            .slsa_level
+            .map_or(false, |l| l >= config.minimum_slsa_level);
         let sigstore_ok = !config.require_sigstore || self.sigstore_verified;
         let builder_ok = self.builder_trusted || config.trusted_builders.is_empty();
 
@@ -188,7 +191,11 @@ impl ProvenanceDetector {
         dependency: &Dependency,
     ) -> DetectorResult<ProvenanceVerificationResult> {
         // Check if ecosystem supports provenance
-        if !self.config.supported_ecosystems.contains(&dependency.ecosystem) {
+        if !self
+            .config
+            .supported_ecosystems
+            .contains(&dependency.ecosystem)
+        {
             return Ok(ProvenanceVerificationResult {
                 has_provenance: false,
                 slsa_level: None,
@@ -265,7 +272,10 @@ impl ProvenanceDetector {
 
         // Level 3: Rekor transparency log with inclusion proof
         if level >= 2
-            && result.rekor_entry.as_ref().map_or(false, |e| e.inclusion_verified)
+            && result
+                .rekor_entry
+                .as_ref()
+                .map_or(false, |e| e.inclusion_verified)
             && result.source_digest.is_some()
         {
             level = 3;
@@ -405,7 +415,9 @@ impl Detector for ProvenanceDetector {
 
                     Some(alert)
                 } else if result.method == "untrusted_builder" {
-                    let builder_id: Option<String> = result.details.get("builder_id")
+                    let builder_id: Option<String> = result
+                        .details
+                        .get("builder_id")
                         .and_then(|v| v.as_str())
                         .map(String::from);
 

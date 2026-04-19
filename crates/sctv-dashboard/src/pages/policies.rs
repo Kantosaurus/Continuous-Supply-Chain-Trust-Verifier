@@ -32,7 +32,8 @@ pub fn PoliciesPage() -> impl IntoView {
                 },
                 RuleData {
                     rule_type: "Block Typosquatting".to_string(),
-                    description: "Block packages with >85% similarity to popular packages".to_string(),
+                    description: "Block packages with >85% similarity to popular packages"
+                        .to_string(),
                     severity: "Critical".to_string(),
                     enabled: true,
                 },

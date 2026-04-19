@@ -512,7 +512,11 @@ pub fn generate_bom_ref(ecosystem: &str, name: &str, version: &str) -> String {
 
     let input = format!("{}:{}@{}", ecosystem, name, version);
     let hash = Sha256::digest(input.as_bytes());
-    format!("{}-{}", name.replace(['/', '@', '.'], "-"), &hex::encode(&hash[..8]))
+    format!(
+        "{}-{}",
+        name.replace(['/', '@', '.'], "-"),
+        &hex::encode(&hash[..8])
+    )
 }
 
 #[cfg(test)]

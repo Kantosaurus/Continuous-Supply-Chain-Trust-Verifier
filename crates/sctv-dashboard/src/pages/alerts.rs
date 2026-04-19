@@ -6,8 +6,8 @@
 use leptos::prelude::*;
 
 use crate::components::{
-    AlertCard, Button, ButtonVariant, FilterIcon, PageHeader, RefreshIcon, SearchInput,
-    Section, StatCard, StatusIndicator, StatusLevel, StatsRow, TabNav,
+    AlertCard, Button, ButtonVariant, FilterIcon, PageHeader, RefreshIcon, SearchInput, Section,
+    StatCard, StatsRow, StatusIndicator, StatusLevel, TabNav,
 };
 
 /// Alerts management and triage page.

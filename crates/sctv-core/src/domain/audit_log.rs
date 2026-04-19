@@ -233,8 +233,13 @@ impl AuditLog {
     /// Creates a login audit entry.
     #[must_use]
     pub fn login(tenant_id: TenantId, user_id: UserId) -> Self {
-        Self::new(tenant_id, Some(user_id), AuditAction::Login, ResourceType::User)
-            .with_resource_id(user_id.0)
+        Self::new(
+            tenant_id,
+            Some(user_id),
+            AuditAction::Login,
+            ResourceType::User,
+        )
+        .with_resource_id(user_id.0)
     }
 
     /// Creates a resource creation audit entry.
@@ -245,8 +250,13 @@ impl AuditLog {
         resource_type: ResourceType,
         resource_id: Uuid,
     ) -> Self {
-        Self::new(tenant_id, Some(user_id), AuditAction::Created, resource_type)
-            .with_resource_id(resource_id)
+        Self::new(
+            tenant_id,
+            Some(user_id),
+            AuditAction::Created,
+            resource_type,
+        )
+        .with_resource_id(resource_id)
     }
 
     /// Creates a resource update audit entry.
@@ -258,9 +268,14 @@ impl AuditLog {
         resource_id: Uuid,
         changes: serde_json::Value,
     ) -> Self {
-        Self::new(tenant_id, Some(user_id), AuditAction::Updated, resource_type)
-            .with_resource_id(resource_id)
-            .with_details(changes)
+        Self::new(
+            tenant_id,
+            Some(user_id),
+            AuditAction::Updated,
+            resource_type,
+        )
+        .with_resource_id(resource_id)
+        .with_details(changes)
     }
 
     /// Creates a resource deletion audit entry.
@@ -271,8 +286,13 @@ impl AuditLog {
         resource_type: ResourceType,
         resource_id: Uuid,
     ) -> Self {
-        Self::new(tenant_id, Some(user_id), AuditAction::Deleted, resource_type)
-            .with_resource_id(resource_id)
+        Self::new(
+            tenant_id,
+            Some(user_id),
+            AuditAction::Deleted,
+            resource_type,
+        )
+        .with_resource_id(resource_id)
     }
 }
 

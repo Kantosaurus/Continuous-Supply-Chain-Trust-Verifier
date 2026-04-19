@@ -8,8 +8,8 @@ use axum::{
 use chrono::Utc;
 use sctv_core::traits::AlertFilter;
 use sctv_core::{
-    Alert, AlertId, Dependency, DependencyId, Policy, PolicyId, PolicyRule,
-    Project, ProjectId, Severity,
+    Alert, AlertId, Dependency, DependencyId, Policy, PolicyId, PolicyRule, Project, ProjectId,
+    Severity,
 };
 use std::sync::Arc;
 use url::Url;
@@ -65,8 +65,13 @@ fn alert_to_response(alert: &Alert, project_name: Option<String>) -> AlertRespon
 fn extract_dependency_info(alert_type: &sctv_core::AlertType) -> (Option<String>, Option<String>) {
     use sctv_core::AlertType;
     match alert_type {
-        AlertType::DependencyTampering(d) => (Some(d.package_name.clone()), Some(d.version.clone())),
-        AlertType::DowngradeAttack(d) => (Some(d.package_name.clone()), Some(d.current_version.to_string())),
+        AlertType::DependencyTampering(d) => {
+            (Some(d.package_name.clone()), Some(d.version.clone()))
+        }
+        AlertType::DowngradeAttack(d) => (
+            Some(d.package_name.clone()),
+            Some(d.current_version.to_string()),
+        ),
         AlertType::Typosquatting(d) => (Some(d.suspicious_package.clone()), None),
         AlertType::ProvenanceFailure(d) => (Some(d.package_name.clone()), Some(d.version.clone())),
         AlertType::PolicyViolation(_) => (None, None),
@@ -136,10 +141,16 @@ fn rule_request_to_policy_rule(request: &PolicyRuleRequest) -> Result<PolicyRule
     // Merge type and config into a single JSON object for deserialization
     let mut json = request.config.clone();
     if let Some(obj) = json.as_object_mut() {
-        obj.insert("type".to_string(), serde_json::Value::String(request.rule_type.clone()));
+        obj.insert(
+            "type".to_string(),
+            serde_json::Value::String(request.rule_type.clone()),
+        );
     } else {
         let mut obj = serde_json::Map::new();
-        obj.insert("type".to_string(), serde_json::Value::String(request.rule_type.clone()));
+        obj.insert(
+            "type".to_string(),
+            serde_json::Value::String(request.rule_type.clone()),
+        );
         json = serde_json::Value::Object(obj);
     }
 
@@ -170,18 +181,18 @@ pub async fn list_projects(
     let limit = pagination.per_page as usize;
 
     // Paginate results
-    let paginated: Vec<_> = projects
-        .into_iter()
-        .skip(offset)
-        .take(limit)
-        .collect();
+    let paginated: Vec<_> = projects.into_iter().skip(offset).take(limit).collect();
 
     // Build responses with dependency and alert counts
     let mut responses = Vec::with_capacity(paginated.len());
     for project in paginated {
         let deps = dep_repo.find_by_project(project.id).await?;
         let alert_count = alert_repo.count_open_by_project(project.id).await?;
-        responses.push(project_to_response(&project, deps.len() as u32, alert_count));
+        responses.push(project_to_response(
+            &project,
+            deps.len() as u32,
+            alert_count,
+        ));
     }
 
     Ok(Json(PaginatedResponse {
@@ -242,7 +253,11 @@ pub async fn get_project(
     let deps = dep_repo.find_by_project(project.id).await?;
     let alert_count = alert_repo.count_open_by_project(project.id).await?;
 
-    Ok(Json(project_to_response(&project, deps.len() as u32, alert_count)))
+    Ok(Json(project_to_response(
+        &project,
+        deps.len() as u32,
+        alert_count,
+    )))
 }
 
 /// Update a project.
@@ -287,7 +302,11 @@ pub async fn update_project(
     let deps = dep_repo.find_by_project(project.id).await?;
     let alert_count = alert_repo.count_open_by_project(project.id).await?;
 
-    Ok(Json(project_to_response(&project, deps.len() as u32, alert_count)))
+    Ok(Json(project_to_response(
+        &project,
+        deps.len() as u32,
+        alert_count,
+    )))
 }
 
 /// Delete a project.
@@ -537,7 +556,9 @@ pub async fn resolve_alert(
     // Resolve the alert
     let remediation = sctv_core::Remediation {
         action_taken: request.action_taken,
-        new_version: request.new_version.and_then(|v| semver::Version::parse(&v).ok()),
+        new_version: request
+            .new_version
+            .and_then(|v| semver::Version::parse(&v).ok()),
         notes: request.notes,
     };
     alert.resolve(user.user_id, remediation);
@@ -703,10 +724,8 @@ pub async fn update_policy(
         policy.description = Some(desc);
     }
     if let Some(rules) = request.rules {
-        let converted_rules: Result<Vec<PolicyRule>, _> = rules
-            .iter()
-            .map(rule_request_to_policy_rule)
-            .collect();
+        let converted_rules: Result<Vec<PolicyRule>, _> =
+            rules.iter().map(rule_request_to_policy_rule).collect();
         policy.rules = converted_rules?;
     }
     if let Some(enabled) = request.is_enabled {
@@ -812,7 +831,10 @@ pub async fn verify_dependency(
 
     // Signature check
     use sctv_core::SignatureStatus;
-    let sig_passed = matches!(dependency.integrity.signature_status, SignatureStatus::Verified);
+    let sig_passed = matches!(
+        dependency.integrity.signature_status,
+        SignatureStatus::Verified
+    );
     checks.push(VerificationCheck {
         check_type: "signature".to_string(),
         passed: sig_passed,
@@ -821,7 +843,10 @@ pub async fn verify_dependency(
         message: if sig_passed {
             None
         } else {
-            Some(format!("Signature status: {:?}", dependency.integrity.signature_status))
+            Some(format!(
+                "Signature status: {:?}",
+                dependency.integrity.signature_status
+            ))
         },
     });
 
@@ -829,16 +854,17 @@ pub async fn verify_dependency(
     use sctv_core::ProvenanceStatus;
     let prov_passed = matches!(
         dependency.integrity.provenance_status,
-        ProvenanceStatus::SlsaLevel1
-            | ProvenanceStatus::SlsaLevel2
-            | ProvenanceStatus::SlsaLevel3
+        ProvenanceStatus::SlsaLevel1 | ProvenanceStatus::SlsaLevel2 | ProvenanceStatus::SlsaLevel3
     );
     checks.push(VerificationCheck {
         check_type: "provenance".to_string(),
         passed: prov_passed,
         expected: None,
         actual: None,
-        message: Some(format!("Provenance level: {:?}", dependency.integrity.provenance_status)),
+        message: Some(format!(
+            "Provenance level: {:?}",
+            dependency.integrity.provenance_status
+        )),
     });
 
     let is_valid = checks.iter().filter(|c| c.passed).count() >= 2;
@@ -975,7 +1001,11 @@ pub async fn github_webhook(
         received: true,
         message: "Webhook received successfully".to_string(),
         scan_triggered: should_scan,
-        scan_id: if should_scan { Some(Uuid::new_v4()) } else { None },
+        scan_id: if should_scan {
+            Some(Uuid::new_v4())
+        } else {
+            None
+        },
     }))
 }
 
@@ -992,6 +1022,10 @@ pub async fn gitlab_webhook(
         received: true,
         message: "Webhook received successfully".to_string(),
         scan_triggered: should_scan,
-        scan_id: if should_scan { Some(Uuid::new_v4()) } else { None },
+        scan_id: if should_scan {
+            Some(Uuid::new_v4())
+        } else {
+            None
+        },
     }))
 }

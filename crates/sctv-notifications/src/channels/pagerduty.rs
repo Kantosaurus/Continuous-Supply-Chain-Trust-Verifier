@@ -365,21 +365,14 @@ impl PagerDutyChannel {
             .as_deref()
             .unwrap_or(PAGERDUTY_EVENTS_API);
 
-        let response = self
-            .client
-            .post(api_url)
-            .json(&event)
-            .send()
-            .await?;
+        let response = self.client.post(api_url).json(&event).send().await?;
 
         let duration_ms = start.elapsed().as_millis() as u64;
         let status = response.status();
 
         if status.is_success() {
-            let pd_response: PagerDutyResponse = response
-                .json()
-                .await
-                .unwrap_or_else(|_| PagerDutyResponse {
+            let pd_response: PagerDutyResponse =
+                response.json().await.unwrap_or_else(|_| PagerDutyResponse {
                     status: "success".to_string(),
                     message: "Event accepted".to_string(),
                     dedup_key: None,
@@ -547,7 +540,10 @@ mod tests {
         assert_eq!(event.event_action, EventAction::Trigger);
         assert!(event.payload.summary.contains("Critical"));
         assert_eq!(event.payload.source, "sctv");
-        assert!(matches!(event.payload.severity, PagerDutySeverity::Critical));
+        assert!(matches!(
+            event.payload.severity,
+            PagerDutySeverity::Critical
+        ));
         assert!(!event.links.is_empty());
         assert!(event.payload.custom_details.contains_key("project"));
     }

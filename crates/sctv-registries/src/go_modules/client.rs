@@ -77,7 +77,10 @@ impl GoModulesClient {
 
         tracing::debug!("Fetching version list for {} from {}", module, url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND
             || response.status() == reqwest::StatusCode::GONE
@@ -116,9 +119,17 @@ impl GoModulesClient {
             .join(&format!("/{}/@v/{}.info", encoded, version))
             .map_err(|e| RegistryError::Parse(e.to_string()))?;
 
-        tracing::debug!("Fetching version info for {}@{} from {}", module, version, url);
+        tracing::debug!(
+            "Fetching version info for {}@{} from {}",
+            module,
+            version,
+            url
+        );
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND
             || response.status() == reqwest::StatusCode::GONE
@@ -152,7 +163,10 @@ impl GoModulesClient {
 
         tracing::debug!("Fetching go.mod for {}@{} from {}", module, version, url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND
             || response.status() == reqwest::StatusCode::GONE
@@ -330,7 +344,10 @@ impl RegistryClient for GoModulesClient {
 
     async fn get_version(&self, name: &str, version: &str) -> RegistryResult<VersionMetadata> {
         // Check cache first
-        if let Some(cached) = self.cache.get_version(PackageEcosystem::GoModules, name, version) {
+        if let Some(cached) = self
+            .cache
+            .get_version(PackageEcosystem::GoModules, name, version)
+        {
             tracing::debug!("Cache hit for {}@{}", name, version);
             return Ok(cached);
         }
@@ -424,7 +441,10 @@ impl RegistryClient for GoModulesClient {
 
         tracing::debug!("Downloading {}@{} from {}", name, version, url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND
             || response.status() == reqwest::StatusCode::GONE
@@ -551,8 +571,7 @@ mod tests {
         assert_eq!(url.as_str(), "https://github.com/gin-gonic/gin");
 
         // For versioned paths like /v2, we still get the full module path
-        let url =
-            GoModulesClient::infer_repository_url("github.com/gin-gonic/gin/v2").unwrap();
+        let url = GoModulesClient::infer_repository_url("github.com/gin-gonic/gin/v2").unwrap();
         assert_eq!(url.as_str(), "https://github.com/gin-gonic/gin/v2");
     }
 

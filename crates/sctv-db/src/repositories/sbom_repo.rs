@@ -28,9 +28,9 @@ impl PgSbomRepository {
         let generated_at: DateTime<Utc> = row.get("generated_at");
         let scan_id: Option<uuid::Uuid> = row.get("scan_id");
 
-        let format = format_str
-            .parse::<SbomFormat>()
-            .map_err(|_| RepositoryError::InvalidData(format!("Unknown SBOM format: {format_str}")))?;
+        let format = format_str.parse::<SbomFormat>().map_err(|_| {
+            RepositoryError::InvalidData(format!("Unknown SBOM format: {format_str}"))
+        })?;
 
         Ok(Sbom {
             id: SbomId(id),

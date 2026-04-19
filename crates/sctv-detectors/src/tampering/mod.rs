@@ -35,10 +35,7 @@ impl Default for TamperingConfig {
             PackageEcosystem::Npm,
             vec!["https://registry.npmjs.org".to_string()],
         );
-        trusted.insert(
-            PackageEcosystem::PyPi,
-            vec!["https://pypi.org".to_string()],
-        );
+        trusted.insert(PackageEcosystem::PyPi, vec!["https://pypi.org".to_string()]);
         trusted.insert(
             PackageEcosystem::Maven,
             vec!["https://repo1.maven.org/maven2".to_string()],
@@ -298,7 +295,10 @@ impl TamperingDetector {
         // Check for missing checksums when they should exist
         if dependency.integrity.hash_sha256.is_none()
             && registry_checksums.sha256.is_some()
-            && self.config.required_algorithms.contains(&HashAlgorithm::Sha256)
+            && self
+                .config
+                .required_algorithms
+                .contains(&HashAlgorithm::Sha256)
         {
             findings.push(TamperingFinding {
                 finding_type: TamperingType::ChecksumMissing,
@@ -447,11 +447,7 @@ impl Detector for TamperingDetector {
         }
     }
 
-    fn create_alerts(
-        &self,
-        dependency: &Dependency,
-        results: &[DetectionResult],
-    ) -> Vec<Alert> {
+    fn create_alerts(&self, dependency: &Dependency, results: &[DetectionResult]) -> Vec<Alert> {
         results
             .iter()
             .filter(|r| r.detected)
@@ -554,7 +550,9 @@ impl IntegrityVerifier {
         let mut mismatches = Vec::new();
 
         // Compare registry vs computed
-        if let (Some(registry), Some(computed)) = (&self.registry_checksums, &self.computed_checksums) {
+        if let (Some(registry), Some(computed)) =
+            (&self.registry_checksums, &self.computed_checksums)
+        {
             if let (Some(r_sha256), Some(c_sha256)) = (&registry.sha256, &computed.sha256) {
                 if r_sha256.to_lowercase() != c_sha256.to_lowercase() {
                     mismatches.push(IntegrityMismatch {
@@ -569,7 +567,9 @@ impl IntegrityVerifier {
         }
 
         // Compare lockfile vs computed
-        if let (Some(lockfile), Some(computed)) = (&self.lockfile_checksums, &self.computed_checksums) {
+        if let (Some(lockfile), Some(computed)) =
+            (&self.lockfile_checksums, &self.computed_checksums)
+        {
             if let (Some(l_sha256), Some(c_sha256)) = (&lockfile.sha256, &computed.sha256) {
                 if l_sha256.to_lowercase() != c_sha256.to_lowercase() {
                     mismatches.push(IntegrityMismatch {
@@ -584,7 +584,9 @@ impl IntegrityVerifier {
         }
 
         // Compare registry vs lockfile
-        if let (Some(registry), Some(lockfile)) = (&self.registry_checksums, &self.lockfile_checksums) {
+        if let (Some(registry), Some(lockfile)) =
+            (&self.registry_checksums, &self.lockfile_checksums)
+        {
             if let (Some(r_sha256), Some(l_sha256)) = (&registry.sha256, &lockfile.sha256) {
                 if r_sha256.to_lowercase() != l_sha256.to_lowercase() {
                     mismatches.push(IntegrityMismatch {

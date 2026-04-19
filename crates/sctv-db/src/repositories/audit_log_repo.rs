@@ -3,7 +3,9 @@
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sctv_core::traits::{AuditLogRepository, RepositoryError, RepositoryResult};
-use sctv_core::{AuditAction, AuditLog, AuditLogFilter, AuditLogId, ResourceType, TenantId, UserId};
+use sctv_core::{
+    AuditAction, AuditLog, AuditLogFilter, AuditLogId, ResourceType, TenantId, UserId,
+};
 use sqlx::{PgPool, Row};
 use std::net::IpAddr;
 

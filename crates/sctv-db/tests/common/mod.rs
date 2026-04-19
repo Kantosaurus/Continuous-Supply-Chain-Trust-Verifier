@@ -52,10 +52,13 @@ impl testcontainers::Image for PostgresImage {
 
     fn env_vars(
         &self,
-    ) -> impl IntoIterator<Item = (impl Into<std::borrow::Cow<'_, str>>, impl Into<std::borrow::Cow<'_, str>>)> {
-        self.env_vars
-            .iter()
-            .map(|(k, v)| (k.as_str(), v.as_str()))
+    ) -> impl IntoIterator<
+        Item = (
+            impl Into<std::borrow::Cow<'_, str>>,
+            impl Into<std::borrow::Cow<'_, str>>,
+        ),
+    > {
+        self.env_vars.iter().map(|(k, v)| (k.as_str(), v.as_str()))
     }
 
     fn expose_ports(&self) -> &[testcontainers::core::ContainerPort] {
@@ -95,10 +98,7 @@ impl TestDb {
             .await
             .expect("Failed to get host port");
 
-        let database_url = format!(
-            "postgres://test:test@127.0.0.1:{}/sctv_test",
-            host_port
-        );
+        let database_url = format!("postgres://test:test@127.0.0.1:{}/sctv_test", host_port);
 
         // Wait a bit for PostgreSQL to be fully ready
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;
@@ -123,7 +123,10 @@ impl TestDb {
 pub fn create_test_tenant() -> sctv_core::Tenant {
     sctv_core::Tenant::new(
         format!("Test Tenant {}", uuid::Uuid::new_v4()),
-        format!("test-{}", uuid::Uuid::new_v4().to_string().split('-').next().unwrap()),
+        format!(
+            "test-{}",
+            uuid::Uuid::new_v4().to_string().split('-').next().unwrap()
+        ),
     )
 }
 
@@ -137,8 +140,5 @@ pub fn create_test_user(tenant_id: sctv_core::TenantId) -> sctv_core::User {
 
 /// Creates a test project for use in tests.
 pub fn create_test_project(tenant_id: sctv_core::TenantId) -> sctv_core::Project {
-    sctv_core::Project::new(
-        tenant_id,
-        format!("test-project-{}", uuid::Uuid::new_v4()),
-    )
+    sctv_core::Project::new(tenant_id, format!("test-project-{}", uuid::Uuid::new_v4()))
 }

@@ -74,15 +74,13 @@ impl DowngradePolicy {
         Self {
             name: "Permissive".to_string(),
             description: Some("Warn on downgrades but don't block".to_string()),
-            rules: vec![
-                DowngradeRule {
-                    name: "alert-major".to_string(),
-                    condition: DowngradeCondition::SeverityAtLeast(DowngradeSeverity::Major),
-                    action: DowngradeAction::Alert,
-                    package_filter: None,
-                    ecosystem_filter: None,
-                },
-            ],
+            rules: vec![DowngradeRule {
+                name: "alert-major".to_string(),
+                condition: DowngradeCondition::SeverityAtLeast(DowngradeSeverity::Major),
+                action: DowngradeAction::Alert,
+                package_filter: None,
+                ecosystem_filter: None,
+            }],
             default_action: DowngradeAction::Warn,
         }
     }
@@ -194,7 +192,10 @@ impl DowngradeCondition {
             Self::SeverityAtLeast(min) => context.severity >= *min,
             Self::SeverityExact(exact) => context.severity == *exact,
             Self::VersionGapAtLeast(min) => {
-                let gap = Self::calculate_version_gap(&context.previous_version, &context.current_version);
+                let gap = Self::calculate_version_gap(
+                    &context.previous_version,
+                    &context.current_version,
+                );
                 gap >= *min
             }
             Self::All(conditions) => conditions.iter().all(|c| c.matches(context)),

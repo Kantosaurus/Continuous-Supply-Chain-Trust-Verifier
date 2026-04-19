@@ -80,18 +80,18 @@ impl Project {
     pub fn should_scan_now(&self) -> bool {
         match &self.scan_schedule {
             ScanSchedule::Manual => false,
-            ScanSchedule::Hourly => {
-                self.last_scan_at
-                    .map_or(true, |last| Utc::now() - last >= chrono::Duration::hours(1))
-            }
+            ScanSchedule::Hourly => self
+                .last_scan_at
+                .map_or(true, |last| Utc::now() - last >= chrono::Duration::hours(1)),
             ScanSchedule::Daily { hour } => {
                 let now = Utc::now();
                 let current_hour = now.hour();
                 if current_hour != u32::from(*hour) {
                     return false;
                 }
-                self.last_scan_at
-                    .map_or(true, |last| Utc::now() - last >= chrono::Duration::hours(20))
+                self.last_scan_at.map_or(true, |last| {
+                    Utc::now() - last >= chrono::Duration::hours(20)
+                })
             }
             ScanSchedule::Weekly { day, hour } => {
                 let now = Utc::now();

@@ -6,8 +6,8 @@
 use leptos::prelude::*;
 
 use crate::components::{
-    AlertIcon, AsymmetricGrid, Button, ButtonVariant, GridItem, PackageIcon, PageHeader,
-    PlusIcon, PolicyIcon, ProjectCard, SearchInput, Section, StatCard, StatsRow, StatusLevel,
+    AlertIcon, AsymmetricGrid, Button, ButtonVariant, GridItem, PackageIcon, PageHeader, PlusIcon,
+    PolicyIcon, ProjectCard, SearchInput, Section, StatCard, StatsRow, StatusLevel,
 };
 
 /// Projects overview and management page.

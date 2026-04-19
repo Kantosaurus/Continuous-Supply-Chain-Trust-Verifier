@@ -53,13 +53,12 @@ impl ExecutorRegistry {
 
     /// Executes a job using the appropriate executor.
     pub async fn execute(&self, job: &Job, ctx: &ExecutionContext) -> WorkerResult<JobResult> {
-        let executor = self
-            .executors
-            .get(&job.job_type)
-            .ok_or_else(|| WorkerError::Execution(format!(
+        let executor = self.executors.get(&job.job_type).ok_or_else(|| {
+            WorkerError::Execution(format!(
                 "No executor registered for job type: {:?}",
                 job.job_type
-            )))?;
+            ))
+        })?;
 
         tracing::debug!(
             job_id = %job.id,
@@ -100,8 +99,8 @@ impl Default for ExecutorRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use async_trait::async_trait;
     use crate::jobs::{Job, JobPayload, JobResult, ScanProjectPayload, ScanProjectResult};
+    use async_trait::async_trait;
     use sctv_core::{PackageEcosystem, ProjectId, TenantId};
 
     struct MockScanExecutor;

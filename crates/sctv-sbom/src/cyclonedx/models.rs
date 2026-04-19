@@ -413,13 +413,9 @@ impl Hash {
 #[serde(untagged)]
 pub enum LicenseChoice {
     /// SPDX expression.
-    Expression {
-        expression: String,
-    },
+    Expression { expression: String },
     /// Named license.
-    License {
-        license: License,
-    },
+    License { license: License },
 }
 
 impl LicenseChoice {

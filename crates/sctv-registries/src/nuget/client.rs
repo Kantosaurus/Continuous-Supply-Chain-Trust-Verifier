@@ -135,7 +135,10 @@ impl NuGetClient {
     }
 
     /// Gets all versions from a registration index, fetching pages if needed.
-    async fn get_all_versions(&self, index: &RegistrationIndex) -> RegistryResult<Vec<RegistrationLeaf>> {
+    async fn get_all_versions(
+        &self,
+        index: &RegistrationIndex,
+    ) -> RegistryResult<Vec<RegistrationLeaf>> {
         let mut all_items = Vec::new();
 
         for page in &index.items {
@@ -268,7 +271,10 @@ impl RegistryClient for NuGetClient {
             ecosystem: PackageEcosystem::NuGet,
             name: latest_entry.package_id.clone(),
             normalized_name: normalize_package_name(&latest_entry.package_id),
-            description: latest_entry.description.clone().or_else(|| latest_entry.summary.clone()),
+            description: latest_entry
+                .description
+                .clone()
+                .or_else(|| latest_entry.summary.clone()),
             homepage,
             repository,
             popularity_rank: None,
@@ -293,7 +299,10 @@ impl RegistryClient for NuGetClient {
 
     async fn get_version(&self, name: &str, version: &str) -> RegistryResult<VersionMetadata> {
         // Check cache first
-        if let Some(cached) = self.cache.get_version(PackageEcosystem::NuGet, name, version) {
+        if let Some(cached) = self
+            .cache
+            .get_version(PackageEcosystem::NuGet, name, version)
+        {
             tracing::debug!("Cache hit for {}@{}", name, version);
             return Ok(cached);
         }
@@ -305,9 +314,7 @@ impl RegistryClient for NuGetClient {
         let version_data = all_versions
             .iter()
             .find(|v| v.catalog_entry.version.to_lowercase() == version.to_lowercase())
-            .ok_or_else(|| {
-                RegistryError::VersionNotFound(name.to_string(), version.to_string())
-            })?;
+            .ok_or_else(|| RegistryError::VersionNotFound(name.to_string(), version.to_string()))?;
 
         let entry = &version_data.catalog_entry;
 
@@ -346,7 +353,10 @@ impl RegistryClient for NuGetClient {
             (false, None)
         };
 
-        let published_at = entry.published.as_ref().and_then(|s| Self::parse_timestamp(s));
+        let published_at = entry
+            .published
+            .as_ref()
+            .and_then(|s| Self::parse_timestamp(s));
 
         // NuGet doesn't provide checksums in the registration API
         let checksums = PackageChecksums::default();
@@ -382,7 +392,10 @@ impl RegistryClient for NuGetClient {
 
         tracing::debug!("Downloading {}@{} from {}", name, version, url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::VersionNotFound(

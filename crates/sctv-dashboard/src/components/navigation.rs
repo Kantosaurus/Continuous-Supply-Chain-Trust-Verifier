@@ -53,7 +53,9 @@ pub fn Sidebar() -> impl IntoView {
 
 /// Projects navigation link.
 #[component]
-fn NavLinkProjects(current_path: impl Fn() -> String + Send + Sync + Clone + 'static) -> impl IntoView {
+fn NavLinkProjects(
+    current_path: impl Fn() -> String + Send + Sync + Clone + 'static,
+) -> impl IntoView {
     let is_active = move || {
         let path = current_path();
         path == "/projects" || path == "/"
@@ -73,7 +75,9 @@ fn NavLinkProjects(current_path: impl Fn() -> String + Send + Sync + Clone + 'st
 
 /// Alerts navigation link.
 #[component]
-fn NavLinkAlerts(current_path: impl Fn() -> String + Send + Sync + Clone + 'static) -> impl IntoView {
+fn NavLinkAlerts(
+    current_path: impl Fn() -> String + Send + Sync + Clone + 'static,
+) -> impl IntoView {
     let is_active = move || current_path() == "/alerts";
 
     view! {
@@ -91,7 +95,9 @@ fn NavLinkAlerts(current_path: impl Fn() -> String + Send + Sync + Clone + 'stat
 
 /// Policies navigation link.
 #[component]
-fn NavLinkPolicies(current_path: impl Fn() -> String + Send + Sync + Clone + 'static) -> impl IntoView {
+fn NavLinkPolicies(
+    current_path: impl Fn() -> String + Send + Sync + Clone + 'static,
+) -> impl IntoView {
     let is_active = move || current_path() == "/policies";
 
     view! {
@@ -108,7 +114,9 @@ fn NavLinkPolicies(current_path: impl Fn() -> String + Send + Sync + Clone + 'st
 
 /// Settings navigation link.
 #[component]
-fn NavLinkSettings(current_path: impl Fn() -> String + Send + Sync + Clone + 'static) -> impl IntoView {
+fn NavLinkSettings(
+    current_path: impl Fn() -> String + Send + Sync + Clone + 'static,
+) -> impl IntoView {
     let is_active = move || current_path() == "/settings";
 
     view! {

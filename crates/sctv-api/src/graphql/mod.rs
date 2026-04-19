@@ -66,8 +66,14 @@ impl QueryRoot {
 
         let mut result = Vec::new();
         for project in projects.into_iter().skip(offset).take(limit) {
-            let deps = dep_repo.find_by_project(project.id).await.unwrap_or_default();
-            let alert_count = alert_repo.count_open_by_project(project.id).await.unwrap_or(0);
+            let deps = dep_repo
+                .find_by_project(project.id)
+                .await
+                .unwrap_or_default();
+            let alert_count = alert_repo
+                .count_open_by_project(project.id)
+                .await
+                .unwrap_or(0);
 
             result.push(Project {
                 id: ID::from(project.id.0.to_string()),
@@ -123,8 +129,14 @@ impl QueryRoot {
             return Err(async_graphql::Error::new("Access denied"));
         }
 
-        let deps = dep_repo.find_by_project(project.id).await.unwrap_or_default();
-        let alert_count = alert_repo.count_open_by_project(project.id).await.unwrap_or(0);
+        let deps = dep_repo
+            .find_by_project(project.id)
+            .await
+            .unwrap_or_default();
+        let alert_count = alert_repo
+            .count_open_by_project(project.id)
+            .await
+            .unwrap_or(0);
 
         Ok(Some(Project {
             id: ID::from(project.id.0.to_string()),
@@ -292,9 +304,7 @@ impl QueryRoot {
                 .find_direct_by_project(sctv_core::ProjectId(uuid))
                 .await
         } else {
-            dep_repo
-                .find_by_project(sctv_core::ProjectId(uuid))
-                .await
+            dep_repo.find_by_project(sctv_core::ProjectId(uuid)).await
         }
         .map_err(|e| async_graphql::Error::new(e.to_string()))?;
 
@@ -379,7 +389,11 @@ pub struct MutationRoot;
 #[Object]
 impl MutationRoot {
     /// Create a new project.
-    async fn create_project(&self, ctx: &Context<'_>, input: CreateProjectInput) -> Result<Project> {
+    async fn create_project(
+        &self,
+        ctx: &Context<'_>,
+        input: CreateProjectInput,
+    ) -> Result<Project> {
         let gql_ctx = ctx.data::<GqlContext>()?;
         let state = &gql_ctx.state;
 
@@ -473,8 +487,14 @@ impl MutationRoot {
             .await
             .map_err(|e| async_graphql::Error::new(e.to_string()))?;
 
-        let deps = dep_repo.find_by_project(project.id).await.unwrap_or_default();
-        let alert_count = alert_repo.count_open_by_project(project.id).await.unwrap_or(0);
+        let deps = dep_repo
+            .find_by_project(project.id)
+            .await
+            .unwrap_or_default();
+        let alert_count = alert_repo
+            .count_open_by_project(project.id)
+            .await
+            .unwrap_or(0);
 
         Ok(Some(Project {
             id: ID::from(project.id.0.to_string()),
@@ -753,10 +773,13 @@ impl MutationRoot {
 fn extract_dependency_info(alert_type: &sctv_core::AlertType) -> (Option<String>, Option<String>) {
     use sctv_core::AlertType;
     match alert_type {
-        AlertType::DependencyTampering(d) => (Some(d.package_name.clone()), Some(d.version.clone())),
-        AlertType::DowngradeAttack(d) => {
-            (Some(d.package_name.clone()), Some(d.current_version.to_string()))
+        AlertType::DependencyTampering(d) => {
+            (Some(d.package_name.clone()), Some(d.version.clone()))
         }
+        AlertType::DowngradeAttack(d) => (
+            Some(d.package_name.clone()),
+            Some(d.current_version.to_string()),
+        ),
         AlertType::Typosquatting(d) => (Some(d.suspicious_package.clone()), None),
         AlertType::ProvenanceFailure(d) => (Some(d.package_name.clone()), Some(d.version.clone())),
         AlertType::PolicyViolation(_) => (None, None),

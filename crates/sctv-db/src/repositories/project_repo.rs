@@ -38,8 +38,7 @@ impl PgProjectRepository {
         let created_at: DateTime<Utc> = row.get("created_at");
         let updated_at: DateTime<Utc> = row.get("updated_at");
 
-        let repository_url = repository_url
-            .and_then(|u| Url::parse(&u).ok());
+        let repository_url = repository_url.and_then(|u| Url::parse(&u).ok());
 
         let ecosystems: Vec<PackageEcosystem> = ecosystems
             .into_iter()
@@ -115,10 +114,7 @@ impl ProjectRepository for PgProjectRepository {
         .await
         .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
-        records
-            .iter()
-            .map(Self::row_to_project)
-            .collect()
+        records.iter().map(Self::row_to_project).collect()
     }
 
     async fn create(&self, project: &Project) -> RepositoryResult<()> {
@@ -261,10 +257,7 @@ impl ProjectRepository for PgProjectRepository {
         .await
         .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
-        records
-            .iter()
-            .map(Self::row_to_project)
-            .collect()
+        records.iter().map(Self::row_to_project).collect()
     }
 
     async fn count_by_tenant(&self, tenant_id: TenantId) -> RepositoryResult<u32> {

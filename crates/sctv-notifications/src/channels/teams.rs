@@ -190,11 +190,11 @@ impl TeamsChannel {
     /// Returns the emoji indicator for the given severity level.
     fn severity_indicator(severity: Severity) -> &'static str {
         match severity {
-            Severity::Critical => "\u{1F6A8}", // 🚨
-            Severity::High => "\u{26A0}\u{FE0F}",  // ⚠️
-            Severity::Medium => "\u{1F536}",  // 🔶
-            Severity::Low => "\u{2139}\u{FE0F}",   // ℹ️
-            Severity::Info => "\u{1F4AC}",    // 💬
+            Severity::Critical => "\u{1F6A8}",    // 🚨
+            Severity::High => "\u{26A0}\u{FE0F}", // ⚠️
+            Severity::Medium => "\u{1F536}",      // 🔶
+            Severity::Low => "\u{2139}\u{FE0F}",  // ℹ️
+            Severity::Info => "\u{1F4AC}",        // 💬
         }
     }
 
@@ -237,7 +237,10 @@ impl TeamsChannel {
 
         facts.push(Fact {
             title: "Time".to_string(),
-            value: notification.created_at.format("%Y-%m-%d %H:%M:%S UTC").to_string(),
+            value: notification
+                .created_at
+                .format("%Y-%m-%d %H:%M:%S UTC")
+                .to_string(),
         });
 
         if let Some(project) = &notification.context.project_name {
@@ -413,10 +416,7 @@ impl NotificationChannel for TeamsChannel {
         // Check for Teams webhook URL patterns
         let host = url.host_str().unwrap_or("");
         if !host.contains("webhook.office.com") && !host.contains("microsoft.com") {
-            warn!(
-                "Webhook URL does not appear to be a Teams URL: {}",
-                host
-            );
+            warn!("Webhook URL does not appear to be a Teams URL: {}", host);
         }
 
         Ok(())
@@ -475,7 +475,10 @@ mod tests {
 
     #[test]
     fn test_severity_indicators() {
-        assert_eq!(TeamsChannel::severity_color(Severity::Critical), "attention");
+        assert_eq!(
+            TeamsChannel::severity_color(Severity::Critical),
+            "attention"
+        );
         assert_eq!(TeamsChannel::severity_color(Severity::High), "warning");
         assert_eq!(TeamsChannel::severity_color(Severity::Info), "default");
     }

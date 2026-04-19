@@ -61,7 +61,10 @@ impl RubyGemsClient {
 
         tracing::debug!("Fetching gem {} from {}", name, url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::PackageNotFound(name.to_string()));
@@ -93,7 +96,10 @@ impl RubyGemsClient {
 
         tracing::debug!("Fetching versions for {} from {}", name, url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::PackageNotFound(name.to_string()));
@@ -123,7 +129,10 @@ impl RubyGemsClient {
             .join(&format!("/api/v1/gems/{}/owners.json", name))
             .map_err(|e| RegistryError::Parse(e.to_string()))?;
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if !response.status().is_success() {
             // Non-fatal - return empty list
@@ -302,7 +311,10 @@ impl RegistryClient for RubyGemsClient {
 
     async fn get_version(&self, name: &str, version: &str) -> RegistryResult<VersionMetadata> {
         // Check cache first
-        if let Some(cached) = self.cache.get_version(PackageEcosystem::RubyGems, name, version) {
+        if let Some(cached) = self
+            .cache
+            .get_version(PackageEcosystem::RubyGems, name, version)
+        {
             tracing::debug!("Cache hit for {}@{}", name, version);
             return Ok(cached);
         }
@@ -313,9 +325,7 @@ impl RegistryClient for RubyGemsClient {
         let version_data = versions
             .iter()
             .find(|v| v.number == version)
-            .ok_or_else(|| {
-                RegistryError::VersionNotFound(name.to_string(), version.to_string())
-            })?;
+            .ok_or_else(|| RegistryError::VersionNotFound(name.to_string(), version.to_string()))?;
 
         // Also fetch gem info for dependencies
         let gem = self.fetch_gem(name).await?;
@@ -335,12 +345,17 @@ impl RegistryClient for RubyGemsClient {
                 is_optional: false,
                 is_dev: false,
             })
-            .chain(gem.dependencies.development.iter().map(|d| PackageDependency {
-                name: d.name.clone(),
-                version_constraint: d.requirements.clone(),
-                is_optional: false,
-                is_dev: true,
-            }))
+            .chain(
+                gem.dependencies
+                    .development
+                    .iter()
+                    .map(|d| PackageDependency {
+                        name: d.name.clone(),
+                        version_constraint: d.requirements.clone(),
+                        is_optional: false,
+                        is_dev: true,
+                    }),
+            )
             .collect();
 
         let checksums = PackageChecksums {
@@ -387,7 +402,10 @@ impl RegistryClient for RubyGemsClient {
 
         tracing::debug!("Downloading {}@{} from {}", name, version, url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::VersionNotFound(

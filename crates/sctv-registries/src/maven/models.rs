@@ -33,11 +33,7 @@ impl MavenCoordinate {
 
     /// Returns the repository path for this coordinate.
     pub fn repo_path(&self) -> String {
-        format!(
-            "{}/{}",
-            self.group_id.replace('.', "/"),
-            self.artifact_id
-        )
+        format!("{}/{}", self.group_id.replace('.', "/"), self.artifact_id)
     }
 
     /// Returns the artifact path for a specific version.

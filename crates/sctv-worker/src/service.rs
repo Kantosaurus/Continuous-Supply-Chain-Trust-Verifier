@@ -121,9 +121,9 @@ impl WorkerServiceBuilder {
 
     /// Builds the worker service.
     pub fn build(self) -> WorkerResult<WorkerService> {
-        let db_pool = self
-            .db_pool
-            .ok_or_else(|| crate::error::WorkerError::Configuration("Database pool required".into()))?;
+        let db_pool = self.db_pool.ok_or_else(|| {
+            crate::error::WorkerError::Configuration("Database pool required".into())
+        })?;
 
         // Create executor registry with default executors
         let mut registry = ExecutorRegistry::new();
@@ -138,8 +138,8 @@ impl WorkerServiceBuilder {
         }
 
         // Create execution context
-        let mut context = ExecutionContext::new(db_pool.clone())
-            .with_config(self.config.executor.clone());
+        let mut context =
+            ExecutionContext::new(db_pool.clone()).with_config(self.config.executor.clone());
 
         if let Some(http_client) = self.http_client {
             context = context.with_http_client(http_client);

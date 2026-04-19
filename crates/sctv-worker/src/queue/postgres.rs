@@ -46,9 +46,7 @@ impl PgJobQueue {
         let priority = JobPriority::try_from(priority)?;
 
         let payload: JobPayload = serde_json::from_value(payload_json)?;
-        let result: Option<JobResult> = result_json
-            .map(serde_json::from_value)
-            .transpose()?;
+        let result: Option<JobResult> = result_json.map(serde_json::from_value).transpose()?;
 
         Ok(Job {
             id: JobId(id),

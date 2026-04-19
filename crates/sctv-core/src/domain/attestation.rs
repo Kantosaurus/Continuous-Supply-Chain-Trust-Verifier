@@ -64,10 +64,8 @@ pub enum AttestationType {
 
 impl AttestationType {
     /// Returns the predicate type URI for SLSA provenance.
-    pub const SLSA_PROVENANCE_V1: &'static str =
-        "https://slsa.dev/provenance/v1";
-    pub const SLSA_PROVENANCE_V02: &'static str =
-        "https://slsa.dev/provenance/v0.2";
+    pub const SLSA_PROVENANCE_V1: &'static str = "https://slsa.dev/provenance/v1";
+    pub const SLSA_PROVENANCE_V02: &'static str = "https://slsa.dev/provenance/v0.2";
 }
 
 /// Subject of an attestation (the artifact being attested).

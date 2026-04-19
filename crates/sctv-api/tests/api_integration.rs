@@ -628,8 +628,7 @@ mod cors {
         // Should have CORS headers
         let headers = response.headers();
         assert!(
-            headers.contains_key("access-control-allow-origin")
-                || headers.contains_key("vary"),
+            headers.contains_key("access-control-allow-origin") || headers.contains_key("vary"),
             "Expected CORS headers"
         );
     }

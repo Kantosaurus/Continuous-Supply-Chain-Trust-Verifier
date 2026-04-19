@@ -18,8 +18,8 @@ pub async fn run(
 
     let raw = std::fs::read_to_string(policy_path)
         .map_err(|e| anyhow::anyhow!("Could not read {}: {e}", policy_path.display()))?;
-    let policy: Policy = serde_json::from_str(&raw)
-        .map_err(|e| anyhow::anyhow!("Invalid policy JSON: {e}"))?;
+    let policy: Policy =
+        serde_json::from_str(&raw).map_err(|e| anyhow::anyhow!("Invalid policy JSON: {e}"))?;
 
     match format {
         OutputFormat::Json => {
@@ -42,7 +42,11 @@ pub async fn run(
             crate::shared::emit_sarif(&[])?;
         }
         OutputFormat::Text => {
-            println!("Loaded policy '{}' from {}", policy.name, policy_path.display());
+            println!(
+                "Loaded policy '{}' from {}",
+                policy.name,
+                policy_path.display()
+            );
             println!("  rules: {}", policy.rules.len());
             println!("  severity overrides: {}", policy.severity_overrides.len());
             println!("  enabled: {}", policy.enabled);

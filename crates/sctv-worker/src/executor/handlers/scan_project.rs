@@ -5,18 +5,16 @@
 use async_trait::async_trait;
 use std::time::Instant;
 
-use sctv_core::{
-    Alert, AlertId, AlertMetadata, AlertStatus, AlertType, Dependency, HashAlgorithm,
-    Remediation, Severity, SignatureStatus, TamperingDetails, TyposquattingDetails,
-};
 use sctv_core::traits::{AlertRepository, DependencyRepository, ProjectRepository};
+use sctv_core::{
+    Alert, AlertId, AlertMetadata, AlertStatus, AlertType, Dependency, HashAlgorithm, Remediation,
+    Severity, SignatureStatus, TamperingDetails, TyposquattingDetails,
+};
 use sctv_db::repositories::{PgAlertRepository, PgDependencyRepository, PgProjectRepository};
 
 use crate::error::{WorkerError, WorkerResult};
 use crate::executor::{ExecutionContext, JobExecutor};
-use crate::jobs::{
-    Job, JobPayload, JobResult, JobType, ScanProjectPayload, ScanProjectResult,
-};
+use crate::jobs::{Job, JobPayload, JobResult, JobType, ScanProjectPayload, ScanProjectResult};
 
 /// Executor for scanning project dependencies.
 pub struct ScanProjectExecutor;
@@ -65,10 +63,7 @@ impl ScanProjectExecutor {
             .await
             .map_err(|e| WorkerError::Execution(format!("Failed to fetch dependencies: {}", e)))?;
 
-        tracing::debug!(
-            count = existing_deps.len(),
-            "Found existing dependencies"
-        );
+        tracing::debug!(count = existing_deps.len(), "Found existing dependencies");
 
         let mut alerts_created = 0u32;
         let dependencies_found = existing_deps.len() as u32;
@@ -133,13 +128,11 @@ impl ScanProjectExecutor {
         }
 
         // Get the highest confidence finding
-        let finding = candidates
-            .into_iter()
-            .max_by_key(|c| match c.confidence {
-                Confidence::High => 3,
-                Confidence::Medium => 2,
-                Confidence::Low => 1,
-            });
+        let finding = candidates.into_iter().max_by_key(|c| match c.confidence {
+            Confidence::High => 3,
+            Confidence::Medium => 2,
+            Confidence::Low => 1,
+        });
 
         if let Some(finding) = finding {
             let severity = match finding.confidence {
@@ -238,7 +231,9 @@ impl ScanProjectExecutor {
             ),
             status: AlertStatus::Open,
             remediation: Some(Remediation {
-                action_taken: "Investigate the package integrity and consider using an alternative.".to_string(),
+                action_taken:
+                    "Investigate the package integrity and consider using an alternative."
+                        .to_string(),
                 new_version: None,
                 notes: Some("Verify the package checksum manually".to_string()),
             }),

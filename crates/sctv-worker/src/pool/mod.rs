@@ -222,9 +222,7 @@ impl<Q: JobQueue + 'static> WorkerPool<Q> {
                                         error = %e,
                                         "Job execution failed"
                                     );
-                                    if let Err(e) =
-                                        pool.queue.fail(job_id, &e.to_string()).await
-                                    {
+                                    if let Err(e) = pool.queue.fail(job_id, &e.to_string()).await {
                                         tracing::error!(
                                             worker_id = worker_id,
                                             job_id = %job_id,

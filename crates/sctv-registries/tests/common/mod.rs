@@ -37,7 +37,10 @@ pub fn npm_package_metadata(name: &str, versions: &[&str]) -> serde_json::Value 
                 }
             }),
         );
-        time_map.insert(version.to_string(), json!(format!("2024-0{}-01T00:00:00.000Z", i + 1)));
+        time_map.insert(
+            version.to_string(),
+            json!(format!("2024-0{}-01T00:00:00.000Z", i + 1)),
+        );
     }
 
     json!({
@@ -225,8 +228,7 @@ pub async fn mount_npm_package(server: &MockServer, name: &str, versions: &[&str
     Mock::given(method("GET"))
         .and(path(format!("/{}", encoded_name)))
         .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_json(npm_package_metadata(name, versions)),
+            ResponseTemplate::new(200).set_body_json(npm_package_metadata(name, versions)),
         )
         .mount(server)
         .await;
@@ -244,8 +246,7 @@ pub async fn mount_npm_abbreviated(server: &MockServer, name: &str, versions: &[
         .and(path(format!("/{}", encoded_name)))
         .and(header("Accept", "application/vnd.npm.install-v1+json"))
         .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_json(npm_abbreviated_metadata(name, versions)),
+            ResponseTemplate::new(200).set_body_json(npm_abbreviated_metadata(name, versions)),
         )
         .mount(server)
         .await;
@@ -261,10 +262,7 @@ pub async fn mount_npm_version(server: &MockServer, name: &str, version: &str) {
 
     Mock::given(method("GET"))
         .and(path(format!("/{}/{}", encoded_name, version)))
-        .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_json(npm_version_metadata(name, version)),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_json(npm_version_metadata(name, version)))
         .mount(server)
         .await;
 }
@@ -279,10 +277,7 @@ pub async fn mount_npm_not_found(server: &MockServer, name: &str) {
 
     Mock::given(method("GET"))
         .and(path(format!("/{}", encoded_name)))
-        .respond_with(
-            ResponseTemplate::new(404)
-                .set_body_json(json!({ "error": "Not found" })),
-        )
+        .respond_with(ResponseTemplate::new(404).set_body_json(json!({ "error": "Not found" })))
         .mount(server)
         .await;
 }
@@ -329,8 +324,7 @@ pub async fn mount_pypi_package(server: &MockServer, name: &str, version: &str) 
     Mock::given(method("GET"))
         .and(path(format!("/pypi/{}/json", name)))
         .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_json(pypi_package_metadata(name, version)),
+            ResponseTemplate::new(200).set_body_json(pypi_package_metadata(name, version)),
         )
         .mount(server)
         .await;

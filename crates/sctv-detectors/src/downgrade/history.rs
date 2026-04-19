@@ -180,7 +180,10 @@ impl VersionHistoryStore {
     /// Gets the maximum version ever recorded for a package.
     #[must_use]
     pub fn get_max_version(&self, key: &VersionHistoryKey) -> Option<Version> {
-        self.histories.read().get(key).and_then(|h| h.max().cloned())
+        self.histories
+            .read()
+            .get(key)
+            .and_then(|h| h.max().cloned())
     }
 
     /// Gets the full history for a package.
@@ -236,7 +239,10 @@ pub trait VersionHistoryPersistence: Send + Sync {
     async fn load(
         &self,
         project_id: ProjectId,
-    ) -> Result<HashMap<VersionHistoryKey, PackageVersionHistory>, Box<dyn std::error::Error + Send + Sync>>;
+    ) -> Result<
+        HashMap<VersionHistoryKey, PackageVersionHistory>,
+        Box<dyn std::error::Error + Send + Sync>,
+    >;
 
     /// Saves history for a project.
     async fn save(
@@ -264,8 +270,10 @@ impl VersionHistoryPersistence for MemoryPersistence {
     async fn load(
         &self,
         project_id: ProjectId,
-    ) -> Result<HashMap<VersionHistoryKey, PackageVersionHistory>, Box<dyn std::error::Error + Send + Sync>>
-    {
+    ) -> Result<
+        HashMap<VersionHistoryKey, PackageVersionHistory>,
+        Box<dyn std::error::Error + Send + Sync>,
+    > {
         Ok(self
             .data
             .read()

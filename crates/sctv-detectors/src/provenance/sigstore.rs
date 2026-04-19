@@ -228,7 +228,10 @@ impl SigstoreVerifier {
     }
 
     /// Verifies a Sigstore bundle.
-    pub fn verify_bundle(&self, bundle: &SigstoreBundle) -> Result<BundleVerificationResult, SigstoreError> {
+    pub fn verify_bundle(
+        &self,
+        bundle: &SigstoreBundle,
+    ) -> Result<BundleVerificationResult, SigstoreError> {
         let mut result = BundleVerificationResult::default();
 
         // Extract and verify certificate
@@ -270,7 +273,8 @@ impl SigstoreVerifier {
     /// Verifies a certificate chain.
     fn verify_certificate(&self, cert: &Certificate) -> Result<bool, SigstoreError> {
         // Decode the certificate
-        let cert_bytes = BASE64.decode(&cert.raw_bytes)
+        let cert_bytes = BASE64
+            .decode(&cert.raw_bytes)
             .map_err(|e| SigstoreError::CertificateError(e.to_string()))?;
 
         // In a real implementation, we would:
@@ -285,10 +289,14 @@ impl SigstoreVerifier {
 
     /// Extracts Rekor entry info from a tlog entry.
     fn extract_rekor_info(&self, entry: &TlogEntry) -> Result<RekorEntryInfo, SigstoreError> {
-        let log_index = entry.log_index.parse::<u64>()
+        let log_index = entry
+            .log_index
+            .parse::<u64>()
             .map_err(|_| SigstoreError::RekorError("Invalid log index".to_string()))?;
 
-        let integrated_time = entry.integrated_time.parse::<i64>()
+        let integrated_time = entry
+            .integrated_time
+            .parse::<i64>()
             .map_err(|_| SigstoreError::RekorError("Invalid integrated time".to_string()))?;
 
         let inclusion_verified = entry.inclusion_proof.is_some();

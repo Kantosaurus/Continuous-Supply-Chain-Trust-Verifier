@@ -73,7 +73,9 @@ impl Policy {
                 algorithms: vec![HashAlgorithm::Sha256],
             },
             PolicyRule::BlockTyposquatting { threshold: 0.85 },
-            PolicyRule::RequireProvenance { minimum_slsa_level: 1 },
+            PolicyRule::RequireProvenance {
+                minimum_slsa_level: 1,
+            },
             PolicyRule::EnforceVersionPinning {
                 strategy: VersionPinningStrategy::Locked,
             },

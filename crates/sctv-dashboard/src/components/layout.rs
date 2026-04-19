@@ -157,10 +157,7 @@ pub fn Skeleton(
 
 /// Content container with max width.
 #[component]
-pub fn Container(
-    #[prop(optional)] class: Option<String>,
-    children: Children,
-) -> impl IntoView {
+pub fn Container(#[prop(optional)] class: Option<String>, children: Children) -> impl IntoView {
     view! {
         <div class=format!("container {}", class.unwrap_or_default())>{children()}</div>
     }

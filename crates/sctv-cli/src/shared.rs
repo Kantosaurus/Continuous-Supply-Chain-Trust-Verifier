@@ -33,10 +33,7 @@ pub fn typosquat_to_alert(candidate: &TyposquatCandidate, ecosystem: PackageEcos
             popular_package_downloads: None,
         }),
         severity,
-        title: format!(
-            "Possible typosquatting of '{}'",
-            candidate.popular_name
-        ),
+        title: format!("Possible typosquatting of '{}'", candidate.popular_name),
         description: format!(
             "Package '{}' looks similar to popular package '{}' (score {:.2}, method {:?}).",
             candidate.suspicious_name,

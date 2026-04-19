@@ -313,11 +313,7 @@ impl NotificationService {
     }
 
     /// Sends notifications to channels sequentially.
-    async fn send_sequential(
-        &self,
-        notification: &Notification,
-        result: &mut MultiChannelResult,
-    ) {
+    async fn send_sequential(&self, notification: &Notification, result: &mut MultiChannelResult) {
         for entry in &self.channels {
             let channel_name = entry.channel.name().to_string();
 

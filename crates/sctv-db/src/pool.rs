@@ -95,14 +95,13 @@ impl TenantAwarePool {
             .execute(&mut *conn)
             .await?;
 
-        Ok(TenantConnection {
-            conn,
-            tenant_id,
-        })
+        Ok(TenantConnection { conn, tenant_id })
     }
 
     /// Gets a raw connection without tenant context (for admin operations).
-    pub async fn acquire_admin(&self) -> Result<sqlx::pool::PoolConnection<sqlx::Postgres>, DbError> {
+    pub async fn acquire_admin(
+        &self,
+    ) -> Result<sqlx::pool::PoolConnection<sqlx::Postgres>, DbError> {
         Ok(self.pool.acquire().await?)
     }
 

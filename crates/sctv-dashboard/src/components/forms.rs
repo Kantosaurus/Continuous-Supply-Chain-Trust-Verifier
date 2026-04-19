@@ -255,10 +255,7 @@ pub fn IconButton(
 
 /// Form field group for organizing related inputs.
 #[component]
-pub fn FieldGroup(
-    #[prop(optional)] label: Option<String>,
-    children: Children,
-) -> impl IntoView {
+pub fn FieldGroup(#[prop(optional)] label: Option<String>, children: Children) -> impl IntoView {
     view! {
         <fieldset class="field-group">
             {label.map(|l| view! { <legend class="field-group__legend">{l}</legend> })}

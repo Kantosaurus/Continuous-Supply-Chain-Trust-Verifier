@@ -100,7 +100,10 @@ impl NpmClient {
 
         tracing::debug!("Fetching full metadata for {} from {}", name, url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::PackageNotFound(name.to_string()));
@@ -132,7 +135,10 @@ impl NpmClient {
 
         tracing::debug!("Fetching version {}@{} from {}", name, version, url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::VersionNotFound(
@@ -219,7 +225,9 @@ impl NpmClient {
     }
 
     /// Converts npm dependencies map to package dependencies.
-    fn parse_dependencies(deps: Option<&std::collections::HashMap<String, String>>) -> Vec<PackageDependency> {
+    fn parse_dependencies(
+        deps: Option<&std::collections::HashMap<String, String>>,
+    ) -> Vec<PackageDependency> {
         deps.map(|d| {
             d.iter()
                 .map(|(name, constraint)| PackageDependency {
@@ -402,7 +410,10 @@ impl RegistryClient for NpmClient {
 
         tracing::debug!("Downloading {}@{} from {}", name, version, url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if !response.status().is_success() {
             return Err(RegistryError::Unavailable(format!(
@@ -512,10 +523,7 @@ impl IntegrityResult {
             self.sha512_match,
             self.integrity_match,
         ];
-        checks
-            .iter()
-            .filter_map(|c| *c)
-            .all(|matched| matched)
+        checks.iter().filter_map(|c| *c).all(|matched| matched)
     }
 
     /// Returns true if any check failed.
@@ -565,7 +573,10 @@ mod tests {
     #[test]
     fn test_parse_integrity_hash() {
         let integrity = "sha512-abc123def456";
-        assert_eq!(parse_integrity_hash(integrity), Some("abc123def456".to_string()));
+        assert_eq!(
+            parse_integrity_hash(integrity),
+            Some("abc123def456".to_string())
+        );
 
         let invalid = "invalid";
         assert_eq!(parse_integrity_hash(invalid), None);

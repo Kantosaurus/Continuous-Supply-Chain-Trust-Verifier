@@ -67,9 +67,5 @@ pub trait Detector: Send + Sync {
     async fn analyze(&self, dependency: &Dependency) -> DetectorResult<Vec<DetectionResult>>;
 
     /// Creates alerts from detection results.
-    fn create_alerts(
-        &self,
-        dependency: &Dependency,
-        results: &[DetectionResult],
-    ) -> Vec<Alert>;
+    fn create_alerts(&self, dependency: &Dependency, results: &[DetectionResult]) -> Vec<Alert>;
 }

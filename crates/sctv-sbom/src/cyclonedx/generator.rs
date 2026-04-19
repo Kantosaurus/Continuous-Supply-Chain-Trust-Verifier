@@ -78,16 +78,12 @@ impl CycloneDxGenerator {
     }
 
     /// Builds the metadata section.
-    fn build_metadata(
-        &self,
-        project: &Project,
-        config: &GeneratorConfig,
-    ) -> SbomResult<Metadata> {
+    fn build_metadata(&self, project: &Project, config: &GeneratorConfig) -> SbomResult<Metadata> {
         let mut metadata = Metadata::new();
 
         // Add tool information
-        let tool = Tool::new(&config.tool_name, &config.tool_version)
-            .with_vendor(&config.tool_vendor);
+        let tool =
+            Tool::new(&config.tool_name, &config.tool_version).with_vendor(&config.tool_vendor);
         metadata.add_tool(tool);
 
         // Add main component (the project itself)
@@ -105,10 +101,7 @@ impl CycloneDxGenerator {
 
         // Add ecosystems as properties
         for ecosystem in &project.ecosystems {
-            main_component.add_property(Property::new(
-                "sctv:ecosystem",
-                ecosystem.purl_type(),
-            ));
+            main_component.add_property(Property::new("sctv:ecosystem", ecosystem.purl_type()));
         }
 
         metadata.component = Some(main_component);
@@ -126,11 +119,7 @@ impl CycloneDxGenerator {
     }
 
     /// Builds a component from a dependency.
-    fn build_component(
-        &self,
-        dep: &Dependency,
-        config: &GeneratorConfig,
-    ) -> SbomResult<Component> {
+    fn build_component(&self, dep: &Dependency, config: &GeneratorConfig) -> SbomResult<Component> {
         let bom_ref = generate_bom_ref(
             dep.ecosystem.purl_type(),
             &dep.package_name,
@@ -167,20 +156,14 @@ impl CycloneDxGenerator {
         }
 
         // Add properties
-        component.add_property(Property::new(
-            "sctv:ecosystem",
-            dep.ecosystem.purl_type(),
-        ));
+        component.add_property(Property::new("sctv:ecosystem", dep.ecosystem.purl_type()));
 
         component.add_property(Property::new(
             "sctv:direct",
             if dep.is_direct { "true" } else { "false" },
         ));
 
-        component.add_property(Property::new(
-            "sctv:depth",
-            dep.depth.to_string(),
-        ));
+        component.add_property(Property::new("sctv:depth", dep.depth.to_string()));
 
         // Add provenance information if available
         if let Some(level) = dep.integrity.provenance_status.level() {
@@ -290,13 +273,19 @@ impl CycloneDxGenerator {
                 xml.push_str("    <tools>\n");
                 xml.push_str("      <tool>\n");
                 if let Some(vendor) = &tool.vendor {
-                    xml.push_str(&format!("        <vendor>{}</vendor>\n", escape_xml(vendor)));
+                    xml.push_str(&format!(
+                        "        <vendor>{}</vendor>\n",
+                        escape_xml(vendor)
+                    ));
                 }
                 if let Some(name) = &tool.name {
                     xml.push_str(&format!("        <name>{}</name>\n", escape_xml(name)));
                 }
                 if let Some(version) = &tool.version {
-                    xml.push_str(&format!("        <version>{}</version>\n", escape_xml(version)));
+                    xml.push_str(&format!(
+                        "        <version>{}</version>\n",
+                        escape_xml(version)
+                    ));
                 }
                 xml.push_str("      </tool>\n");
                 xml.push_str("    </tools>\n");
@@ -306,9 +295,15 @@ impl CycloneDxGenerator {
                     "    <component type=\"{}\">\n",
                     component_type_xml(&component.component_type)
                 ));
-                xml.push_str(&format!("      <name>{}</name>\n", escape_xml(&component.name)));
+                xml.push_str(&format!(
+                    "      <name>{}</name>\n",
+                    escape_xml(&component.name)
+                ));
                 if let Some(version) = &component.version {
-                    xml.push_str(&format!("      <version>{}</version>\n", escape_xml(version)));
+                    xml.push_str(&format!(
+                        "      <version>{}</version>\n",
+                        escape_xml(version)
+                    ));
                 }
                 xml.push_str("    </component>\n");
             }
@@ -326,9 +321,15 @@ impl CycloneDxGenerator {
                 xml.push_str(&format!(" bom-ref=\"{}\"", escape_xml(bom_ref)));
             }
             xml.push_str(">\n");
-            xml.push_str(&format!("      <name>{}</name>\n", escape_xml(&component.name)));
+            xml.push_str(&format!(
+                "      <name>{}</name>\n",
+                escape_xml(&component.name)
+            ));
             if let Some(version) = &component.version {
-                xml.push_str(&format!("      <version>{}</version>\n", escape_xml(version)));
+                xml.push_str(&format!(
+                    "      <version>{}</version>\n",
+                    escape_xml(version)
+                ));
             }
             if let Some(purl) = &component.purl {
                 xml.push_str(&format!("      <purl>{}</purl>\n", escape_xml(purl)));
@@ -352,7 +353,10 @@ impl CycloneDxGenerator {
         if !bom.dependencies.is_empty() {
             xml.push_str("  <dependencies>\n");
             for dep in &bom.dependencies {
-                xml.push_str(&format!("    <dependency ref=\"{}\"", escape_xml(&dep.reference)));
+                xml.push_str(&format!(
+                    "    <dependency ref=\"{}\"",
+                    escape_xml(&dep.reference)
+                ));
                 if dep.depends_on.is_empty() {
                     xml.push_str(" />\n");
                 } else {

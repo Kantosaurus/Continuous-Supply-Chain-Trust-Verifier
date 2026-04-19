@@ -242,7 +242,10 @@ impl PolicyRepository for PgPolicyRepository {
 
     async fn set_default(&self, tenant_id: TenantId, policy_id: PolicyId) -> RepositoryResult<()> {
         // Start a transaction
-        let mut tx = self.pool.begin().await
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
         // Unset current default
@@ -268,7 +271,8 @@ impl PolicyRepository for PgPolicyRepository {
             return Err(RepositoryError::NotFound);
         }
 
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
         Ok(())

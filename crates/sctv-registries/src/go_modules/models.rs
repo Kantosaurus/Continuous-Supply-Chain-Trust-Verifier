@@ -239,11 +239,9 @@ impl GoMod {
                 return Some(GoRetract {
                     low: versions[0].to_string(),
                     high: Some(versions[1].to_string()),
-                    rationale: line.get(bracket_end + 1..).and_then(|s| {
-                        s.trim()
-                            .strip_prefix("//")
-                            .map(|r| r.trim().to_string())
-                    }),
+                    rationale: line
+                        .get(bracket_end + 1..)
+                        .and_then(|s| s.trim().strip_prefix("//").map(|r| r.trim().to_string())),
                 });
             }
         }

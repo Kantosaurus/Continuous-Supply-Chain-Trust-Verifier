@@ -44,10 +44,7 @@ async fn main() -> anyhow::Result<()> {
         .with_config(config)
         .build()?;
 
-    tracing::info!(
-        "Worker service initialized with {} workers",
-        worker_count
-    );
+    tracing::info!("Worker service initialized with {} workers", worker_count);
 
     // Register signal handlers for graceful shutdown
     let shutdown_signal = shutdown_signal();

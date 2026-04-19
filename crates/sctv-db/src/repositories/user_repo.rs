@@ -29,9 +29,7 @@ impl PgUserRepository {
         let created_at: DateTime<Utc> = row.get("created_at");
         let updated_at: DateTime<Utc> = row.get("updated_at");
 
-        let role = role_str
-            .parse::<UserRole>()
-            .unwrap_or(UserRole::Member);
+        let role = role_str.parse::<UserRole>().unwrap_or(UserRole::Member);
 
         Ok(User {
             id: UserId(id),
@@ -201,13 +199,12 @@ impl UserRepository for PgUserRepository {
     }
 
     async fn update_last_login(&self, id: UserId) -> RepositoryResult<()> {
-        let result = sqlx::query(
-            "UPDATE users SET last_login_at = NOW(), updated_at = NOW() WHERE id = $1",
-        )
-        .bind(id.0)
-        .execute(&self.pool)
-        .await
-        .map_err(|e| RepositoryError::Database(e.to_string()))?;
+        let result =
+            sqlx::query("UPDATE users SET last_login_at = NOW(), updated_at = NOW() WHERE id = $1")
+                .bind(id.0)
+                .execute(&self.pool)
+                .await
+                .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
         if result.rows_affected() == 0 {
             return Err(RepositoryError::NotFound);

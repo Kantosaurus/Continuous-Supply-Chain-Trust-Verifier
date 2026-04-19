@@ -442,7 +442,9 @@ impl WebhookChannel {
         request = match &self.config.auth {
             WebhookAuth::None => request,
             WebhookAuth::Bearer { token } => request.bearer_auth(token),
-            WebhookAuth::Basic { username, password } => request.basic_auth(username, Some(password)),
+            WebhookAuth::Basic { username, password } => {
+                request.basic_auth(username, Some(password))
+            }
             WebhookAuth::ApiKey {
                 header_name,
                 api_key,
@@ -468,10 +470,7 @@ impl WebhookChannel {
         let status = response.status();
 
         if status.is_success() {
-            let body: serde_json::Value = response
-                .json()
-                .await
-                .unwrap_or(serde_json::Value::Null);
+            let body: serde_json::Value = response.json().await.unwrap_or(serde_json::Value::Null);
 
             Ok(DeliveryResult::success_with_response(
                 duration_ms,
@@ -592,7 +591,10 @@ mod tests {
         assert_eq!(config.url, "https://api.example.com/webhooks/alerts");
         assert_eq!(config.method, WebhookMethod::Post);
         assert!(matches!(config.auth, WebhookAuth::Bearer { .. }));
-        assert_eq!(config.headers.get("X-Custom-Header"), Some(&"custom-value".to_string()));
+        assert_eq!(
+            config.headers.get("X-Custom-Header"),
+            Some(&"custom-value".to_string())
+        );
         assert_eq!(config.max_retries, 5);
     }
 

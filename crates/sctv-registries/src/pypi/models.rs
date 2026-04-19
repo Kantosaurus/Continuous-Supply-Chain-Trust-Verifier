@@ -160,7 +160,9 @@ impl PyPiDependency {
                 &rest[..idx],
                 Some(rest[idx + 1..end_idx].trim().to_string()),
             )
-        } else if let Some(idx) = rest.find(|c: char| c == '<' || c == '>' || c == '=' || c == '~' || c == '!') {
+        } else if let Some(idx) =
+            rest.find(|c: char| c == '<' || c == '>' || c == '=' || c == '~' || c == '!')
+        {
             (&rest[..idx], Some(rest[idx..].trim().to_string()))
         } else {
             (rest, None)

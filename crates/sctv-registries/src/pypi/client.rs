@@ -62,7 +62,10 @@ impl PyPiClient {
 
         tracing::debug!("Fetching PyPI package {} from {}", name, url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::PackageNotFound(name.to_string()));
@@ -86,7 +89,11 @@ impl PyPiClient {
     }
 
     /// Fetches metadata for a specific version.
-    async fn fetch_version(&self, name: &str, version: &str) -> RegistryResult<PyPiVersionResponse> {
+    async fn fetch_version(
+        &self,
+        name: &str,
+        version: &str,
+    ) -> RegistryResult<PyPiVersionResponse> {
         let normalized = normalize_pypi_name(name);
         let url = self
             .base_url
@@ -95,7 +102,10 @@ impl PyPiClient {
 
         tracing::debug!("Fetching PyPI version {}=={} from {}", name, version, url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::VersionNotFound(
@@ -139,7 +149,10 @@ impl PyPiClient {
 
         tracing::debug!("Fetching attestations from {}", url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             // No attestations available - this is not an error
@@ -157,7 +170,11 @@ impl PyPiClient {
     }
 
     /// Verifies the integrity of downloaded package bytes.
-    pub fn verify_integrity(&self, bytes: &Bytes, expected: &PackageChecksums) -> PyPiIntegrityResult {
+    pub fn verify_integrity(
+        &self,
+        bytes: &Bytes,
+        expected: &PackageChecksums,
+    ) -> PyPiIntegrityResult {
         let mut result = PyPiIntegrityResult {
             sha256_match: None,
             blake2b_256_match: None,
@@ -191,7 +208,10 @@ impl PyPiClient {
     }
 
     /// Finds the best release file for a version (prefers wheel, then sdist).
-    fn select_best_release_file<'a>(&self, files: &'a [PyPiReleaseFile]) -> Option<&'a PyPiReleaseFile> {
+    fn select_best_release_file<'a>(
+        &self,
+        files: &'a [PyPiReleaseFile],
+    ) -> Option<&'a PyPiReleaseFile> {
         // Prefer wheels, then source distributions
         // Among wheels, prefer universal (py3-none-any)
         let mut best: Option<&PyPiReleaseFile> = None;
@@ -363,7 +383,10 @@ impl RegistryClient for PyPiClient {
         let normalized = normalize_pypi_name(name);
 
         // Check cache first
-        if let Some(cached) = self.cache.get_version(PackageEcosystem::PyPi, &normalized, version) {
+        if let Some(cached) = self
+            .cache
+            .get_version(PackageEcosystem::PyPi, &normalized, version)
+        {
             tracing::debug!("Cache hit for {}=={}", name, version);
             return Ok(cached);
         }
@@ -385,7 +408,11 @@ impl RegistryClient for PyPiClient {
             sha1: None,
             sha256: release_file.digests.sha256.clone(),
             sha512: None,
-            integrity: release_file.digests.blake2b_256.clone().map(|h| format!("blake2b_256:{}", h)),
+            integrity: release_file
+                .digests
+                .blake2b_256
+                .clone()
+                .map(|h| format!("blake2b_256:{}", h)),
         };
 
         let download_url = Url::parse(&release_file.url).ok();
@@ -420,8 +447,12 @@ impl RegistryClient for PyPiClient {
             download_url,
         };
 
-        self.cache
-            .set_version(PackageEcosystem::PyPi, &normalized, version, metadata.clone());
+        self.cache.set_version(
+            PackageEcosystem::PyPi,
+            &normalized,
+            version,
+            metadata.clone(),
+        );
 
         Ok(metadata)
     }
@@ -431,7 +462,10 @@ impl RegistryClient for PyPiClient {
 
         tracing::debug!("Downloading {}=={} from {}", name, version, url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if !response.status().is_success() {
             return Err(RegistryError::Unavailable(format!(

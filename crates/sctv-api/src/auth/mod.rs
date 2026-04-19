@@ -150,8 +150,8 @@ pub fn decode_token(token: &str, secret: &str) -> Result<Claims, ApiError> {
     validation.set_audience(&["sctv"]);
     validation.set_issuer(&["sctv-api"]);
 
-    let token_data = decode::<Claims>(token, &key, &validation)
-        .map_err(|_| ApiError::Unauthorized)?;
+    let token_data =
+        decode::<Claims>(token, &key, &validation).map_err(|_| ApiError::Unauthorized)?;
 
     Ok(token_data.claims)
 }

@@ -104,8 +104,8 @@ fn load_npm_package_names(project_path: &Path) -> anyhow::Result<(Vec<String>, P
     let manifest = project_path.join("package.json");
     let raw = std::fs::read_to_string(&manifest)
         .map_err(|e| anyhow::anyhow!("Could not read {}: {e}", manifest.display()))?;
-    let parsed: serde_json::Value = serde_json::from_str(&raw)
-        .map_err(|e| anyhow::anyhow!("Invalid package.json: {e}"))?;
+    let parsed: serde_json::Value =
+        serde_json::from_str(&raw).map_err(|e| anyhow::anyhow!("Invalid package.json: {e}"))?;
 
     let mut names = Vec::new();
     for section in ["dependencies", "devDependencies", "peerDependencies"] {
