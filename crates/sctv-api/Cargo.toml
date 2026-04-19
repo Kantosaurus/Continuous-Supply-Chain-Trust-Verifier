@@ -12,6 +12,7 @@ path = "src/main.rs"
 [dependencies]
 sctv-core = { path = "../sctv-core", features = ["graphql"] }
 sctv-db = { path = "../sctv-db" }
+sctv-worker = { path = "../sctv-worker" }
 
 # Web framework
 axum = { workspace = true }

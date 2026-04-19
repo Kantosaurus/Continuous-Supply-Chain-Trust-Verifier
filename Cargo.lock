@@ -3745,6 +3745,7 @@ dependencies = [
  "jsonwebtoken",
  "sctv-core",
  "sctv-db",
+ "sctv-worker",
  "semver",
  "serde",
  "serde_json",
