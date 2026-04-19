@@ -6,6 +6,9 @@
 use serde::{Deserialize, Serialize};
 
 /// Configuration options for SBOM generation.
+// Each bool is a distinct, independent feature toggle; grouping into an enum would
+// reduce discoverability without improving safety.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone)]
 pub struct GeneratorConfig {
     /// Include development dependencies.
@@ -281,7 +284,6 @@ impl ExternalReferenceType {
     pub const fn spdx_category(&self) -> &'static str {
         match self {
             Self::Vcs | Self::BuildSystem => "PACKAGE-MANAGER",
-            Self::Documentation | Self::Website => "OTHER",
             Self::SecurityAdvisory => "SECURITY",
             _ => "OTHER",
         }

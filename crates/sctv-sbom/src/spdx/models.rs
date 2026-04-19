@@ -136,11 +136,10 @@ impl CreationInfo {
 
     /// Adds a person creator.
     pub fn add_person(&mut self, name: &str, email: Option<&str>) {
-        let creator = if let Some(email) = email {
-            format!("Person: {name} ({email})")
-        } else {
-            format!("Person: {name}")
-        };
+        let creator = email.map_or_else(
+            || format!("Person: {name}"),
+            |email| format!("Person: {name} ({email})"),
+        );
         self.creators.push(creator);
     }
 }

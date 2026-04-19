@@ -1,5 +1,7 @@
 //! SPDX 2.3 SBOM generator.
 
+use std::fmt::Write as _;
+
 use sctv_core::{Dependency, PackageEcosystem, Project};
 use uuid::Uuid;
 
@@ -36,11 +38,10 @@ impl SpdxGenerator {
 
     /// Builds the SPDX document.
     fn build_document(
-        &self,
         project: &Project,
         dependencies: &[Dependency],
         config: &GeneratorConfig,
-    ) -> SbomResult<Document> {
+    ) -> Document {
         let doc_uuid = Uuid::new_v4();
         let namespace = format!(
             "https://spdx.org/spdxdocs/{}-{}",
@@ -51,11 +52,11 @@ impl SpdxGenerator {
         let mut doc = Document::new(format!("{} SBOM", project.name), namespace);
 
         // Build creation info
-        let creation_info = self.build_creation_info(config)?;
+        let creation_info = Self::build_creation_info(config);
         doc.creation_info = creation_info;
 
         // Add main project package
-        let project_pkg = self.build_project_package(project)?;
+        let project_pkg = Self::build_project_package(project);
         let project_spdx_id = project_pkg.spdx_id.clone();
         doc.add_package(project_pkg);
 
@@ -81,7 +82,7 @@ impl SpdxGenerator {
 
         // Build packages for each dependency
         for dep in &filtered_deps {
-            let package = self.build_dependency_package(dep, config)?;
+            let package = Self::build_dependency_package(dep, config);
             let pkg_spdx_id = package.spdx_id.clone();
             doc.add_package(package);
 
@@ -106,8 +107,8 @@ impl SpdxGenerator {
             if let Some(parent_id) = dep.parent_id {
                 // Find parent in filtered deps
                 if let Some(parent) = filtered_deps.iter().find(|d| d.id == parent_id) {
-                    let dep_spdx_id = self.generate_spdx_id(dep);
-                    let parent_spdx_id = self.generate_spdx_id(parent);
+                    let dep_spdx_id = Self::generate_spdx_id(dep);
+                    let parent_spdx_id = Self::generate_spdx_id(parent);
 
                     doc.add_relationship(Relationship::dependency_of(
                         &dep_spdx_id,
@@ -117,11 +118,11 @@ impl SpdxGenerator {
             }
         }
 
-        Ok(doc)
+        doc
     }
 
     /// Builds the creation info section.
-    fn build_creation_info(&self, config: &GeneratorConfig) -> SbomResult<CreationInfo> {
+    fn build_creation_info(config: &GeneratorConfig) -> CreationInfo {
         let mut info = CreationInfo::new();
 
         // Add tool
@@ -132,11 +133,11 @@ impl SpdxGenerator {
             info.add_organization(supplier);
         }
 
-        Ok(info)
+        info
     }
 
     /// Builds a package for the main project.
-    fn build_project_package(&self, project: &Project) -> SbomResult<Package> {
+    fn build_project_package(project: &Project) -> Package {
         let spdx_id = format!("SPDXRef-Package-{}", sanitize_spdx_id(&project.name));
 
         let mut pkg =
@@ -155,16 +156,12 @@ impl SpdxGenerator {
         // Add supplier
         pkg.supplier = Some(format!("Organization: {}", project.name));
 
-        Ok(pkg)
+        pkg
     }
 
     /// Builds a package from a dependency.
-    fn build_dependency_package(
-        &self,
-        dep: &Dependency,
-        config: &GeneratorConfig,
-    ) -> SbomResult<Package> {
-        let spdx_id = self.generate_spdx_id(dep);
+    fn build_dependency_package(dep: &Dependency, config: &GeneratorConfig) -> Package {
+        let spdx_id = Self::generate_spdx_id(dep);
 
         let mut pkg = Package::new(&spdx_id, &dep.package_name)
             .with_version(dep.resolved_version.to_string())
@@ -174,7 +171,7 @@ impl SpdxGenerator {
         pkg.add_external_ref(ExternalRef::purl(dep.purl()));
 
         // Set download location based on ecosystem
-        pkg.download_location = self.get_download_location(dep);
+        pkg.download_location = Self::get_download_location(dep);
 
         // Add checksums if configured
         if config.include_hashes {
@@ -201,11 +198,11 @@ impl SpdxGenerator {
             dep.ecosystem.purl_type()
         ));
 
-        Ok(pkg)
+        pkg
     }
 
     /// Generates an SPDX ID for a dependency.
-    fn generate_spdx_id(&self, dep: &Dependency) -> String {
+    fn generate_spdx_id(dep: &Dependency) -> String {
         let bom_ref = generate_bom_ref(
             dep.ecosystem.purl_type(),
             &dep.package_name,
@@ -215,7 +212,7 @@ impl SpdxGenerator {
     }
 
     /// Gets the download location for a dependency.
-    fn get_download_location(&self, dep: &Dependency) -> String {
+    fn get_download_location(dep: &Dependency) -> String {
         match dep.ecosystem {
             PackageEcosystem::Npm => {
                 format!(
@@ -273,7 +270,7 @@ impl SpdxGenerator {
     }
 
     /// Serializes the document to JSON.
-    fn serialize_json(&self, doc: &Document, pretty: bool) -> SbomResult<String> {
+    fn serialize_json(doc: &Document, pretty: bool) -> SbomResult<String> {
         if pretty {
             serde_json::to_string_pretty(doc)
         } else {
@@ -283,33 +280,35 @@ impl SpdxGenerator {
     }
 
     /// Serializes the document to tag-value format.
-    fn serialize_tag_value(&self, doc: &Document) -> SbomResult<String> {
+    fn serialize_tag_value(doc: &Document) -> String {
         let mut output = String::new();
 
         // Document information
-        output.push_str(&format!("SPDXVersion: {}\n", doc.spdx_version));
-        output.push_str(&format!("DataLicense: {}\n", doc.data_license));
-        output.push_str(&format!("SPDXID: {}\n", doc.spdx_id));
-        output.push_str(&format!("DocumentName: {}\n", doc.name));
-        output.push_str(&format!("DocumentNamespace: {}\n", doc.document_namespace));
+        writeln!(output, "SPDXVersion: {}", doc.spdx_version).unwrap();
+        writeln!(output, "DataLicense: {}", doc.data_license).unwrap();
+        writeln!(output, "SPDXID: {}", doc.spdx_id).unwrap();
+        writeln!(output, "DocumentName: {}", doc.name).unwrap();
+        writeln!(output, "DocumentNamespace: {}", doc.document_namespace).unwrap();
 
         // Creation info
-        output.push_str(&format!(
-            "Creator: Tool: {}\n",
+        writeln!(
+            output,
+            "Creator: Tool: {}",
             doc.creation_info
                 .creators
                 .iter()
                 .find(|c| c.starts_with("Tool:"))
                 .map_or("unknown", |s| s.trim_start_matches("Tool: "))
-        ));
+        )
+        .unwrap();
         for creator in &doc.creation_info.creators {
             if !creator.starts_with("Tool:") {
-                output.push_str(&format!("Creator: {creator}\n"));
+                writeln!(output, "Creator: {creator}").unwrap();
             }
         }
-        output.push_str(&format!("Created: {}\n", doc.creation_info.created));
+        writeln!(output, "Created: {}", doc.creation_info.created).unwrap();
         if let Some(license_version) = &doc.creation_info.license_list_version {
-            output.push_str(&format!("LicenseListVersion: {license_version}\n"));
+            writeln!(output, "LicenseListVersion: {license_version}").unwrap();
         }
 
         output.push('\n');
@@ -317,62 +316,63 @@ impl SpdxGenerator {
         // Packages
         for pkg in &doc.packages {
             output.push_str("##### Package\n\n");
-            output.push_str(&format!("PackageName: {}\n", pkg.name));
-            output.push_str(&format!("SPDXID: {}\n", pkg.spdx_id));
+            writeln!(output, "PackageName: {}", pkg.name).unwrap();
+            writeln!(output, "SPDXID: {}", pkg.spdx_id).unwrap();
 
             if let Some(version) = &pkg.version_info {
-                output.push_str(&format!("PackageVersion: {version}\n"));
+                writeln!(output, "PackageVersion: {version}").unwrap();
             }
 
             if let Some(supplier) = &pkg.supplier {
-                output.push_str(&format!("PackageSupplier: {supplier}\n"));
+                writeln!(output, "PackageSupplier: {supplier}").unwrap();
             }
 
-            output.push_str(&format!(
-                "PackageDownloadLocation: {}\n",
-                pkg.download_location
-            ));
+            writeln!(output, "PackageDownloadLocation: {}", pkg.download_location).unwrap();
 
             if let Some(files_analyzed) = pkg.files_analyzed {
-                output.push_str(&format!("FilesAnalyzed: {files_analyzed}\n"));
+                writeln!(output, "FilesAnalyzed: {files_analyzed}").unwrap();
             }
 
             for checksum in &pkg.checksums {
-                output.push_str(&format!(
-                    "PackageChecksum: {}: {}\n",
+                writeln!(
+                    output,
+                    "PackageChecksum: {}: {}",
                     checksum.algorithm, checksum.checksum_value
-                ));
+                )
+                .unwrap();
             }
 
             if let Some(homepage) = &pkg.homepage {
-                output.push_str(&format!("PackageHomePage: {homepage}\n"));
+                writeln!(output, "PackageHomePage: {homepage}").unwrap();
             }
 
             if let Some(license) = &pkg.license_concluded {
-                output.push_str(&format!("PackageLicenseConcluded: {license}\n"));
+                writeln!(output, "PackageLicenseConcluded: {license}").unwrap();
             }
 
             if let Some(license) = &pkg.license_declared {
-                output.push_str(&format!("PackageLicenseDeclared: {license}\n"));
+                writeln!(output, "PackageLicenseDeclared: {license}").unwrap();
             }
 
             if let Some(copyright) = &pkg.copyright_text {
-                output.push_str(&format!("PackageCopyrightText: {copyright}\n"));
+                writeln!(output, "PackageCopyrightText: {copyright}").unwrap();
             }
 
             if let Some(purpose) = &pkg.primary_package_purpose {
-                output.push_str(&format!("PrimaryPackagePurpose: {purpose}\n"));
+                writeln!(output, "PrimaryPackagePurpose: {purpose}").unwrap();
             }
 
             for ext_ref in &pkg.external_refs {
-                output.push_str(&format!(
-                    "ExternalRef: {} {} {}\n",
+                writeln!(
+                    output,
+                    "ExternalRef: {} {} {}",
                     ext_ref.reference_category, ext_ref.reference_type, ext_ref.reference_locator
-                ));
+                )
+                .unwrap();
             }
 
             if let Some(desc) = &pkg.description {
-                output.push_str(&format!("PackageDescription: <text>{desc}</text>\n"));
+                writeln!(output, "PackageDescription: <text>{desc}</text>").unwrap();
             }
 
             output.push('\n');
@@ -380,13 +380,15 @@ impl SpdxGenerator {
 
         // Relationships
         for rel in &doc.relationships {
-            output.push_str(&format!(
-                "Relationship: {} {} {}\n",
+            writeln!(
+                output,
+                "Relationship: {} {} {}",
                 rel.spdx_element_id, rel.relationship_type, rel.related_spdx_element
-            ));
+            )
+            .unwrap();
         }
 
-        Ok(output)
+        output
     }
 }
 
@@ -405,12 +407,12 @@ impl SbomGenerator for SpdxGenerator {
         dependencies: &[Dependency],
         config: &GeneratorConfig,
     ) -> SbomResult<SbomOutput> {
-        let doc = self.build_document(project, dependencies, config)?;
+        let doc = Self::build_document(project, dependencies, config);
 
         let content = if self.tag_value_output {
-            self.serialize_tag_value(&doc)?
+            Self::serialize_tag_value(&doc)
         } else {
-            self.serialize_json(&doc, config.pretty_print)?
+            Self::serialize_json(&doc, config.pretty_print)?
         };
 
         Ok(SbomOutput {
@@ -504,25 +506,19 @@ mod tests {
 
     #[test]
     fn test_download_locations() {
-        let generator = SpdxGenerator::json();
-
         let mut dep = create_test_dependency();
-        assert!(generator.get_download_location(&dep).contains("npmjs.org"));
+        assert!(SpdxGenerator::get_download_location(&dep).contains("npmjs.org"));
 
         dep.ecosystem = PackageEcosystem::PyPi;
-        assert!(generator.get_download_location(&dep).contains("pypi.org"));
+        assert!(SpdxGenerator::get_download_location(&dep).contains("pypi.org"));
 
         dep.ecosystem = PackageEcosystem::Cargo;
-        assert!(generator.get_download_location(&dep).contains("crates.io"));
+        assert!(SpdxGenerator::get_download_location(&dep).contains("crates.io"));
 
         dep.ecosystem = PackageEcosystem::RubyGems;
-        assert!(generator
-            .get_download_location(&dep)
-            .contains("rubygems.org"));
+        assert!(SpdxGenerator::get_download_location(&dep).contains("rubygems.org"));
 
         dep.ecosystem = PackageEcosystem::GoModules;
-        assert!(generator
-            .get_download_location(&dep)
-            .contains("proxy.golang.org"));
+        assert!(SpdxGenerator::get_download_location(&dep).contains("proxy.golang.org"));
     }
 }
