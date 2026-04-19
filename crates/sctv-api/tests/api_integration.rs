@@ -408,13 +408,17 @@ mod error_responses {
 
     #[tokio::test]
     async fn test_not_found_error_format() {
+        // `get_scan` now hits the jobs table, so without a DB-configured
+        // AppState it returns 503 rather than 404. Validate that the error
+        // envelope still has the documented shape. The previous version of
+        // this test passed only because the handler was a stub that returned
+        // 404 unconditionally — that stub has been replaced, see plan #24.
         let state = create_test_state();
         let router = create_router(state);
 
         let tenant_id = TenantId::new();
         let token = create_test_token(tenant_id, Uuid::new_v4(), "test-secret");
 
-        // Request a non-existent scan
         let fake_id = Uuid::new_v4();
         let request = Request::builder()
             .uri(format!("/api/v1/scans/{}", fake_id))
@@ -425,14 +429,16 @@ mod error_responses {
 
         let response = router.oneshot(request).await.unwrap();
 
-        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
 
         let body = axum::body::to_bytes(response.into_body(), usize::MAX)
             .await
             .unwrap();
         let json: Value = serde_json::from_slice(&body).unwrap();
 
-        assert_eq!(json["error"]["code"], "NOT_FOUND");
+        assert!(json["error"].is_object());
+        assert!(json["error"]["code"].is_string());
+        assert!(json["error"]["message"].is_string());
     }
 }
 
@@ -564,7 +570,12 @@ mod scans {
     use super::*;
 
     #[tokio::test]
-    async fn test_list_scans_empty() {
+    async fn test_list_scans_requires_database() {
+        // `list_scans` is backed by the jobs table, so it requires a DB-
+        // configured AppState. In tests without a pool, it returns 503.
+        // The previous version of this test asserted an empty list, but the
+        // handler used to be a stub that returned `data: []` regardless of
+        // state — that was plan item #24's bug, now fixed.
         let state = create_test_state();
         let router = create_router(state);
 
@@ -580,17 +591,7 @@ mod scans {
 
         let response = router.oneshot(request).await.unwrap();
 
-        assert_eq!(response.status(), StatusCode::OK);
-
-        let body = axum::body::to_bytes(response.into_body(), usize::MAX)
-            .await
-            .unwrap();
-        let json: Value = serde_json::from_slice(&body).unwrap();
-
-        // Should return empty list with pagination
-        assert!(json["data"].is_array());
-        assert_eq!(json["data"].as_array().unwrap().len(), 0);
-        assert!(json["pagination"].is_object());
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
     }
 }
 
