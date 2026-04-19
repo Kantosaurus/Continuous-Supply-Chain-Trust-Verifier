@@ -291,6 +291,65 @@ impl AlertRepository for PgAlertRepository {
         records.iter().map(Self::row_to_alert).collect()
     }
 
+    async fn count_with_filter(
+        &self,
+        tenant_id: TenantId,
+        filter: AlertFilter,
+    ) -> RepositoryResult<u64> {
+        let mut query = String::from("SELECT COUNT(*)::BIGINT FROM alerts WHERE tenant_id = $1");
+        let mut param_count = 1;
+
+        if filter.project_id.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND project_id = ${param_count}"));
+        }
+
+        if filter.status.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND status = ANY(${param_count})"));
+        }
+
+        if filter.severity.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND severity = ANY(${param_count})"));
+        }
+
+        if filter.alert_type.is_some() {
+            param_count += 1;
+            query.push_str(&format!(" AND alert_type = ANY(${param_count})"));
+        }
+
+        let mut query_builder = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id.0);
+
+        if let Some(project_id) = filter.project_id {
+            query_builder = query_builder.bind(project_id.0);
+        }
+
+        if let Some(ref statuses) = filter.status {
+            let status_strs: Vec<&str> = statuses.iter().map(|s| Self::status_to_str(*s)).collect();
+            query_builder = query_builder.bind(status_strs);
+        }
+
+        if let Some(ref severities) = filter.severity {
+            let severity_strs: Vec<&str> = severities
+                .iter()
+                .map(|s| Self::severity_to_str(*s))
+                .collect();
+            query_builder = query_builder.bind(severity_strs);
+        }
+
+        if let Some(ref alert_types) = filter.alert_type {
+            query_builder = query_builder.bind(alert_types);
+        }
+
+        let total: i64 = query_builder
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| RepositoryError::Database(e.to_string()))?;
+
+        Ok(total.max(0) as u64)
+    }
+
     async fn create(&self, alert: &Alert) -> RepositoryResult<()> {
         let alert_details = Self::alert_type_details(&alert.alert_type)?;
 

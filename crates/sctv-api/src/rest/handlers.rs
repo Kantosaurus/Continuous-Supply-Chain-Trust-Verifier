@@ -400,7 +400,7 @@ pub async fn list_alerts(
     let alert_repo = state.alert_repo()?;
     let project_repo = state.project_repo()?;
 
-    // Build filter
+    // Build filter (cloned so we can count with the same predicate)
     let filter = AlertFilter {
         project_id: filters.project_id.map(ProjectId),
         status: filters.status.map(|s| vec![s]),
@@ -408,7 +408,10 @@ pub async fn list_alerts(
         alert_type: filters.alert_type.map(|t| vec![t]),
     };
 
-    // Fetch alerts with filter
+    let total_items = alert_repo
+        .count_with_filter(user.tenant_id, filter.clone())
+        .await?;
+
     let alerts = alert_repo
         .find_with_filter(
             user.tenant_id,
@@ -418,7 +421,6 @@ pub async fn list_alerts(
         )
         .await?;
 
-    // Get project names for alerts
     let mut responses = Vec::with_capacity(alerts.len());
     for alert in &alerts {
         let project_name = project_repo
@@ -428,10 +430,8 @@ pub async fn list_alerts(
         responses.push(alert_to_response(alert, project_name));
     }
 
-    // Note: For proper pagination, we'd need a count query
-    // For now, estimate based on returned results
-    let total_items = responses.len() as u64;
-    let total_pages = 1; // Would need a count query for accuracy
+    let per_page = pagination.per_page.max(1) as u64;
+    let total_pages = ((total_items + per_page - 1) / per_page) as u32;
 
     Ok(Json(PaginatedResponse {
         data: responses,

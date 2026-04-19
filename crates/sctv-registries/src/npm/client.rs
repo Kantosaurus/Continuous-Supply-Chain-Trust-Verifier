@@ -15,7 +15,8 @@ use url::Url;
 
 use super::models::*;
 use crate::{
-    PackageMetadata, RegistryCache, RegistryClient, RegistryError, RegistryResult, VersionMetadata,
+    retry_http, PackageMetadata, RegistryCache, RegistryClient, RegistryError, RegistryResult,
+    RetryConfig, VersionMetadata,
 };
 
 /// npm registry client with caching and hash verification.
@@ -61,12 +62,13 @@ impl NpmClient {
 
         tracing::debug!("Fetching abbreviated metadata for {} from {}", name, url);
 
-        let response = self
-            .http
-            .get(url)
-            .header("Accept", "application/vnd.npm.install-v1+json")
-            .send()
-            .await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http
+                .get(url.clone())
+                .header("Accept", "application/vnd.npm.install-v1+json")
+                .send()
+        })
+        .await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::PackageNotFound(name.to_string()));
@@ -98,7 +100,7 @@ impl NpmClient {
 
         tracing::debug!("Fetching full metadata for {} from {}", name, url);
 
-        let response = self.http.get(url).send().await?;
+        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::PackageNotFound(name.to_string()));
@@ -130,7 +132,7 @@ impl NpmClient {
 
         tracing::debug!("Fetching version {}@{} from {}", name, version, url);
 
-        let response = self.http.get(url).send().await?;
+        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::VersionNotFound(
@@ -400,7 +402,7 @@ impl RegistryClient for NpmClient {
 
         tracing::debug!("Downloading {}@{} from {}", name, version, url);
 
-        let response = self.http.get(url).send().await?;
+        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
 
         if !response.status().is_success() {
             return Err(RegistryError::Unavailable(format!(

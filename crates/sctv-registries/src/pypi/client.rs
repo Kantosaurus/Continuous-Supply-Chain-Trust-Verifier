@@ -14,7 +14,8 @@ use url::Url;
 
 use super::models::*;
 use crate::{
-    PackageMetadata, RegistryCache, RegistryClient, RegistryError, RegistryResult, VersionMetadata,
+    retry_http, PackageMetadata, RegistryCache, RegistryClient, RegistryError, RegistryResult,
+    RetryConfig, VersionMetadata,
 };
 
 /// PyPI registry client with caching and hash verification.
@@ -61,7 +62,7 @@ impl PyPiClient {
 
         tracing::debug!("Fetching PyPI package {} from {}", name, url);
 
-        let response = self.http.get(url).send().await?;
+        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::PackageNotFound(name.to_string()));
@@ -94,7 +95,7 @@ impl PyPiClient {
 
         tracing::debug!("Fetching PyPI version {}=={} from {}", name, version, url);
 
-        let response = self.http.get(url).send().await?;
+        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::VersionNotFound(
@@ -138,7 +139,7 @@ impl PyPiClient {
 
         tracing::debug!("Fetching attestations from {}", url);
 
-        let response = self.http.get(url).send().await?;
+        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             // No attestations available - this is not an error
@@ -430,7 +431,7 @@ impl RegistryClient for PyPiClient {
 
         tracing::debug!("Downloading {}=={} from {}", name, version, url);
 
-        let response = self.http.get(url).send().await?;
+        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
 
         if !response.status().is_success() {
             return Err(RegistryError::Unavailable(format!(

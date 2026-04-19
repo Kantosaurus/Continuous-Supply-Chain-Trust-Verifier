@@ -14,7 +14,8 @@ use url::Url;
 
 use super::models::*;
 use crate::{
-    PackageMetadata, RegistryCache, RegistryClient, RegistryError, RegistryResult, VersionMetadata,
+    retry_http, PackageMetadata, RegistryCache, RegistryClient, RegistryError, RegistryResult,
+    RetryConfig, VersionMetadata,
 };
 
 /// Go module proxy client with caching.
@@ -76,7 +77,7 @@ impl GoModulesClient {
 
         tracing::debug!("Fetching version list for {} from {}", module, url);
 
-        let response = self.http.get(url).send().await?;
+        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND
             || response.status() == reqwest::StatusCode::GONE
@@ -117,7 +118,7 @@ impl GoModulesClient {
 
         tracing::debug!("Fetching version info for {}@{} from {}", module, version, url);
 
-        let response = self.http.get(url).send().await?;
+        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND
             || response.status() == reqwest::StatusCode::GONE
@@ -151,7 +152,7 @@ impl GoModulesClient {
 
         tracing::debug!("Fetching go.mod for {}@{} from {}", module, version, url);
 
-        let response = self.http.get(url).send().await?;
+        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND
             || response.status() == reqwest::StatusCode::GONE
@@ -423,7 +424,7 @@ impl RegistryClient for GoModulesClient {
 
         tracing::debug!("Downloading {}@{} from {}", name, version, url);
 
-        let response = self.http.get(url).send().await?;
+        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND
             || response.status() == reqwest::StatusCode::GONE

@@ -202,6 +202,13 @@ pub trait AlertRepository: Send + Sync {
         offset: u32,
     ) -> RepositoryResult<Vec<Alert>>;
 
+    /// Counts alerts matching the same filter (used for pagination totals).
+    async fn count_with_filter(
+        &self,
+        tenant_id: TenantId,
+        filter: AlertFilter,
+    ) -> RepositoryResult<u64>;
+
     /// Creates a new alert.
     async fn create(&self, alert: &Alert) -> RepositoryResult<()>;
 
