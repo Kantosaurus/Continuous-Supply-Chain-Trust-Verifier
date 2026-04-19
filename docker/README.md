@@ -4,7 +4,16 @@ This directory contains Docker configuration for deploying the Supply Chain Trus
 
 ## Quick Start
 
+The base compose file requires `POSTGRES_PASSWORD` and `SCTV_JWT_SECRET` to be
+set — it will refuse to start without them. First-time setup:
+
 ```bash
+# Create a local .env from the template and fill in secrets
+cp .env.example .env
+# Generate strong values and paste them into .env:
+openssl rand -base64 24   # POSTGRES_PASSWORD
+openssl rand -hex 32      # SCTV_JWT_SECRET
+
 # Start development environment
 docker-compose up -d
 

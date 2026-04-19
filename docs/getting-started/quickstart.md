@@ -41,6 +41,14 @@ If you haven't installed SCTV yet, see the [Installation Guide](installation.md)
 git clone https://github.com/example/supply-chain-trust-verifier.git
 cd supply-chain-trust-verifier
 
+# Required: create a local .env with strong secrets before starting.
+# The base compose file refuses to start without POSTGRES_PASSWORD and
+# SCTV_JWT_SECRET, so `docker-compose up` will fail otherwise.
+cp .env.example .env
+# Generate values and paste into .env:
+#   openssl rand -base64 24   # POSTGRES_PASSWORD
+#   openssl rand -hex 32      # SCTV_JWT_SECRET
+
 # Start all services
 docker-compose up -d
 
