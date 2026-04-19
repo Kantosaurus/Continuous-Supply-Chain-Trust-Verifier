@@ -57,6 +57,9 @@ pub struct Alert {
 impl Alert {
     /// Creates a new alert.
     #[must_use]
+    // alert_type is cloned into self.alert_type and also used for default_severity();
+    // changing to &AlertType would break callers in other crates (sctv-detectors, sctv-ci).
+    #[allow(clippy::needless_pass_by_value)]
     pub fn new(
         tenant_id: TenantId,
         project_id: ProjectId,
@@ -92,7 +95,7 @@ impl Alert {
     }
 
     /// Marks the alert as being investigated.
-    pub fn start_investigation(&mut self) {
+    pub const fn start_investigation(&mut self) {
         self.status = AlertStatus::Investigating;
     }
 
@@ -113,7 +116,7 @@ impl Alert {
     }
 
     /// Suppresses the alert.
-    pub fn suppress(&mut self, until: Option<DateTime<Utc>>) {
+    pub const fn suppress(&mut self, until: Option<DateTime<Utc>>) {
         self.status = AlertStatus::Suppressed;
         self.metadata.suppressed_until = until;
     }
@@ -159,13 +162,10 @@ impl AlertType {
     #[must_use]
     pub const fn default_severity(&self) -> Severity {
         match self {
-            Self::DependencyTampering(_) => Severity::Critical,
-            Self::DowngradeAttack(_) => Severity::High,
-            Self::Typosquatting(_) => Severity::Critical,
-            Self::ProvenanceFailure(_) => Severity::Medium,
+            Self::DependencyTampering(_) | Self::Typosquatting(_) => Severity::Critical,
+            Self::DowngradeAttack(_) | Self::SuspiciousMaintainer(_) => Severity::High,
+            Self::ProvenanceFailure(_) | Self::NewPackage(_) => Severity::Medium,
             Self::PolicyViolation(details) => details.rule_severity,
-            Self::NewPackage(_) => Severity::Medium,
-            Self::SuspiciousMaintainer(_) => Severity::High,
         }
     }
 

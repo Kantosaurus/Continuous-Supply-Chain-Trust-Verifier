@@ -354,11 +354,11 @@ pub trait ApiKeyRepository: Send + Sync {
     /// Creates a new API key row.
     async fn create(&self, key: &ApiKey) -> RepositoryResult<()>;
 
-    /// Marks an API key revoked (soft-delete). Returns NotFound if the row
+    /// Marks an API key revoked (soft-delete). Returns `NotFound` if the row
     /// doesn't exist or is already revoked.
     async fn revoke(&self, id: ApiKeyId) -> RepositoryResult<()>;
 
-    /// Updates the last_used_at timestamp. Intended to be called on each
+    /// Updates the `last_used_at` timestamp. Intended to be called on each
     /// successful auth but is best-effort; errors are logged, not propagated.
     async fn touch_last_used(&self, id: ApiKeyId) -> RepositoryResult<()>;
 }

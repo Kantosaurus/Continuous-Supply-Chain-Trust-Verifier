@@ -33,8 +33,10 @@ impl std::fmt::Display for UserId {
 /// Role of a user within a tenant.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum UserRole {
     /// Regular team member with read access.
+    #[default]
     Member,
     /// Can manage projects and policies.
     Developer,
@@ -42,12 +44,6 @@ pub enum UserRole {
     Admin,
     /// Full access including billing and tenant deletion.
     Owner,
-}
-
-impl Default for UserRole {
-    fn default() -> Self {
-        Self::Member
-    }
 }
 
 impl std::fmt::Display for UserRole {
@@ -70,7 +66,7 @@ impl std::str::FromStr for UserRole {
             "developer" => Ok(Self::Developer),
             "admin" => Ok(Self::Admin),
             "owner" => Ok(Self::Owner),
-            _ => Err(format!("Unknown role: {}", s)),
+            _ => Err(format!("Unknown role: {s}")),
         }
     }
 }

@@ -90,7 +90,7 @@ impl std::fmt::Display for AuditAction {
             Self::DataExported => "data_exported",
             Self::SbomGenerated => "sbom_generated",
         };
-        write!(f, "{}", s)
+        write!(f, "{s}")
     }
 }
 
@@ -118,7 +118,7 @@ impl std::str::FromStr for AuditAction {
             "settings_updated" => Ok(Self::SettingsUpdated),
             "data_exported" => Ok(Self::DataExported),
             "sbom_generated" => Ok(Self::SbomGenerated),
-            _ => Err(format!("Unknown audit action: {}", s)),
+            _ => Err(format!("Unknown audit action: {s}")),
         }
     }
 }
@@ -165,7 +165,7 @@ impl std::str::FromStr for ResourceType {
             "sbom" => Ok(Self::Sbom),
             "api_key" => Ok(Self::ApiKey),
             "settings" => Ok(Self::Settings),
-            _ => Err(format!("Unknown resource type: {}", s)),
+            _ => Err(format!("Unknown resource type: {s}")),
         }
     }
 }
@@ -210,7 +210,7 @@ impl AuditLog {
 
     /// Sets the resource ID.
     #[must_use]
-    pub fn with_resource_id(mut self, resource_id: Uuid) -> Self {
+    pub const fn with_resource_id(mut self, resource_id: Uuid) -> Self {
         self.resource_id = Some(resource_id);
         self
     }

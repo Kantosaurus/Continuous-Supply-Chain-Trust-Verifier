@@ -113,7 +113,7 @@ pub struct AttestationSignature {
 impl AttestationSignature {
     /// Creates a new unverified signature.
     #[must_use]
-    pub fn new(sig: String) -> Self {
+    pub const fn new(sig: String) -> Self {
         Self {
             keyid: None,
             sig,
@@ -124,7 +124,7 @@ impl AttestationSignature {
     }
 
     /// Marks the signature as verified.
-    pub fn mark_verified(&mut self) {
+    pub const fn mark_verified(&mut self) {
         self.verified = true;
     }
 }

@@ -76,8 +76,10 @@ impl JobType {
 /// Status of a background job.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum JobStatus {
     /// Job is waiting to be processed.
+    #[default]
     Pending,
     /// Job is currently being executed.
     Running,
@@ -89,12 +91,6 @@ pub enum JobStatus {
     Cancelled,
     /// Job is scheduled for future execution.
     Scheduled,
-}
-
-impl Default for JobStatus {
-    fn default() -> Self {
-        Self::Pending
-    }
 }
 
 impl std::fmt::Display for JobStatus {
@@ -121,28 +117,23 @@ impl std::str::FromStr for JobStatus {
             "failed" => Ok(Self::Failed),
             "cancelled" => Ok(Self::Cancelled),
             "scheduled" => Ok(Self::Scheduled),
-            _ => Err(format!("Unknown job status: {}", s)),
+            _ => Err(format!("Unknown job status: {s}")),
         }
     }
 }
 
 /// Priority levels for job scheduling.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
 pub enum JobPriority {
     /// Low priority, processed when queue is idle.
     Low = 0,
     /// Normal priority for regular operations.
+    #[default]
     Normal = 5,
     /// High priority for time-sensitive tasks.
     High = 10,
     /// Critical priority for security alerts.
     Critical = 15,
-}
-
-impl Default for JobPriority {
-    fn default() -> Self {
-        Self::Normal
-    }
 }
 
 impl From<i32> for JobPriority {
@@ -158,7 +149,7 @@ impl From<i32> for JobPriority {
 
 impl From<JobPriority> for i32 {
     fn from(priority: JobPriority) -> Self {
-        priority as i32
+        priority as Self
     }
 }
 
@@ -207,14 +198,14 @@ impl Job {
 
     /// Creates a job with a specific priority.
     #[must_use]
-    pub fn with_priority(mut self, priority: JobPriority) -> Self {
+    pub const fn with_priority(mut self, priority: JobPriority) -> Self {
         self.priority = priority;
         self
     }
 
     /// Creates a job scheduled for future execution.
     #[must_use]
-    pub fn scheduled_for(mut self, scheduled_at: DateTime<Utc>) -> Self {
+    pub const fn scheduled_for(mut self, scheduled_at: DateTime<Utc>) -> Self {
         self.scheduled_at = scheduled_at;
         self.status = JobStatus::Scheduled;
         self
