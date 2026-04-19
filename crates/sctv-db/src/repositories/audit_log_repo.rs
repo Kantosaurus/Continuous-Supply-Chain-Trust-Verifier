@@ -198,6 +198,13 @@ impl AuditLogRepository for PgAuditLogRepository {
     }
 
     async fn cleanup_old_logs(&self, older_than_days: u32) -> RepositoryResult<u32> {
+        // A retention of 0 days is almost always a misconfiguration. Treat
+        // it as a no-op rather than "delete every row older than NOW()",
+        // which would silently wipe the entire audit trail.
+        if older_than_days == 0 {
+            return Ok(0);
+        }
+
         let result = sqlx::query(
             r#"
             DELETE FROM audit_logs

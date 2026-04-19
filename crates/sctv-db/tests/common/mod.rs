@@ -2,8 +2,7 @@
 
 use sqlx::PgPool;
 use std::sync::Once;
-use testcontainers::{runners::AsyncRunner, ContainerAsync, ImageExt};
-use testcontainers::core::IntoContainerPort;
+use testcontainers::{runners::AsyncRunner, ContainerAsync};
 
 static INIT: Once = Once::new();
 
@@ -60,7 +59,13 @@ impl testcontainers::Image for PostgresImage {
     }
 
     fn expose_ports(&self) -> &[testcontainers::core::ContainerPort] {
-        &[]
+        // Expose 5432 on a random host port. The previous version returned
+        // &[] and relied on a hardcoded .with_mapped_port(5432, 5432) at
+        // the call site, which forced every parallel test to fight for the
+        // same host port and caused cross-test DB sharing under contention.
+        const PORTS: &[testcontainers::core::ContainerPort] =
+            &[testcontainers::core::ContainerPort::Tcp(5432)];
+        PORTS
     }
 }
 
@@ -73,11 +78,14 @@ pub struct TestDb {
 
 impl TestDb {
     /// Creates a new test database with migrations applied.
+    ///
+    /// Each call spins up its own Postgres container with a random host port
+    /// so tests can run in parallel without fighting for port 5432 and
+    /// without sharing state through a single shared database.
     pub async fn new() -> Self {
         init_tracing();
 
         let container = PostgresImage::default()
-            .with_mapped_port(5432, 5432.tcp())
             .start()
             .await
             .expect("Failed to start PostgreSQL container");

@@ -303,6 +303,13 @@ impl JobRepository for PgJobRepository {
     }
 
     async fn cleanup_old_jobs(&self, older_than_days: u32) -> RepositoryResult<u32> {
+        // Same rationale as audit_log_repo::cleanup_old_logs: a retention
+        // of 0 days is a config mistake, not a request to purge every
+        // completed job. No-op protects against that.
+        if older_than_days == 0 {
+            return Ok(0);
+        }
+
         let result = sqlx::query(
             r#"
             DELETE FROM jobs
