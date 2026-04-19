@@ -54,9 +54,8 @@ impl ApiError {
             Self::Conflict(_) => StatusCode::CONFLICT,
             Self::RateLimited => StatusCode::TOO_MANY_REQUESTS,
             Self::Validation(_) => StatusCode::UNPROCESSABLE_ENTITY,
-            Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Self::Internal(_) | Self::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Self::ServiceUnavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
-            Self::Database(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 

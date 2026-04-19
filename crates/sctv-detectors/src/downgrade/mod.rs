@@ -495,8 +495,10 @@ mod tests {
     #[test]
     fn test_patch_downgrade_detected() {
         // Use config that detects patch downgrades
-        let mut config = DowngradeConfig::default();
-        config.minimum_severity = DowngradeSeverity::Patch;
+        let config = DowngradeConfig {
+            minimum_severity: DowngradeSeverity::Patch,
+            ..DowngradeConfig::default()
+        };
 
         let detector = DowngradeDetector::with_config(config);
         let project_id = ProjectId::new();
@@ -624,8 +626,10 @@ mod tests {
 
     #[test]
     fn test_allow_patch_downgrades() {
-        let mut config = DowngradeConfig::default();
-        config.allow_patch_downgrades = true;
+        let config = DowngradeConfig {
+            allow_patch_downgrades: true,
+            ..DowngradeConfig::default()
+        };
 
         let detector = DowngradeDetector::with_config(config);
         let project_id = ProjectId::new();

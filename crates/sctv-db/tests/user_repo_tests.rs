@@ -113,12 +113,12 @@ async fn test_find_users_by_tenant() {
         .expect("Failed to create user2");
 
     // Find all users for tenant
-    let users = user_repo
+    let found_users = user_repo
         .find_by_tenant(tenant.id)
         .await
         .expect("Failed to find users");
 
-    assert_eq!(users.len(), 2);
+    assert_eq!(found_users.len(), 2);
 }
 
 #[tokio::test]

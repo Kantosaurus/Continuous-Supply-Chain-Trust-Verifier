@@ -673,7 +673,11 @@ mod tests {
         assert!(result.is_some());
         let finding = result.unwrap();
         assert_eq!(finding.finding_type, TamperingType::HashMismatch);
-        assert_eq!(finding.confidence, 1.0);
+        // confidence is set to exactly 1.0 (a whole-number literal) for hash mismatches.
+        #[allow(clippy::float_cmp)]
+        {
+            assert_eq!(finding.confidence, 1.0);
+        }
     }
 
     #[test]

@@ -190,7 +190,7 @@ impl ProvenanceDetector {
     /// # Errors
     ///
     /// Returns an error if the underlying Sigstore verification fails.
-    pub async fn verify_provenance(
+    pub fn verify_provenance(
         &self,
         dependency: &Dependency,
     ) -> DetectorResult<ProvenanceVerificationResult> {
@@ -302,7 +302,7 @@ impl Detector for ProvenanceDetector {
     }
 
     async fn analyze(&self, dependency: &Dependency) -> DetectorResult<Vec<DetectionResult>> {
-        let verification_result = self.verify_provenance(dependency).await?;
+        let verification_result = self.verify_provenance(dependency)?;
         let mut results = Vec::new();
 
         // Check if provenance meets requirements
@@ -510,7 +510,7 @@ mod tests {
         let mut dependency = create_test_dependency();
         dependency.ecosystem = PackageEcosystem::Maven;
 
-        let result = detector.verify_provenance(&dependency).await.unwrap();
+        let result = detector.verify_provenance(&dependency).unwrap();
         assert!(!result.has_provenance);
         assert!(!result.warnings.is_empty());
     }
