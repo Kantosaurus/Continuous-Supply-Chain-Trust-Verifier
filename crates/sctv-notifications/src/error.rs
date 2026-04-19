@@ -13,9 +13,13 @@ pub enum NotificationError {
     #[error("SMTP transport error: {0}")]
     SmtpTransport(String),
 
-    /// Failed to send webhook notification.
+    /// Failed to send webhook notification (retryable server-side failure).
     #[error("webhook delivery failed: {0}")]
     WebhookDelivery(String),
+
+    /// Webhook rejected the request with a 4xx client error — retrying will not help.
+    #[error("webhook rejected request: {0}")]
+    WebhookClientError(String),
 
     /// Invalid webhook URL.
     #[error("invalid webhook URL: {0}")]
@@ -48,6 +52,24 @@ pub enum NotificationError {
     /// Timeout waiting for response.
     #[error("request timed out after {timeout_secs} seconds")]
     Timeout { timeout_secs: u64 },
+}
+
+impl NotificationError {
+    /// Returns true if retrying the request may succeed (rate limits, 5xx, transient I/O).
+    /// Returns false for hard client errors (4xx, auth failures, invalid config) where
+    /// further attempts are wasted.
+    #[must_use]
+    pub fn is_retryable(&self) -> bool {
+        !matches!(
+            self,
+            Self::WebhookClientError(_)
+                | Self::InvalidWebhookUrl(_)
+                | Self::InvalidConfig(_)
+                | Self::AuthenticationFailed(_)
+                | Self::ChannelDisabled
+                | Self::Serialization(_)
+        )
+    }
 }
 
 impl From<reqwest::Error> for NotificationError {

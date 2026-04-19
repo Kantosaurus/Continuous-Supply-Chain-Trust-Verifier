@@ -265,8 +265,12 @@ impl RegistryClient for GoModulesClient {
                     && !v.contains("-pre")
             })
             .max_by(|a, b| {
-                let va = Self::parse_go_version(a).ok();
-                let vb = Self::parse_go_version(b).ok();
+                let va = Self::parse_go_version(a)
+                    .map_err(|e| tracing::warn!(version = %a, error = %e, "Skipping unparseable Go version during sort"))
+                    .ok();
+                let vb = Self::parse_go_version(b)
+                    .map_err(|e| tracing::warn!(version = %b, error = %e, "Skipping unparseable Go version during sort"))
+                    .ok();
                 va.cmp(&vb)
             })
             .or_else(|| versions.last())

@@ -5,7 +5,7 @@
 
 #[cfg(feature = "ssr")]
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     use axum::Router;
     use leptos::logging::log;
     use leptos::prelude::*;
@@ -13,16 +13,13 @@ async fn main() {
     use sctv_dashboard::App;
     use tower_http::services::ServeDir;
 
-    // Initialize logging
     tracing_subscriber::fmt::init();
 
-    // Generate Leptos route configuration
-    let conf = get_configuration(None).unwrap();
+    let conf = get_configuration(None)?;
     let leptos_options = conf.leptos_options;
     let addr = leptos_options.site_addr;
     let routes = generate_route_list(App);
 
-    // Build the Axum application
     let app = Router::new()
         .leptos_routes(&leptos_options, routes, {
             let leptos_options = leptos_options.clone();
@@ -35,11 +32,10 @@ async fn main() {
 
     log!("Starting SCTV Dashboard at http://{}", addr);
 
-    // Start the server
-    let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
-    axum::serve(listener, app.into_make_service())
-        .await
-        .unwrap();
+    let listener = tokio::net::TcpListener::bind(&addr).await?;
+    axum::serve(listener, app.into_make_service()).await?;
+
+    Ok(())
 }
 
 #[cfg(feature = "ssr")]
