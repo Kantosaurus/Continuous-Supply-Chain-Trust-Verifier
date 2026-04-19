@@ -42,7 +42,7 @@ impl PgPackageRepository {
         let repository = repository.and_then(|u| Url::parse(&u).ok());
 
         let maintainers: Vec<String> = serde_json::from_value(maintainers)
-            .unwrap_or_default();
+            .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
         Ok(Package {
             id: PackageId(id),
@@ -262,15 +262,15 @@ impl PgPackageVersionRepository {
                     .map_err(|e| RepositoryError::InvalidData(format!("Invalid version: {}", e)))?;
 
                 let checksums: sctv_core::PackageChecksums = serde_json::from_value(checksums)
-                    .unwrap_or_default();
+                    .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
                 let download_url = download_url.and_then(|u| Url::parse(&u).ok());
 
                 let attestations: Vec<sctv_core::Attestation> = serde_json::from_value(attestations)
-                    .unwrap_or_default();
+                    .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
                 let dependencies: Vec<sctv_core::PackageDependency> = serde_json::from_value(dependencies)
-                    .unwrap_or_default();
+                    .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
                 Ok(Some(sctv_core::PackageVersion {
                     package_id: PackageId(package_id),
@@ -377,15 +377,15 @@ impl PgPackageVersionRepository {
 
             if let Ok(version) = semver::Version::parse(&version_str) {
                 let checksums: sctv_core::PackageChecksums = serde_json::from_value(checksums)
-                    .unwrap_or_default();
+                    .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
                 let download_url = download_url.and_then(|u| Url::parse(&u).ok());
 
                 let attestations: Vec<sctv_core::Attestation> = serde_json::from_value(attestations)
-                    .unwrap_or_default();
+                    .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
                 let dependencies: Vec<sctv_core::PackageDependency> = serde_json::from_value(dependencies)
-                    .unwrap_or_default();
+                    .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
                 versions.push(sctv_core::PackageVersion {
                     package_id: PackageId(package_id),

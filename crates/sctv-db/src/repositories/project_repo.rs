@@ -57,7 +57,7 @@ impl PgProjectRepository {
         };
 
         let metadata: ProjectMetadata = serde_json::from_value(metadata)
-            .unwrap_or_default();
+            .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
         Ok(Project {
             id: ProjectId(id),

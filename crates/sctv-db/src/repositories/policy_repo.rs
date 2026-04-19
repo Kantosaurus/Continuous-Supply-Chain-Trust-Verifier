@@ -33,9 +33,11 @@ impl PgPolicyRepository {
         let rules: Vec<PolicyRule> = serde_json::from_value(rules)
             .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
-        let severity_overrides: Vec<SeverityOverride> = severity_overrides
-            .and_then(|v| serde_json::from_value(v).ok())
-            .unwrap_or_default();
+        let severity_overrides: Vec<SeverityOverride> = match severity_overrides {
+            Some(v) => serde_json::from_value(v)
+                .map_err(|e| RepositoryError::Serialization(e.to_string()))?,
+            None => Vec::new(),
+        };
 
         Ok(Policy {
             id: PolicyId(id),
@@ -119,13 +121,18 @@ impl PolicyRepository for PgPolicyRepository {
         let severity_overrides = serde_json::to_value(&policy.severity_overrides)
             .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
-        // If this policy is being set as default, unset any existing default first
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| RepositoryError::Database(e.to_string()))?;
+
         if policy.is_default {
             sqlx::query(
                 "UPDATE policies SET is_default = false WHERE tenant_id = $1 AND is_default = true",
             )
             .bind(policy.tenant_id.0)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await
             .map_err(|e| RepositoryError::Database(e.to_string()))?;
         }
@@ -148,7 +155,7 @@ impl PolicyRepository for PgPolicyRepository {
         .bind(policy.enabled)
         .bind(policy.created_at)
         .bind(policy.updated_at)
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await
         .map_err(|e| {
             if e.to_string().contains("duplicate key") {
@@ -157,6 +164,10 @@ impl PolicyRepository for PgPolicyRepository {
                 RepositoryError::Database(e.to_string())
             }
         })?;
+
+        tx.commit()
+            .await
+            .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
         Ok(())
     }
@@ -168,14 +179,19 @@ impl PolicyRepository for PgPolicyRepository {
         let severity_overrides = serde_json::to_value(&policy.severity_overrides)
             .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
-        // If this policy is being set as default, unset any existing default first
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| RepositoryError::Database(e.to_string()))?;
+
         if policy.is_default {
             sqlx::query(
                 "UPDATE policies SET is_default = false WHERE tenant_id = $1 AND is_default = true AND id != $2",
             )
             .bind(policy.tenant_id.0)
             .bind(policy.id.0)
-            .execute(&self.pool)
+            .execute(&mut *tx)
             .await
             .map_err(|e| RepositoryError::Database(e.to_string()))?;
         }
@@ -195,13 +211,17 @@ impl PolicyRepository for PgPolicyRepository {
         .bind(severity_overrides)
         .bind(policy.is_default)
         .bind(policy.enabled)
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await
         .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
         if result.rows_affected() == 0 {
             return Err(RepositoryError::NotFound);
         }
+
+        tx.commit()
+            .await
+            .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
         Ok(())
     }

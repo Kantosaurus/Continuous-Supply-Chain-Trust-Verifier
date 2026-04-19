@@ -96,6 +96,16 @@ fn dependency_to_response(dep: &Dependency) -> DependencyResponse {
 }
 
 fn policy_to_response(policy: &Policy) -> PolicyResponse {
+    // Pick the highest override severity so the UI reflects the most severe
+    // override the policy enforces; fall back to Medium when no overrides
+    // are configured (rules carry their own severities per-finding).
+    let severity = policy
+        .severity_overrides
+        .iter()
+        .map(|o| o.severity)
+        .max()
+        .unwrap_or(Severity::Medium);
+
     PolicyResponse {
         id: policy.id.0,
         name: policy.name.clone(),
@@ -114,7 +124,7 @@ fn policy_to_response(policy: &Policy) -> PolicyResponse {
                 Some(PolicyRuleResponse { rule_type, config })
             })
             .collect(),
-        severity: Severity::High, // Default severity for policy display
+        severity,
         is_enabled: policy.enabled,
         created_at: policy.created_at,
         updated_at: policy.updated_at,
@@ -169,8 +179,8 @@ pub async fn list_projects(
     // Build responses with dependency and alert counts
     let mut responses = Vec::with_capacity(paginated.len());
     for project in paginated {
-        let deps = dep_repo.find_by_project(project.id).await.unwrap_or_default();
-        let alert_count = alert_repo.count_open_by_project(project.id).await.unwrap_or(0);
+        let deps = dep_repo.find_by_project(project.id).await?;
+        let alert_count = alert_repo.count_open_by_project(project.id).await?;
         responses.push(project_to_response(&project, deps.len() as u32, alert_count));
     }
 
@@ -229,8 +239,8 @@ pub async fn get_project(
         return Err(ApiError::Forbidden);
     }
 
-    let deps = dep_repo.find_by_project(project.id).await.unwrap_or_default();
-    let alert_count = alert_repo.count_open_by_project(project.id).await.unwrap_or(0);
+    let deps = dep_repo.find_by_project(project.id).await?;
+    let alert_count = alert_repo.count_open_by_project(project.id).await?;
 
     Ok(Json(project_to_response(&project, deps.len() as u32, alert_count)))
 }
@@ -274,8 +284,8 @@ pub async fn update_project(
     // Save updates
     project_repo.update(&project).await?;
 
-    let deps = dep_repo.find_by_project(project.id).await.unwrap_or_default();
-    let alert_count = alert_repo.count_open_by_project(project.id).await.unwrap_or(0);
+    let deps = dep_repo.find_by_project(project.id).await?;
+    let alert_count = alert_repo.count_open_by_project(project.id).await?;
 
     Ok(Json(project_to_response(&project, deps.len() as u32, alert_count)))
 }
@@ -413,9 +423,7 @@ pub async fn list_alerts(
     for alert in &alerts {
         let project_name = project_repo
             .find_by_id(alert.project_id)
-            .await
-            .ok()
-            .flatten()
+            .await?
             .map(|p| p.name);
         responses.push(alert_to_response(alert, project_name));
     }
@@ -457,9 +465,7 @@ pub async fn get_alert(
 
     let project_name = project_repo
         .find_by_id(alert.project_id)
-        .await
-        .ok()
-        .flatten()
+        .await?
         .map(|p| p.name);
 
     Ok(Json(alert_to_response(&alert, project_name)))
@@ -491,9 +497,7 @@ pub async fn acknowledge_alert(
 
     let project_name = project_repo
         .find_by_id(alert.project_id)
-        .await
-        .ok()
-        .flatten()
+        .await?
         .map(|p| p.name);
 
     Ok(Json(alert_to_response(&alert, project_name)))
@@ -530,9 +534,7 @@ pub async fn resolve_alert(
 
     let project_name = project_repo
         .find_by_id(alert.project_id)
-        .await
-        .ok()
-        .flatten()
+        .await?
         .map(|p| p.name);
 
     Ok(Json(alert_to_response(&alert, project_name)))
@@ -564,9 +566,7 @@ pub async fn suppress_alert(
 
     let project_name = project_repo
         .find_by_id(alert.project_id)
-        .await
-        .ok()
-        .flatten()
+        .await?
         .map(|p| p.name);
 
     Ok(Json(alert_to_response(&alert, project_name)))

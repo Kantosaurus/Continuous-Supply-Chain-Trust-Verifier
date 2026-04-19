@@ -102,10 +102,22 @@ impl MonitorRegistryExecutor {
                         }
 
                         // Update cached package
-                        let _ = package_repo.upsert(&metadata.package).await;
+                        if let Err(e) = package_repo.upsert(&metadata.package).await {
+                            tracing::error!(
+                                package = package_name,
+                                error = %e,
+                                "Failed to upsert cached package"
+                            );
+                        }
                     } else {
                         // New package, cache it
-                        let _ = package_repo.upsert(&metadata.package).await;
+                        if let Err(e) = package_repo.upsert(&metadata.package).await {
+                            tracing::error!(
+                                package = package_name,
+                                error = %e,
+                                "Failed to insert new package"
+                            );
+                        }
                     }
                 }
                 Err(e) => {

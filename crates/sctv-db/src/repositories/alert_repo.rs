@@ -66,7 +66,7 @@ impl PgAlertRepository {
             .and_then(|v| serde_json::from_value(v).ok());
 
         let metadata: AlertMetadata = serde_json::from_value(metadata_json)
-            .unwrap_or_default();
+            .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
         Ok(Alert {
             id: AlertId(id),
