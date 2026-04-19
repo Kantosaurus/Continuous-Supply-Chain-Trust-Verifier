@@ -190,7 +190,11 @@ impl ProvenanceDetector {
     /// # Errors
     ///
     /// Returns an error if the underlying Sigstore verification fails.
-    pub fn verify_provenance(
+    #[allow(clippy::unused_async)]
+    // Public API: caller-visible async fn must remain async so signature
+    // and .await behavior stay stable; implementation may become async
+    // when provenance acquires real I/O.
+    pub async fn verify_provenance(
         &self,
         dependency: &Dependency,
     ) -> DetectorResult<ProvenanceVerificationResult> {
@@ -224,7 +228,7 @@ impl ProvenanceDetector {
         match provenance_status {
             ProvenanceStatus::Unknown => {
                 // Need to fetch and verify provenance
-                self.verifier.verify(dependency)
+                self.verifier.verify(dependency).await
             }
             ProvenanceStatus::Failed => {
                 Ok(ProvenanceVerificationResult::verification_failed(vec![
@@ -302,7 +306,7 @@ impl Detector for ProvenanceDetector {
     }
 
     async fn analyze(&self, dependency: &Dependency) -> DetectorResult<Vec<DetectionResult>> {
-        let verification_result = self.verify_provenance(dependency)?;
+        let verification_result = self.verify_provenance(dependency).await?;
         let mut results = Vec::new();
 
         // Check if provenance meets requirements
@@ -510,7 +514,7 @@ mod tests {
         let mut dependency = create_test_dependency();
         dependency.ecosystem = PackageEcosystem::Maven;
 
-        let result = detector.verify_provenance(&dependency).unwrap();
+        let result = detector.verify_provenance(&dependency).await.unwrap();
         assert!(!result.has_provenance);
         assert!(!result.warnings.is_empty());
     }

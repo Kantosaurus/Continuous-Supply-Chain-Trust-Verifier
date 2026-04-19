@@ -40,7 +40,14 @@ impl ProvenanceVerifier {
     /// # Errors
     ///
     /// Returns an error if the underlying Sigstore verification or bundle parsing fails.
-    pub fn verify(&self, dependency: &Dependency) -> DetectorResult<ProvenanceVerificationResult> {
+    #[allow(clippy::unused_async)]
+    // Public API: caller-visible async fn must remain async so signature
+    // and .await behavior stay stable; implementation may become async
+    // when verification acquires real I/O.
+    pub async fn verify(
+        &self,
+        dependency: &Dependency,
+    ) -> DetectorResult<ProvenanceVerificationResult> {
         debug!(
             package = %dependency.package_name,
             version = %dependency.resolved_version,
@@ -401,12 +408,12 @@ mod tests {
         ));
     }
 
-    #[test]
-    fn test_verify_returns_no_provenance_for_unknown() {
+    #[tokio::test]
+    async fn test_verify_returns_no_provenance_for_unknown() {
         let verifier = ProvenanceVerifier::new();
         let dependency = create_test_dependency();
 
-        let result = verifier.verify(&dependency).unwrap();
+        let result = verifier.verify(&dependency).await.unwrap();
         assert!(!result.has_provenance);
     }
 

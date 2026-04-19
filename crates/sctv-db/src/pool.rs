@@ -131,10 +131,13 @@ impl TenantAwarePool {
     /// # Errors
     ///
     /// Returns an error if migrations fail to apply.
-    pub fn run_migrations(&self) -> Result<(), DbError> {
+    #[allow(clippy::unused_async)]
+    // Public API: caller-visible async fn must remain async so signature
+    // and .await behavior stay stable; implementation may become async
+    // when migration acquires real I/O.
+    pub async fn run_migrations(&self) -> Result<(), DbError> {
         // Migration support requires sqlx-cli preparation.
         // Use sqlx::migrate!("../../migrations") when database is available.
-        // async removed: no await points in this stub implementation.
         tracing::warn!("Migrations not available - run sqlx prepare first");
         Ok(())
     }
