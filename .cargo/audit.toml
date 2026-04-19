@@ -1,0 +1,41 @@
+# cargo-audit configuration.
+#
+# Every entry below is a documented exception. Each advisory we ignore must
+# be accompanied by:
+#   - a short title,
+#   - a justification for why we cannot (or need not) fix it today, and
+#   - a "Reassess" condition describing when to revisit.
+#
+# Re-evaluate this file any time dependencies change materially. `cargo audit`
+# reads this file automatically from the workspace root.
+
+[advisories]
+ignore = [
+    # RUSTSEC-2023-0071 - rsa 0.9.10 "Marvin Attack" timing sidechannel.
+    #
+    # Justification: `rsa` is pulled in transitively by `sqlx-mysql`, which is
+    # itself an OPTIONAL dependency of `sqlx-macros-core`. We do not enable the
+    # `mysql` feature on `sqlx` anywhere in the workspace (only `postgres`),
+    # so `sqlx-mysql` is not activated in any compiled artifact (verified via
+    # `cargo tree`). It appears in `Cargo.lock` because cargo records all
+    # potential optional dependencies, but cargo-audit does not evaluate
+    # feature unification and so flags it anyway. No `rsa` code is linked into
+    # our binaries.
+    # Reassess: when `sqlx` publishes a release that no longer listsqlx-mysql
+    # as a non-default optional dep of sqlx-macros-core, or when a fixed `rsa`
+    # crate is published.
+    "RUSTSEC-2023-0071",
+
+    # RUSTSEC-2024-0436 - `paste` crate no longer maintained.
+    #
+    # Justification: `paste` is a proc-macro pulled transitively by the
+    # Leptos ecosystem (tachys, reactive_stores, leptos, either_of). There is
+    # no vulnerability associated with this advisory; it simply marks the
+    # crate as unmaintained. We have no ability to remove it without
+    # abandoning Leptos, and the maintainers have publicly stated the crate
+    # is feature-complete. Risk is low: `paste` is a token-pasting macro used
+    # only at compile time.
+    # Reassess: when Leptos migrates off `paste`, or when a security
+    # advisory (not an unmaintained warning) is issued.
+    "RUSTSEC-2024-0436",
+]
