@@ -51,8 +51,8 @@ Key variables:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `POSTGRES_PASSWORD` | Database password | `sctv_secure_password` |
-| `SCTV_JWT_SECRET` | JWT signing secret | (required in prod) |
+| `POSTGRES_PASSWORD` | Database password | (required) |
+| `SCTV_JWT_SECRET` | JWT signing secret | (required) |
 | `SCTV_WORKER_COUNT` | Number of worker threads | `4` |
 | `API_PORT` | API server port | `3000` |
 
