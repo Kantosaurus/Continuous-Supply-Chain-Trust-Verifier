@@ -10,7 +10,8 @@
 #   - dashboard: Web UI (optional)
 #
 # Usage:
-#   # Start all services
+#   # Start all services (requires .env — see .env.example)
+#   cp .env.example .env   # edit and set POSTGRES_PASSWORD + SCTV_JWT_SECRET
 #   docker-compose up -d
 #
 #   # Start specific services
@@ -39,7 +40,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-sctv}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sctv_secure_password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required. Set it in .env (cp .env.example .env) or export it.}
       POSTGRES_DB: ${POSTGRES_DB:-sctv}
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -68,10 +69,10 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:-sctv}:${POSTGRES_PASSWORD:-sctv_secure_password}@postgres:5432/${POSTGRES_DB:-sctv}
+      DATABASE_URL: postgres://${POSTGRES_USER:-sctv}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required. Set it in .env (cp .env.example .env) or export it.}@postgres:5432/${POSTGRES_DB:-sctv}
       SCTV_HOST: 0.0.0.0
       SCTV_PORT: 3000
-      SCTV_JWT_SECRET: ${SCTV_JWT_SECRET:-change-this-in-production}
+      SCTV_JWT_SECRET: ${SCTV_JWT_SECRET:?SCTV_JWT_SECRET is required. Generate with `openssl rand -hex 32` and set in .env or export it.}
       SCTV_ENABLE_CORS: ${SCTV_ENABLE_CORS:-true}
       SCTV_LOG_FORMAT: ${SCTV_LOG_FORMAT:-json}
       RUST_LOG: ${RUST_LOG:-info,sctv_api=debug,tower_http=debug}
@@ -101,7 +102,7 @@ services:
       api:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgres://${POSTGRES_USER:-sctv}:${POSTGRES_PASSWORD:-sctv_secure_password}@postgres:5432/${POSTGRES_DB:-sctv}
+      DATABASE_URL: postgres://${POSTGRES_USER:-sctv}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required. Set it in .env (cp .env.example .env) or export it.}@postgres:5432/${POSTGRES_DB:-sctv}
       SCTV_WORKER_COUNT: ${SCTV_WORKER_COUNT:-4}
       SCTV_POLL_INTERVAL_MS: ${SCTV_POLL_INTERVAL_MS:-1000}
       SCTV_SHUTDOWN_TIMEOUT_SECS: ${SCTV_SHUTDOWN_TIMEOUT_SECS:-30}

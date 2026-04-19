@@ -77,6 +77,19 @@ Create a `.env` file:
 cp .env.example .env
 ```
 
+> **Required before `docker-compose up`.** The base `docker-compose.yml` refuses
+> to start if `POSTGRES_PASSWORD` or `SCTV_JWT_SECRET` is unset — this prevents
+> accidentally shipping the service with a known-bad default. Generate secure
+> values and put them in `.env`:
+>
+> ```bash
+> # Strong database password
+> openssl rand -base64 24
+>
+> # Strong JWT signing secret
+> openssl rand -hex 32
+> ```
+
 Edit `.env` with your configuration:
 
 ```env
