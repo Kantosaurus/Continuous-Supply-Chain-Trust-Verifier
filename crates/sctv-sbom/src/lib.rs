@@ -125,6 +125,10 @@ pub trait SbomGenerator {
     fn format(&self) -> SbomFormat;
 
     /// Generates an SBOM from project and dependencies.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SbomError`] if generation or serialization fails.
     fn generate(
         &self,
         project: &Project,
@@ -144,9 +148,9 @@ pub trait SbomGenerator {
 /// * `format` - The output format
 /// * `config` - Generator configuration options
 ///
-/// # Returns
+/// # Errors
 ///
-/// The generated SBOM output or an error.
+/// Returns [`SbomError`] if generation or serialization fails.
 pub fn generate(
     project: &Project,
     dependencies: &[Dependency],
@@ -168,6 +172,10 @@ pub fn generate(
 /// Generate an SBOM with default configuration.
 ///
 /// Convenience function using default settings.
+///
+/// # Errors
+///
+/// Returns [`SbomError`] if generation or serialization fails.
 pub fn generate_default(
     project: &Project,
     dependencies: &[Dependency],

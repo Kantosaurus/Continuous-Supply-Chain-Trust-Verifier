@@ -134,20 +134,25 @@ impl FromRequestParts<Arc<AppState>> for MaybeAuthUser {
         parts: &mut Parts,
         state: &Arc<AppState>,
     ) -> Result<Self, Self::Rejection> {
-        match AuthUser::from_request_parts(parts, state).await {
-            Ok(user) => Ok(Self(Some(user))),
-            Err(_) => Ok(Self(None)),
-        }
+        Ok(Self(AuthUser::from_request_parts(parts, state).await.ok()))
     }
 }
 
 /// Encodes a JWT token.
+///
+/// # Errors
+///
+/// Returns an error if the JWT encoding fails.
 pub fn encode_token(claims: &Claims, secret: &str) -> Result<String, jsonwebtoken::errors::Error> {
     let key = EncodingKey::from_secret(secret.as_bytes());
     encode(&Header::default(), claims, &key)
 }
 
 /// Decodes and validates a JWT token.
+///
+/// # Errors
+///
+/// Returns [`ApiError::Unauthorized`] if the token is invalid or expired.
 pub fn decode_token(token: &str, secret: &str) -> Result<Claims, ApiError> {
     let key = DecodingKey::from_secret(secret.as_bytes());
     let mut validation = Validation::default();

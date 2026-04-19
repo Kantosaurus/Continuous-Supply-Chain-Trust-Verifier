@@ -85,6 +85,10 @@ async fn health_check() -> Json<HealthResponse> {
 }
 
 /// Starts the API server.
+///
+/// # Errors
+///
+/// Returns an [`std::io::Error`] if binding to the address or serving fails.
 pub async fn run_server(config: ServerConfig, state: Arc<AppState>) -> std::io::Result<()> {
     let router = create_router(state);
 

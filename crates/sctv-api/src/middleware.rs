@@ -27,6 +27,8 @@ pub async fn logging_middleware(request: Request, next: Next) -> Response {
 
 /// Rate limiting state (placeholder - use a proper rate limiter in production).
 pub struct RateLimiter {
+    // Field is stored for future use; the check() method is a stub that doesn't yet use it.
+    #[allow(dead_code)]
     requests_per_minute: u32,
 }
 

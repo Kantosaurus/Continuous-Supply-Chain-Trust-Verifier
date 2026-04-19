@@ -82,6 +82,10 @@ impl AppState {
     }
 
     /// Returns the project repository or an error if not available.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::ApiError::ServiceUnavailable`] if the database is not configured.
     pub fn project_repo(&self) -> Result<&dyn ProjectRepository, crate::ApiError> {
         self.repositories
             .as_ref()
@@ -90,6 +94,10 @@ impl AppState {
     }
 
     /// Returns the alert repository or an error if not available.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::ApiError::ServiceUnavailable`] if the database is not configured.
     pub fn alert_repo(&self) -> Result<&dyn AlertRepository, crate::ApiError> {
         self.repositories
             .as_ref()
@@ -98,6 +106,10 @@ impl AppState {
     }
 
     /// Returns the dependency repository or an error if not available.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::ApiError::ServiceUnavailable`] if the database is not configured.
     pub fn dependency_repo(&self) -> Result<&dyn DependencyRepository, crate::ApiError> {
         self.repositories
             .as_ref()
@@ -106,6 +118,10 @@ impl AppState {
     }
 
     /// Returns the policy repository or an error if not available.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::ApiError::ServiceUnavailable`] if the database is not configured.
     pub fn policy_repo(&self) -> Result<&dyn PolicyRepository, crate::ApiError> {
         self.repositories
             .as_ref()
