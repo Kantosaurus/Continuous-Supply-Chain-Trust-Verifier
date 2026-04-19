@@ -343,6 +343,7 @@ impl RegistryClient for RubyGemsClient {
             .collect();
 
         let checksums = PackageChecksums {
+            sha1: None,
             sha256: Some(version_data.sha.clone()),
             sha512: None,
             integrity: None,

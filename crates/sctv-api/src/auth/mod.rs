@@ -168,28 +168,14 @@ impl FromRequestParts<Arc<AppState>> for ApiKeyAuth {
     type Rejection = ApiError;
 
     async fn from_request_parts(
-        parts: &mut Parts,
+        _parts: &mut Parts,
         _state: &Arc<AppState>,
     ) -> Result<Self, Self::Rejection> {
-        // Check for X-API-Key header
-        let api_key = parts
-            .headers
-            .get("X-API-Key")
-            .and_then(|h| h.to_str().ok())
-            .ok_or(ApiError::Unauthorized)?;
-
-        // In a real implementation, validate against database
-        // For now, return a placeholder
-        if api_key.len() < 32 {
-            return Err(ApiError::Unauthorized);
-        }
-
-        // TODO: Look up API key in database
-        Ok(Self {
-            key_id: Uuid::new_v4(),
-            tenant_id: TenantId::new(),
-            scopes: vec!["read".to_string()],
-        })
+        // API key authentication is not yet wired up to the database. Reject all
+        // requests until the api_keys table and lookup path land (see plan item
+        // Tier 4 #22). A prior placeholder accepted any 32+ char string, which
+        // was a security bypass — do NOT restore that behavior.
+        Err(ApiError::Unauthorized)
     }
 }
 

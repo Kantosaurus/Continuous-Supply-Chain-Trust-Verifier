@@ -139,6 +139,8 @@ impl PackageVersion {
 /// Checksums for integrity verification.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct PackageChecksums {
+    #[serde(default)]
+    pub sha1: Option<String>,
     pub sha256: Option<String>,
     pub sha512: Option<String>,
     pub integrity: Option<String>,
@@ -148,7 +150,10 @@ impl PackageChecksums {
     /// Checks if any checksum is available.
     #[must_use]
     pub fn has_any(&self) -> bool {
-        self.sha256.is_some() || self.sha512.is_some() || self.integrity.is_some()
+        self.sha1.is_some()
+            || self.sha256.is_some()
+            || self.sha512.is_some()
+            || self.integrity.is_some()
     }
 }
 

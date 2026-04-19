@@ -203,8 +203,8 @@ impl MavenClient {
         };
         result.computed_sha256 = Some(sha256_hash.clone());
 
-        // Check against expected SHA-1 (stored in sha512 field for Maven)
-        if let Some(expected_sha1) = &expected.sha512 {
+        // Check against expected SHA-1
+        if let Some(expected_sha1) = &expected.sha1 {
             result.sha1_match = Some(expected_sha1.to_lowercase() == sha1_hash);
         }
 
@@ -381,8 +381,9 @@ impl RegistryClient for MavenClient {
         );
 
         let checksums = PackageChecksums {
+            sha1: sha1.ok().flatten(),
             sha256: sha256.ok().flatten(),
-            sha512: sha1.ok().flatten(), // Store SHA-1 in sha512 field for Maven
+            sha512: None,
             integrity: None,
         };
 

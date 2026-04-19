@@ -287,6 +287,7 @@ impl RegistryClient for CargoClient {
         let download_url = self.build_download_url(name, version)?;
 
         let checksums = PackageChecksums {
+            sha1: None,
             sha256: Some(version_data.checksum.clone()),
             sha512: None,
             integrity: None,

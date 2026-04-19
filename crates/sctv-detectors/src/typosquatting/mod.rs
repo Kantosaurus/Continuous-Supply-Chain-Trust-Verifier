@@ -235,8 +235,12 @@ impl TyposquattingDetector {
             }
         }
 
-        // Sort by similarity score (highest first)
-        candidates.sort_by(|a, b| b.similarity_score.partial_cmp(&a.similarity_score).unwrap());
+        // Sort by similarity score (highest first). NaN scores compare as Equal to avoid panics.
+        candidates.sort_by(|a, b| {
+            b.similarity_score
+                .partial_cmp(&a.similarity_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         candidates
     }
 

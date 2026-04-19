@@ -381,6 +381,7 @@ impl RegistryClient for PyPiClient {
             })?;
 
         let checksums = PackageChecksums {
+            sha1: None,
             sha256: release_file.digests.sha256.clone(),
             sha512: None,
             integrity: release_file.digests.blake2b_256.clone().map(|h| format!("blake2b_256:{}", h)),

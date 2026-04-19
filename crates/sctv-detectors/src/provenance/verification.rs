@@ -336,7 +336,10 @@ impl MockAttestationFetcher {
 
     /// Adds an attestation to return.
     pub fn add_attestation(&self, attestation: FetchedAttestation) {
-        self.attestations.write().unwrap().push(attestation);
+        self.attestations
+            .write()
+            .unwrap_or_else(|e| e.into_inner())
+            .push(attestation);
     }
 }
 
@@ -348,7 +351,11 @@ impl AttestationFetcher for MockAttestationFetcher {
         _package_name: &str,
         _version: &str,
     ) -> Result<Vec<FetchedAttestation>, Box<dyn std::error::Error + Send + Sync>> {
-        Ok(self.attestations.read().unwrap().clone())
+        Ok(self
+            .attestations
+            .read()
+            .unwrap_or_else(|e| e.into_inner())
+            .clone())
     }
 }
 
