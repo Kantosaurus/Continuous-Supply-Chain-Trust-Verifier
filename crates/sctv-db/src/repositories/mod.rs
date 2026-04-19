@@ -1,6 +1,7 @@
 //! Repository implementations for database access.
 
 mod alert_repo;
+mod api_key_repo;
 mod audit_log_repo;
 mod dependency_repo;
 mod job_repo;
@@ -12,6 +13,7 @@ mod tenant_repo;
 mod user_repo;
 
 pub use alert_repo::*;
+pub use api_key_repo::*;
 pub use audit_log_repo::*;
 pub use dependency_repo::*;
 pub use job_repo::*;

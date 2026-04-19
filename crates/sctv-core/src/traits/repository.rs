@@ -4,9 +4,10 @@ use async_trait::async_trait;
 use thiserror::Error;
 
 use crate::domain::{
-    Alert, AlertId, AlertStatus, AuditLog, AuditLogFilter, AuditLogId, Dependency, DependencyId,
-    Job, JobId, JobStatus, Package, PackageEcosystem, PackageId, Policy, PolicyId, Project,
-    ProjectId, Sbom, SbomFormat, SbomId, Severity, Tenant, TenantId, User, UserId,
+    Alert, AlertId, AlertStatus, ApiKey, ApiKeyId, AuditLog, AuditLogFilter, AuditLogId,
+    Dependency, DependencyId, Job, JobId, JobStatus, Package, PackageEcosystem, PackageId, Policy,
+    PolicyId, Project, ProjectId, Sbom, SbomFormat, SbomId, Severity, Tenant, TenantId, User,
+    UserId,
 };
 
 /// Errors that can occur during repository operations.
@@ -327,6 +328,31 @@ pub trait SbomRepository: Send + Sync {
 
     /// Deletes old SBOMs for a project, keeping the most recent N.
     async fn cleanup_old_sboms(&self, project_id: ProjectId, keep_count: u32) -> RepositoryResult<u32>;
+}
+
+/// Repository for API key operations.
+#[async_trait]
+pub trait ApiKeyRepository: Send + Sync {
+    /// Finds an active API key by its SHA-256 digest. Returns None if no
+    /// match exists, is revoked, or is expired.
+    async fn find_active_by_hash(&self, key_hash: &str) -> RepositoryResult<Option<ApiKey>>;
+
+    /// Finds an API key by ID.
+    async fn find_by_id(&self, id: ApiKeyId) -> RepositoryResult<Option<ApiKey>>;
+
+    /// Lists API keys for a tenant (excluding revoked ones).
+    async fn list_active_by_tenant(&self, tenant_id: TenantId) -> RepositoryResult<Vec<ApiKey>>;
+
+    /// Creates a new API key row.
+    async fn create(&self, key: &ApiKey) -> RepositoryResult<()>;
+
+    /// Marks an API key revoked (soft-delete). Returns NotFound if the row
+    /// doesn't exist or is already revoked.
+    async fn revoke(&self, id: ApiKeyId) -> RepositoryResult<()>;
+
+    /// Updates the last_used_at timestamp. Intended to be called on each
+    /// successful auth but is best-effort; errors are logged, not propagated.
+    async fn touch_last_used(&self, id: ApiKeyId) -> RepositoryResult<()>;
 }
 
 /// Repository for audit log operations.

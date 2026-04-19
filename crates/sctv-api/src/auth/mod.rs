@@ -168,14 +168,53 @@ impl FromRequestParts<Arc<AppState>> for ApiKeyAuth {
     type Rejection = ApiError;
 
     async fn from_request_parts(
-        _parts: &mut Parts,
-        _state: &Arc<AppState>,
+        parts: &mut Parts,
+        state: &Arc<AppState>,
     ) -> Result<Self, Self::Rejection> {
-        // API key authentication is not yet wired up to the database. Reject all
-        // requests until the api_keys table and lookup path land (see plan item
-        // Tier 4 #22). A prior placeholder accepted any 32+ char string, which
-        // was a security bypass — do NOT restore that behavior.
-        Err(ApiError::Unauthorized)
+        use sctv_core::traits::ApiKeyRepository;
+        use sctv_db::PgApiKeyRepository;
+        use sha2::{Digest, Sha256};
+
+        let api_key = parts
+            .headers
+            .get("X-API-Key")
+            .and_then(|h| h.to_str().ok())
+            .ok_or(ApiError::Unauthorized)?;
+
+        if api_key.len() < 32 {
+            return Err(ApiError::Unauthorized);
+        }
+
+        let pool = state
+            .pool()
+            .ok_or_else(|| ApiError::ServiceUnavailable("Database not configured".into()))?;
+        let repo = PgApiKeyRepository::new(pool.clone());
+
+        let key_hash = {
+            let mut hasher = Sha256::new();
+            hasher.update(api_key.as_bytes());
+            hex::encode(hasher.finalize())
+        };
+
+        let stored = repo
+            .find_active_by_hash(&key_hash)
+            .await
+            .map_err(|e| ApiError::Internal(format!("API key lookup failed: {e}")))?
+            .ok_or(ApiError::Unauthorized)?;
+
+        if !stored.is_active() {
+            return Err(ApiError::Unauthorized);
+        }
+
+        if let Err(e) = repo.touch_last_used(stored.id).await {
+            tracing::warn!(error = %e, key_id = %stored.id, "Failed to update api_keys.last_used_at");
+        }
+
+        Ok(Self {
+            key_id: stored.id.0,
+            tenant_id: stored.tenant_id,
+            scopes: stored.scopes,
+        })
     }
 }
 

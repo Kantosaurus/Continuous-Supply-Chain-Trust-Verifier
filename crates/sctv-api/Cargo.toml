@@ -33,6 +33,8 @@ serde_json = { workspace = true }
 
 # Auth
 jsonwebtoken = { workspace = true }
+sha2 = { workspace = true }
+hex = { workspace = true }
 
 # Database
 sqlx = { workspace = true }
