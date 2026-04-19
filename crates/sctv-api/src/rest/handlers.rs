@@ -194,7 +194,7 @@ pub async fn list_projects(
     let per_page_u64 = u64::from(pagination.per_page.max(1));
     let total_pages = u32::try_from(total_items.div_ceil(per_page_u64).max(1)).unwrap_or(u32::MAX);
     let offset = usize::try_from(pagination.offset()).unwrap_or(0);
-    let limit = usize::try_from(pagination.per_page).unwrap_or(0);
+    let limit = usize::try_from(pagination.per_page).unwrap_or(usize::MAX);
 
     // Paginate results
     let paginated: Vec<_> = projects.into_iter().skip(offset).take(limit).collect();
@@ -438,7 +438,7 @@ pub async fn list_project_dependencies(
     let per_page_u64 = u64::from(pagination.per_page.max(1));
     let total_pages = u32::try_from(total_items.div_ceil(per_page_u64).max(1)).unwrap_or(u32::MAX);
     let offset = usize::try_from(pagination.offset()).unwrap_or(0);
-    let limit = usize::try_from(pagination.per_page).unwrap_or(0);
+    let limit = usize::try_from(pagination.per_page).unwrap_or(usize::MAX);
 
     // Paginate and convert
     let responses: Vec<_> = dependencies
@@ -686,7 +686,7 @@ pub async fn list_policies(
     let per_page_u64 = u64::from(pagination.per_page.max(1));
     let total_pages = u32::try_from(total_items.div_ceil(per_page_u64).max(1)).unwrap_or(u32::MAX);
     let offset = usize::try_from(pagination.offset()).unwrap_or(0);
-    let limit = usize::try_from(pagination.per_page).unwrap_or(0);
+    let limit = usize::try_from(pagination.per_page).unwrap_or(usize::MAX);
 
     // Paginate and convert
     let responses: Vec<_> = policies
