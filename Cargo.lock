@@ -3778,7 +3778,9 @@ name = "sctv-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "clap",
+ "sctv-ci",
  "sctv-core",
  "sctv-detectors",
  "sctv-registries",

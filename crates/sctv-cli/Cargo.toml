@@ -13,6 +13,10 @@ path = "src/main.rs"
 sctv-core = { path = "../sctv-core" }
 sctv-detectors = { path = "../sctv-detectors" }
 sctv-registries = { path = "../sctv-registries" }
+sctv-ci = { path = "../sctv-ci" }
+
+# Async runtime utilities for registry clients
+chrono = { workspace = true }
 
 # CLI
 clap = { workspace = true }

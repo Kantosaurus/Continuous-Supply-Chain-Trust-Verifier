@@ -1,5 +1,6 @@
-//! Check command - verify a package for typosquatting.
+//! Check command - verify a package name for typosquatting.
 
+use crate::shared;
 use crate::OutputFormat;
 use sctv_core::PackageEcosystem;
 use sctv_detectors::typosquatting::TyposquattingDetector;
@@ -22,16 +23,19 @@ pub async fn run(name: &str, ecosystem: &str, format: OutputFormat) -> anyhow::R
             println!("{}", serde_json::to_string_pretty(&output)?);
         }
         OutputFormat::Sarif => {
-            // TODO: Implement SARIF output
-            println!("SARIF output not yet implemented");
+            let alerts: Vec<_> = candidates
+                .iter()
+                .map(|c| shared::typosquat_to_alert(c, ecosystem))
+                .collect();
+            shared::emit_sarif(&alerts)?;
         }
         OutputFormat::Text => {
             println!("Checking '{}' ({}) for typosquatting...\n", name, ecosystem);
 
             if candidates.is_empty() {
-                println!("✓ No typosquatting detected");
+                println!("No typosquatting detected");
             } else {
-                println!("⚠ Potential typosquatting detected!\n");
+                println!("Potential typosquatting detected!\n");
                 for candidate in &candidates {
                     println!(
                         "  Similar to: {} (score: {:.2}, method: {:?})",
