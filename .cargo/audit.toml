@@ -21,7 +21,7 @@ ignore = [
     # potential optional dependencies, but cargo-audit does not evaluate
     # feature unification and so flags it anyway. No `rsa` code is linked into
     # our binaries.
-    # Reassess: when `sqlx` publishes a release that no longer listsqlx-mysql
+    # Reassess: when `sqlx` publishes a release that no longer lists sqlx-mysql
     # as a non-default optional dep of sqlx-macros-core, or when a fixed `rsa`
     # crate is published.
     "RUSTSEC-2023-0071",
