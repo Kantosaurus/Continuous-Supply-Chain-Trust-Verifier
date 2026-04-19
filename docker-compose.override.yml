@@ -22,7 +22,6 @@ services:
     environment:
       DATABASE_URL: postgres://sctv:sctv_dev@postgres:5432/sctv
       SCTV_JWT_SECRET: development-secret-not-for-production
-      SCTV_ENABLE_GRAPHQL_PLAYGROUND: "true"
       SCTV_LOG_FORMAT: pretty
       RUST_LOG: debug,sctv_api=debug,tower_http=debug,sqlx=warn
     volumes:

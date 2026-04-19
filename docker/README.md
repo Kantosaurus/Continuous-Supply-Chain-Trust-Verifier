@@ -14,7 +14,7 @@ make dev
 
 Access the services:
 - **API**: http://localhost:3000
-- **GraphQL Playground**: http://localhost:3000/graphql
+- **GraphQL endpoint** (POST only): http://localhost:3000/graphql
 - **Health Check**: http://localhost:3000/health
 
 ## Architecture
@@ -166,7 +166,7 @@ docker-compose exec worker env | grep DATABASE_URL
 
 1. **Never use default passwords in production**
 2. **Set `SCTV_JWT_SECRET` to a strong random value**
-3. **Disable GraphQL playground in production** (`SCTV_ENABLE_GRAPHQL_PLAYGROUND=false`)
+3. **Disable CORS in production** (`SCTV_ENABLE_CORS=false`) unless the API is fronted by a gateway that handles CORS policy
 4. **Use Docker secrets for sensitive values in Swarm/Kubernetes**
 5. **Run containers as non-root user** (already configured)
 

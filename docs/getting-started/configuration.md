@@ -54,7 +54,6 @@ jwt_secret = "your-jwt-secret-change-in-production"
 jwt_expiry_hours = 24
 enable_cors = true
 cors_allowed_origins = ["http://localhost:3001"]
-enable_graphql_playground = true
 max_request_size_mb = 10
 
 [worker]
@@ -566,7 +565,6 @@ max_connections = 5
 bind_addr = "127.0.0.1:3000"
 jwt_secret = "dev-secret-not-for-production"
 enable_cors = true
-enable_graphql_playground = true
 
 [worker]
 pool_size = 2
@@ -593,7 +591,6 @@ require_ssl = true
 bind_addr = "0.0.0.0:3000"
 jwt_secret = "${SCTV_JWT_SECRET}"
 enable_cors = false
-enable_graphql_playground = false
 max_request_size_mb = 5
 
 [api.tls]

@@ -209,7 +209,6 @@ max_connections = 20
 bind_addr = "0.0.0.0:3000"
 jwt_secret = "your-jwt-secret"
 enable_cors = true
-enable_graphql_playground = true
 
 [worker]
 pool_size = 4

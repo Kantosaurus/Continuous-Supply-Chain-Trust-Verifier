@@ -39,20 +39,15 @@ curl -X POST http://localhost:3000/graphql \
   }'
 ```
 
-### Using the GraphQL Playground
+### Interactive Query Tools
 
-When enabled (development mode), visit `http://localhost:3000/graphql` in your browser to access an interactive GraphQL IDE with:
+The API server does not ship an embedded GraphQL playground. The GraphQL endpoint accepts only `POST /graphql`. To explore the schema interactively, use an external client such as:
 
-- Query autocompletion
-- Schema documentation
-- Query history
-- Response formatting
+- [Apollo Sandbox](https://studio.apollographql.com/sandbox/explorer) (browser-based)
+- [Altair GraphQL](https://altairgraphql.dev/)
+- [Insomnia](https://insomnia.rest/) or [Postman](https://www.postman.com/) with their built-in GraphQL support
 
-Enable the playground by setting:
-
-```bash
-SCTV_ENABLE_GRAPHQL_PLAYGROUND=true
-```
+Point the client at `http://localhost:3000/graphql` and supply a JWT `Authorization: Bearer <token>` header.
 
 ---
 

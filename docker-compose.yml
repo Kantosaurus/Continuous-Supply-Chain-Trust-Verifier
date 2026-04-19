@@ -73,7 +73,6 @@ services:
       SCTV_PORT: 3000
       SCTV_JWT_SECRET: ${SCTV_JWT_SECRET:-change-this-in-production}
       SCTV_ENABLE_CORS: ${SCTV_ENABLE_CORS:-true}
-      SCTV_ENABLE_GRAPHQL_PLAYGROUND: ${SCTV_ENABLE_GRAPHQL_PLAYGROUND:-true}
       SCTV_LOG_FORMAT: ${SCTV_LOG_FORMAT:-json}
       RUST_LOG: ${RUST_LOG:-info,sctv_api=debug,tower_http=debug}
     ports:

@@ -45,21 +45,18 @@ DATABASE_URL=postgres://sctv:secure_password@localhost:5432/sctv_production
 | `API_PORT` | Integer | `3000` | Port to bind the API server |
 | `SCTV_JWT_SECRET` | String | *Required in production* | Secret key for JWT token signing (minimum 32 characters recommended) |
 | `SCTV_ENABLE_CORS` | Boolean | `true` | Enable Cross-Origin Resource Sharing (disable in production if not needed) |
-| `SCTV_ENABLE_GRAPHQL_PLAYGROUND` | Boolean | `true` | Enable GraphQL Playground UI (disable in production) |
 | `SCTV_LOG_FORMAT` | String | `json` | Log format: `json` (structured) or `pretty` (development) |
 
 **Security Notes:**
 - Always set a strong, random `SCTV_JWT_SECRET` in production
 - Generate with: `openssl rand -base64 32`
-- Disable GraphQL Playground in production environments
-- Disable CORS unless you need cross-origin API access
+- Disable CORS unless you need cross-origin API access (production defaults to off in `docker-compose.prod.yml`)
 
 **Example:**
 ```bash
 SCTV_JWT_SECRET=your-super-secret-jwt-key-change-in-production
 API_PORT=3000
 SCTV_ENABLE_CORS=false
-SCTV_ENABLE_GRAPHQL_PLAYGROUND=false
 SCTV_LOG_FORMAT=json
 ```
 
@@ -221,7 +218,6 @@ ServerConfig {
     bind_addr: "127.0.0.1:3000",
     jwt_secret: "development-secret-change-in-production",
     enable_cors: true,
-    enable_graphql_playground: true,
 }
 ```
 
@@ -274,7 +270,6 @@ GoModulesClient::DEFAULT_REGISTRY = "https://proxy.golang.org"
 DATABASE_URL=postgres://sctv:sctv_dev@localhost:5432/sctv_dev
 SCTV_JWT_SECRET=development-secret-not-for-production
 SCTV_ENABLE_CORS=true
-SCTV_ENABLE_GRAPHQL_PLAYGROUND=true
 SCTV_LOG_FORMAT=pretty
 RUST_LOG=debug,sctv_api=debug,sctv_worker=debug,sqlx=warn
 SCTV_WORKER_COUNT=2
@@ -287,7 +282,6 @@ SCTV_WORKER_COUNT=2
 DATABASE_URL=postgres://sctv_test:sctv_test@localhost:5432/sctv_test
 SCTV_JWT_SECRET=test-secret-for-integration-tests
 SCTV_ENABLE_CORS=true
-SCTV_ENABLE_GRAPHQL_PLAYGROUND=false
 RUST_LOG=info,sctv_api=debug,sctv_worker=debug
 ```
 
@@ -298,7 +292,6 @@ RUST_LOG=info,sctv_api=debug,sctv_worker=debug
 DATABASE_URL=postgres://sctv:${POSTGRES_PASSWORD}@db.staging.example.com:5432/sctv_staging
 SCTV_JWT_SECRET=${JWT_SECRET_FROM_VAULT}
 SCTV_ENABLE_CORS=true
-SCTV_ENABLE_GRAPHQL_PLAYGROUND=true
 SCTV_LOG_FORMAT=json
 RUST_LOG=info,sctv_api=debug
 SCTV_WORKER_COUNT=4
@@ -311,7 +304,6 @@ SCTV_WORKER_COUNT=4
 DATABASE_URL=postgres://sctv:${POSTGRES_PASSWORD}@db.prod.example.com:5432/sctv
 SCTV_JWT_SECRET=${JWT_SECRET_FROM_VAULT}
 SCTV_ENABLE_CORS=false
-SCTV_ENABLE_GRAPHQL_PLAYGROUND=false
 SCTV_LOG_FORMAT=json
 RUST_LOG=info,sctv_api=info,sctv_worker=info,tower_http=warn
 SCTV_WORKER_COUNT=8
@@ -459,8 +451,7 @@ Before deploying to production:
 - [ ] `SCTV_JWT_SECRET` is set to a strong random value (min 32 characters)
 - [ ] `DATABASE_URL` points to production database
 - [ ] `POSTGRES_PASSWORD` is strong and secure
-- [ ] `SCTV_ENABLE_GRAPHQL_PLAYGROUND` is `false`
-- [ ] `SCTV_ENABLE_CORS` is configured appropriately
+- [ ] `SCTV_ENABLE_CORS` is `false` (unless a gateway in front of the API handles CORS)
 - [ ] `RUST_LOG` is set to `info` or `warn` (not `debug`)
 - [ ] SMTP credentials are configured for email notifications
 - [ ] External integration tokens are set (if needed)
