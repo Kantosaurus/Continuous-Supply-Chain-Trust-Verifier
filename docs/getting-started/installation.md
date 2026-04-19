@@ -77,36 +77,56 @@ Create a `.env` file:
 cp .env.example .env
 ```
 
+> **Required before `docker-compose up`.** The base `docker-compose.yml` refuses
+> to start if `POSTGRES_PASSWORD` or `SCTV_JWT_SECRET` is unset — this prevents
+> accidentally shipping the service with a known-bad default. Generate secure
+> values and put them in `.env`:
+>
+> ```bash
+> # Strong database password
+> openssl rand -base64 24
+>
+> # Strong JWT signing secret
+> openssl rand -hex 32
+> ```
+
 Edit `.env` with your configuration:
 
 ```env
 # Database Configuration
-POSTGRES_HOST=postgres
-POSTGRES_PORT=5432
-POSTGRES_DB=sctv
 POSTGRES_USER=sctv
-POSTGRES_PASSWORD=your-secure-password-here
+POSTGRES_PASSWORD=REPLACE_ME_WITH_A_STRONG_PASSWORD
+POSTGRES_DB=sctv
+POSTGRES_PORT=5432
+DATABASE_URL=postgres://sctv:REPLACE_ME_WITH_A_STRONG_PASSWORD@localhost:5432/sctv
 
 # API Configuration
-API_BIND_ADDR=0.0.0.0:3000
-JWT_SECRET=your-jwt-secret-change-in-production
-ENABLE_CORS=true
-ENABLE_GRAPHQL_PLAYGROUND=true
+API_PORT=3000
+SCTV_JWT_SECRET=REPLACE_ME_RUN_openssl_rand_hex_32
+SCTV_ENABLE_CORS=true
+SCTV_LOG_FORMAT=json
+RUST_LOG=info,sctv_api=debug,sctv_worker=debug,tower_http=info
 
 # Worker Configuration
-WORKER_POOL_SIZE=4
-JOB_MAX_RETRIES=3
+SCTV_WORKER_COUNT=4
+SCTV_POLL_INTERVAL_MS=1000
+SCTV_SHUTDOWN_TIMEOUT_SECS=30
 
-# Notification Configuration (Optional)
-SLACK_WEBHOOK_URL=
-EMAIL_SMTP_HOST=
-EMAIL_SMTP_PORT=587
-EMAIL_FROM_ADDRESS=alerts@example.com
+# Dashboard (Optional)
+DASHBOARD_PORT=8080
 
-# Monitoring (Optional)
-LOG_LEVEL=info
-ENABLE_METRICS=true
-METRICS_PORT=9090
+# Email/SMTP (Optional)
+SMTP_HOST=smtp.example.com
+SMTP_PORT=587
+SMTP_USERNAME=
+SMTP_PASSWORD=
+SMTP_FROM=noreply@sctv.local
+SMTP_TLS=true
+
+# External Integrations (Optional)
+GITHUB_TOKEN=
+GITLAB_TOKEN=
+SIGSTORE_ENABLED=true
 ```
 
 ### Step 3: Start Services
@@ -209,7 +229,6 @@ max_connections = 20
 bind_addr = "0.0.0.0:3000"
 jwt_secret = "your-jwt-secret"
 enable_cors = true
-enable_graphql_playground = true
 
 [worker]
 pool_size = 4

@@ -248,15 +248,22 @@ HTTP status codes and corresponding error codes returned by the REST and GraphQL
 3. Fix invalid values
 4. Ensure enums match allowed values
 
-### 429 Too Many Requests
+### 429 Too Many Requests (planned, not yet emitted)
 
 **Status Code:** `429`
 
+> **Note:** The SCTV API server does not currently enforce rate limits
+> and therefore does not emit `429` / `RATE_LIMITED` responses. This
+> section documents the planned shape of the response for when in-app
+> rate limiting is implemented. Clients may still observe `429` from an
+> upstream reverse proxy / ingress if one is configured in front of the
+> API.
+
 | Error Code | Description | Troubleshooting |
 |------------|-------------|-----------------|
-| `RATE_LIMITED` | Rate limit exceeded | Wait before retrying, implement backoff |
+| `RATE_LIMITED` | Rate limit exceeded (planned) | Wait before retrying, implement backoff |
 
-**Example:**
+**Planned example:**
 ```json
 {
   "error": {
@@ -270,9 +277,9 @@ HTTP status codes and corresponding error codes returned by the REST and GraphQL
 }
 ```
 
-**Common Causes:**
+**Common Causes (once implemented):**
 - Too many requests in short time period
-- Upstream registry rate limiting
+- Upstream registry rate limiting (already surfaced via `RATE_LIMITED` registry errors)
 - API key rate limits
 
 **Resolution:**

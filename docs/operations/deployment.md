@@ -129,7 +129,6 @@ services:
       LOG_LEVEL: info
       LOG_FORMAT: json
       ENABLE_CORS: "false"
-      ENABLE_GRAPHQL_PLAYGROUND: "false"
     ports:
       - "3000:3000"
     healthcheck:

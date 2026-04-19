@@ -43,7 +43,6 @@ services:
       DATABASE_URL: postgres://${POSTGRES_USER:-sctv}:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}@postgres:5432/${POSTGRES_DB:-sctv}
       SCTV_JWT_SECRET: ${SCTV_JWT_SECRET:?SCTV_JWT_SECRET is required}
       SCTV_ENABLE_CORS: "false"
-      SCTV_ENABLE_GRAPHQL_PLAYGROUND: "false"
       SCTV_LOG_FORMAT: json
       RUST_LOG: info,sctv_api=info,tower_http=warn
     deploy:

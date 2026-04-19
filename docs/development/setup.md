@@ -112,7 +112,6 @@ Before starting, ensure you have the following installed on your development mac
    API_PORT=3000
    SCTV_JWT_SECRET=change-this-to-a-secure-secret
    SCTV_ENABLE_CORS=true
-   SCTV_ENABLE_GRAPHQL_PLAYGROUND=true
    SCTV_LOG_FORMAT=pretty
 
    # Logging
@@ -161,7 +160,7 @@ curl http://localhost:3000/health
 ### Access Services
 
 - API: http://localhost:3000
-- GraphQL Playground: http://localhost:3000/graphql
+- GraphQL endpoint (POST only): http://localhost:3000/graphql
 - PostgreSQL: localhost:5432
 
 ### Common Docker Commands
@@ -362,7 +361,7 @@ cargo run --bin sctv-api
 
 Access the API:
 - Health check: http://localhost:3000/health
-- GraphQL Playground: http://localhost:3000/graphql
+- GraphQL endpoint (POST only): http://localhost:3000/graphql
 - REST API: http://localhost:3000/api/v1
 
 ### Worker

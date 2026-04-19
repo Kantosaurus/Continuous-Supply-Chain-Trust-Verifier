@@ -32,7 +32,7 @@ SCTV is built on the following architectural principles:
 ### 2. Multi-Tenancy
 - **Tenant Isolation:** Strict data separation between organizations
 - **Row-Level Security:** Database-level tenant isolation
-- **Resource Quotas:** Per-tenant limits and rate limiting
+- **Resource Quotas:** Per-tenant limits (rate limiting planned, not yet implemented)
 - **Audit Logging:** Complete audit trail for compliance
 
 ### 3. Scalability
@@ -77,8 +77,8 @@ SCTV is built on the following architectural principles:
 │  │  │  Handlers  │  │   Schema   │  │   & Authorization    │   │   │
 │  │  └────────────┘  └────────────┘  └──────────────────────┘   │   │
 │  │  ┌────────────┐  ┌────────────┐  ┌──────────────────────┐   │   │
-│  │  │  Webhook   │  │ Middleware │  │    Rate Limiting     │   │   │
-│  │  │  Handlers  │  │   Stack    │  │   & Validation       │   │   │
+│  │  │  Webhook   │  │ Middleware │  │   Request Validation │   │   │
+│  │  │  Handlers  │  │   Stack    │  │  (rate limit: planned)│  │   │
 │  │  └────────────┘  └────────────┘  └──────────────────────┘   │   │
 │  └──────────────────────────────────────────────────────────────┘   │
 └──────────────────────────────┬───────────────────────────────────────┘
@@ -232,7 +232,7 @@ SCTV is built on the following architectural principles:
 - Download package artifacts
 - Query package versions
 - Cache registry responses
-- Rate limiting per registry
+- Surface upstream registry rate-limit responses via `RegistryError::RateLimited` (client-side throttling is planned, not yet implemented)
 
 **Supported Ecosystems:**
 - npm (JavaScript/Node.js)
@@ -454,8 +454,7 @@ SCTV is built on the following architectural principles:
 2. Evaluate notification rules
    │
    ├─► Check severity threshold
-   ├─► Apply tenant settings
-   └─► Check rate limits
+   └─► Apply tenant settings
    │
    ▼
 3. Queue SendNotification job

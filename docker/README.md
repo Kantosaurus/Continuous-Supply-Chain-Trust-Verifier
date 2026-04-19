@@ -4,7 +4,16 @@ This directory contains Docker configuration for deploying the Supply Chain Trus
 
 ## Quick Start
 
+The base compose file requires `POSTGRES_PASSWORD` and `SCTV_JWT_SECRET` to be
+set — it will refuse to start without them. First-time setup:
+
 ```bash
+# Create a local .env from the template and fill in secrets
+cp .env.example .env
+# Generate strong values and paste them into .env:
+openssl rand -base64 24   # POSTGRES_PASSWORD
+openssl rand -hex 32      # SCTV_JWT_SECRET
+
 # Start development environment
 docker-compose up -d
 
@@ -14,7 +23,7 @@ make dev
 
 Access the services:
 - **API**: http://localhost:3000
-- **GraphQL Playground**: http://localhost:3000/graphql
+- **GraphQL endpoint** (POST only): http://localhost:3000/graphql
 - **Health Check**: http://localhost:3000/health
 
 ## Architecture
@@ -51,8 +60,8 @@ Key variables:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `POSTGRES_PASSWORD` | Database password | `sctv_secure_password` |
-| `SCTV_JWT_SECRET` | JWT signing secret | (required in prod) |
+| `POSTGRES_PASSWORD` | Database password | (required) |
+| `SCTV_JWT_SECRET` | JWT signing secret | (required) |
 | `SCTV_WORKER_COUNT` | Number of worker threads | `4` |
 | `API_PORT` | API server port | `3000` |
 
@@ -166,7 +175,7 @@ docker-compose exec worker env | grep DATABASE_URL
 
 1. **Never use default passwords in production**
 2. **Set `SCTV_JWT_SECRET` to a strong random value**
-3. **Disable GraphQL playground in production** (`SCTV_ENABLE_GRAPHQL_PLAYGROUND=false`)
+3. **Disable CORS in production** (`SCTV_ENABLE_CORS=false`) unless the API is fronted by a gateway that handles CORS policy
 4. **Use Docker secrets for sensitive values in Swarm/Kubernetes**
 5. **Run containers as non-root user** (already configured)
 

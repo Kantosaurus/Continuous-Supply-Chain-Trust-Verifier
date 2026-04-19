@@ -15,7 +15,6 @@ mod env_vars {
     pub const JWT_SECRET: &str = "SCTV_JWT_SECRET";
     pub const DATABASE_URL: &str = "DATABASE_URL";
     pub const ENABLE_CORS: &str = "SCTV_ENABLE_CORS";
-    pub const ENABLE_PLAYGROUND: &str = "SCTV_ENABLE_GRAPHQL_PLAYGROUND";
     pub const LOG_FORMAT: &str = "SCTV_LOG_FORMAT";
 }
 
@@ -101,14 +100,9 @@ fn load_config() -> anyhow::Result<ServerConfig> {
         .map(|v| v.to_lowercase() == "true" || v == "1")
         .unwrap_or(true);
 
-    let enable_graphql_playground = std::env::var(env_vars::ENABLE_PLAYGROUND)
-        .map(|v| v.to_lowercase() == "true" || v == "1")
-        .unwrap_or(true);
-
     Ok(ServerConfig {
         bind_addr,
         jwt_secret,
         enable_cors,
-        enable_graphql_playground,
     })
 }

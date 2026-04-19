@@ -13,7 +13,7 @@ use axum::{
     body::Body,
     http::{header, Method, Request, StatusCode},
 };
-use sctv_api::{auth::Claims, create_router, AppState};
+use sctv_api::{auth::Claims, create_router, AppState, ServerConfig};
 use sctv_core::TenantId;
 use serde_json::{json, Value};
 use std::sync::Arc;
@@ -43,6 +43,16 @@ fn create_test_state() -> Arc<AppState> {
     Arc::new(AppState::new("test-secret".to_string()))
 }
 
+/// Creates a test `ServerConfig` with CORS enabled — matches the behavior
+/// the existing integration tests implicitly relied on (the old
+/// `create_router` unconditionally installed a CORS layer).
+fn test_config() -> ServerConfig {
+    ServerConfig {
+        enable_cors: true,
+        ..ServerConfig::default()
+    }
+}
+
 // =============================================================================
 // Health Check Tests
 // =============================================================================
@@ -53,7 +63,7 @@ mod health_check {
     #[tokio::test]
     async fn test_health_check_returns_healthy() {
         let state = create_test_state();
-        let router = create_router(state);
+        let router = create_router(state, &test_config());
 
         let request = Request::builder()
             .uri("/health")
@@ -86,7 +96,7 @@ mod authentication {
     #[tokio::test]
     async fn test_unauthenticated_request_returns_401() {
         let state = create_test_state();
-        let router = create_router(state);
+        let router = create_router(state, &test_config());
 
         let request = Request::builder()
             .uri("/api/v1/projects")
@@ -102,7 +112,7 @@ mod authentication {
     #[tokio::test]
     async fn test_invalid_token_returns_401() {
         let state = create_test_state();
-        let router = create_router(state);
+        let router = create_router(state, &test_config());
 
         let request = Request::builder()
             .uri("/api/v1/projects")
@@ -119,7 +129,7 @@ mod authentication {
     #[tokio::test]
     async fn test_expired_token_returns_401() {
         let state = create_test_state();
-        let router = create_router(state);
+        let router = create_router(state, &test_config());
 
         // Create an expired token (negative expiration)
         let tenant_id = TenantId::new();
@@ -150,7 +160,7 @@ mod authentication {
     #[tokio::test]
     async fn test_missing_bearer_prefix_returns_401() {
         let state = create_test_state();
-        let router = create_router(state);
+        let router = create_router(state, &test_config());
 
         let tenant_id = TenantId::new();
         let token = create_test_token(tenant_id, Uuid::new_v4(), "test-secret");
@@ -178,7 +188,7 @@ mod projects_no_db {
     #[tokio::test]
     async fn test_list_projects_without_db_returns_503() {
         let state = create_test_state(); // No database configured
-        let router = create_router(state);
+        let router = create_router(state, &test_config());
 
         let tenant_id = TenantId::new();
         let token = create_test_token(tenant_id, Uuid::new_v4(), "test-secret");
@@ -199,7 +209,7 @@ mod projects_no_db {
     #[tokio::test]
     async fn test_create_project_without_db_returns_503() {
         let state = create_test_state();
-        let router = create_router(state);
+        let router = create_router(state, &test_config());
 
         let tenant_id = TenantId::new();
         let token = create_test_token(tenant_id, Uuid::new_v4(), "test-secret");
@@ -234,7 +244,7 @@ mod webhooks {
     #[tokio::test]
     async fn test_github_webhook_push_event() {
         let state = create_test_state();
-        let router = create_router(state);
+        let router = create_router(state, &test_config());
 
         let body = json!({
             "action": "push",
@@ -271,7 +281,7 @@ mod webhooks {
     #[tokio::test]
     async fn test_github_webhook_non_push_event() {
         let state = create_test_state();
-        let router = create_router(state);
+        let router = create_router(state, &test_config());
 
         let body = json!({
             "action": "opened",
@@ -306,7 +316,7 @@ mod webhooks {
     #[tokio::test]
     async fn test_gitlab_webhook_push_event() {
         let state = create_test_state();
-        let router = create_router(state);
+        let router = create_router(state, &test_config());
 
         let body = json!({
             "object_kind": "push",
@@ -342,7 +352,7 @@ mod webhooks {
     #[tokio::test]
     async fn test_gitlab_webhook_merge_request_event() {
         let state = create_test_state();
-        let router = create_router(state);
+        let router = create_router(state, &test_config());
 
         let body = json!({
             "object_kind": "merge_request",
@@ -383,7 +393,7 @@ mod error_responses {
     #[tokio::test]
     async fn test_error_response_format() {
         let state = create_test_state();
-        let router = create_router(state);
+        let router = create_router(state, &test_config());
 
         let request = Request::builder()
             .uri("/api/v1/projects")
@@ -414,7 +424,7 @@ mod error_responses {
         // this test passed only because the handler was a stub that returned
         // 404 unconditionally — that stub has been replaced, see plan #24.
         let state = create_test_state();
-        let router = create_router(state);
+        let router = create_router(state, &test_config());
 
         let tenant_id = TenantId::new();
         let token = create_test_token(tenant_id, Uuid::new_v4(), "test-secret");
@@ -452,7 +462,7 @@ mod request_validation {
     #[tokio::test]
     async fn test_invalid_json_returns_bad_request() {
         let state = create_test_state();
-        let router = create_router(state);
+        let router = create_router(state, &test_config());
 
         let tenant_id = TenantId::new();
         let token = create_test_token(tenant_id, Uuid::new_v4(), "test-secret");
@@ -478,7 +488,7 @@ mod request_validation {
     #[tokio::test]
     async fn test_missing_content_type_for_post() {
         let state = create_test_state();
-        let router = create_router(state);
+        let router = create_router(state, &test_config());
 
         let tenant_id = TenantId::new();
         let token = create_test_token(tenant_id, Uuid::new_v4(), "test-secret");
@@ -518,7 +528,7 @@ mod pagination {
     #[tokio::test]
     async fn test_pagination_params_parsing() {
         let state = create_test_state();
-        let router = create_router(state);
+        let router = create_router(state, &test_config());
 
         let tenant_id = TenantId::new();
         let token = create_test_token(tenant_id, Uuid::new_v4(), "test-secret");
@@ -540,7 +550,7 @@ mod pagination {
     #[tokio::test]
     async fn test_default_pagination() {
         let state = create_test_state();
-        let router = create_router(state);
+        let router = create_router(state, &test_config());
 
         let tenant_id = TenantId::new();
         let token = create_test_token(tenant_id, Uuid::new_v4(), "test-secret");
@@ -575,7 +585,7 @@ mod scans {
         // handler used to be a stub that returned `data: []` regardless of
         // state — that was plan item #24's bug, now fixed.
         let state = create_test_state();
-        let router = create_router(state);
+        let router = create_router(state, &test_config());
 
         let tenant_id = TenantId::new();
         let token = create_test_token(tenant_id, Uuid::new_v4(), "test-secret");
@@ -603,7 +613,7 @@ mod cors {
     #[tokio::test]
     async fn test_cors_preflight_request() {
         let state = create_test_state();
-        let router = create_router(state);
+        let router = create_router(state, &test_config());
 
         let request = Request::builder()
             .uri("/api/v1/projects")
@@ -622,11 +632,15 @@ mod cors {
             "Expected 200 or 204, got {status}"
         );
 
-        // Should have CORS headers
+        // Preflight MUST include access-control-allow-origin. The router
+        // configures `allow_origin(Any)`, so the header value is `*`.
         let headers = response.headers();
-        assert!(
-            headers.contains_key("access-control-allow-origin") || headers.contains_key("vary"),
-            "Expected CORS headers"
+        let allow_origin = headers
+            .get("access-control-allow-origin")
+            .expect("preflight response must include access-control-allow-origin");
+        assert_eq!(
+            allow_origin, "*",
+            "expected access-control-allow-origin: *, got {allow_origin:?}"
         );
     }
 }
@@ -641,7 +655,7 @@ mod content_type {
     #[tokio::test]
     async fn test_json_response_content_type() {
         let state = create_test_state();
-        let router = create_router(state);
+        let router = create_router(state, &test_config());
 
         let request = Request::builder()
             .uri("/health")

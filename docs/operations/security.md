@@ -90,7 +90,7 @@ Use this checklist before going to production:
 - [ ] SQL injection protection (parameterized queries)
 - [ ] CSRF protection enabled
 - [ ] Security headers configured
-- [ ] Rate limiting enabled
+- [ ] Rate limiting enabled at the reverse proxy / ingress (in-app rate limiting is planned, not yet implemented)
 - [ ] CORS properly configured
 
 ### Monitoring & Logging
@@ -739,11 +739,14 @@ curl -I https://sctv.example.com
 
 ## Rate Limiting
 
-### Application-Level Rate Limiting
+### Application-Level Rate Limiting (planned, not yet implemented)
 
-Configure in `.env`:
+The SCTV API server does **not** currently enforce its own rate limits.
+The environment variables shown below are reserved for a future release
+and are ignored by the current binary:
 
 ```bash
+# Planned configuration (not yet honored by the server)
 # Global rate limits
 RATE_LIMIT_ENABLED=true
 RATE_LIMIT_REQUESTS_PER_MINUTE=60
@@ -759,6 +762,9 @@ TENANT_RATE_LIMIT_ENABLED=true
 TENANT_RATE_LIMIT_PROJECTS=100      # Max 100 projects per tenant
 TENANT_RATE_LIMIT_SCANS_PER_DAY=500 # Max 500 scans per day
 ```
+
+Until in-app rate limiting ships, enforce limits at the reverse proxy /
+ingress layer (nginx example below).
 
 ### nginx Rate Limiting
 
@@ -798,10 +804,14 @@ http {
 }
 ```
 
-### Redis-Based Rate Limiting
+### Redis-Based Rate Limiting (planned, not yet implemented)
+
+A Redis-backed distributed rate-limit store is planned for when in-app
+rate limiting ships. The snippet below is aspirational and not yet wired
+up in the SCTV binary:
 
 ```bash
-# Add Redis to docker-compose.yml
+# Planned: add Redis to docker-compose.yml
 redis:
   image: redis:alpine
   restart: always
@@ -809,7 +819,7 @@ redis:
   networks:
     - internal
 
-# Configure in .env
+# Planned configuration (not yet honored by the server)
 REDIS_ENABLED=true
 REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
 RATE_LIMIT_BACKEND=redis

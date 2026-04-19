@@ -54,7 +54,6 @@ jwt_secret = "your-jwt-secret-change-in-production"
 jwt_expiry_hours = 24
 enable_cors = true
 cors_allowed_origins = ["http://localhost:3001"]
-enable_graphql_playground = true
 max_request_size_mb = 10
 
 [worker]
@@ -215,16 +214,21 @@ max_age_seconds = 3600
 ```toml
 [api.graphql]
 enabled = true
-playground_enabled = true  # Disable in production
 introspection_enabled = true  # Disable in production
 max_query_depth = 10
 max_query_complexity = 1000
 upload_max_size_mb = 50
 ```
 
-### Rate Limiting
+### Rate Limiting (planned, not yet implemented)
+
+The `[api.rate_limit]` section below is **reserved for a future release**;
+the API server does not currently apply these limits. Enforce rate limits
+at the reverse proxy / ingress layer (see the deployment and security
+guides) until in-app rate limiting lands.
 
 ```toml
+# Planned configuration (not yet honored by the server)
 [api.rate_limit]
 enabled = true
 requests_per_minute = 60
@@ -566,7 +570,6 @@ max_connections = 5
 bind_addr = "127.0.0.1:3000"
 jwt_secret = "dev-secret-not-for-production"
 enable_cors = true
-enable_graphql_playground = true
 
 [worker]
 pool_size = 2
@@ -593,7 +596,6 @@ require_ssl = true
 bind_addr = "0.0.0.0:3000"
 jwt_secret = "${SCTV_JWT_SECRET}"
 enable_cors = false
-enable_graphql_playground = false
 max_request_size_mb = 5
 
 [api.tls]

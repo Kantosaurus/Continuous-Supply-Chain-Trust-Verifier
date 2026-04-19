@@ -626,14 +626,15 @@ jq '.' package.json
 # Check for rate limit errors in logs
 docker-compose logs worker | grep -i "rate limit"
 
-# Configure rate limiting (in .env)
-echo "REGISTRY_RATE_LIMIT=10" >> .env  # requests per second
-docker-compose restart worker
-
-# Use authenticated registry access (npm)
+# Use authenticated registry access (npm) to get higher upstream limits
 echo "NPM_TOKEN=your_token_here" >> .env
 docker-compose restart worker
 ```
+
+> **Note:** Client-side throttling of outbound registry requests
+> (`REGISTRY_RATE_LIMIT`) is planned but not yet implemented. For now,
+> mitigate upstream 429s with authenticated tokens and exponential
+> backoff.
 
 **Problem: Unsupported ecosystem**
 
@@ -797,18 +798,16 @@ docker-compose restart worker
 **Problem: Rate limiting**
 
 ```bash
-# Check for rate limit errors
+# Check for rate limit errors from upstream notification services
 docker-compose logs worker | grep -i "rate limit"
-
-# Configure rate limiting
-echo "NOTIFICATION_RATE_LIMIT=10" >> .env  # per minute
-docker-compose restart worker
-
-# Or batch notifications
-echo "NOTIFICATION_BATCH_SIZE=10" >> .env
-echo "NOTIFICATION_BATCH_DELAY_SECONDS=60" >> .env
-docker-compose restart worker
 ```
+
+> **Note:** Client-side throttling / batching of outbound notifications
+> (`NOTIFICATION_RATE_LIMIT`, `NOTIFICATION_BATCH_SIZE`,
+> `NOTIFICATION_BATCH_DELAY_SECONDS`) is planned but not yet
+> implemented. For now, mitigate upstream 429s (Slack, PagerDuty, SMTP,
+> etc.) by reducing alert volume via policy severity thresholds and
+> tenant notification settings.
 
 **Problem: Notification template error**
 
@@ -827,14 +826,14 @@ docker-compose exec api sctv-cli template render \
 1. **Test notification channels** after configuration
 2. **Monitor delivery success rate**
 3. **Implement retry logic** for failed notifications
-4. **Use notification batching** to avoid rate limits
+4. **Reduce alert volume** via severity thresholds (notification batching /
+   in-app rate limiting is planned, not yet implemented)
 
 ```bash
 # Recommended settings
 NOTIFICATION_MAX_RETRIES=3
 NOTIFICATION_RETRY_DELAY_SECONDS=60
-NOTIFICATION_RATE_LIMIT=10
-NOTIFICATION_BATCH_SIZE=10
+# NOTIFICATION_RATE_LIMIT / NOTIFICATION_BATCH_SIZE: planned, not yet honored
 ```
 
 ---
