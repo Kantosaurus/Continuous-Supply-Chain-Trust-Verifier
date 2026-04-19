@@ -126,7 +126,7 @@ impl TenantAwarePool {
 
     /// Runs pending database migrations.
     /// Note: This requires sqlx-cli to prepare migrations first.
-    /// Run: cargo sqlx prepare --database-url <url>
+    /// Run: `cargo sqlx prepare --database-url <url>`
     ///
     /// # Errors
     ///
