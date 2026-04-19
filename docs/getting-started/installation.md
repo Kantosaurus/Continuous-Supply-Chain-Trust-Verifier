@@ -91,7 +91,6 @@ POSTGRES_PASSWORD=your-secure-password-here
 API_BIND_ADDR=0.0.0.0:3000
 JWT_SECRET=your-jwt-secret-change-in-production
 ENABLE_CORS=true
-ENABLE_GRAPHQL_PLAYGROUND=true
 
 # Worker Configuration
 WORKER_POOL_SIZE=4

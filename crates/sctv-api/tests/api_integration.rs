@@ -632,11 +632,15 @@ mod cors {
             "Expected 200 or 204, got {status}"
         );
 
-        // Should have CORS headers
+        // Preflight MUST include access-control-allow-origin. The router
+        // configures `allow_origin(Any)`, so the header value is `*`.
         let headers = response.headers();
-        assert!(
-            headers.contains_key("access-control-allow-origin") || headers.contains_key("vary"),
-            "Expected CORS headers"
+        let allow_origin = headers
+            .get("access-control-allow-origin")
+            .expect("preflight response must include access-control-allow-origin");
+        assert_eq!(
+            allow_origin, "*",
+            "expected access-control-allow-origin: *, got {allow_origin:?}"
         );
     }
 }

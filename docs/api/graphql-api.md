@@ -2,7 +2,6 @@
 
 **Version:** 0.1.0
 **Endpoint:** `http://localhost:3000/graphql`
-**Playground:** `http://localhost:3000/graphql` (when enabled)
 
 Complete reference for the SCTV GraphQL API, built with async-graphql.
 

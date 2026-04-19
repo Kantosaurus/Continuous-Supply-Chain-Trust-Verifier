@@ -214,7 +214,6 @@ max_age_seconds = 3600
 ```toml
 [api.graphql]
 enabled = true
-playground_enabled = true  # Disable in production
 introspection_enabled = true  # Disable in production
 max_query_depth = 10
 max_query_complexity = 1000
