@@ -3,6 +3,10 @@
 //! Features clean input designs with geometric accents
 //! and clear visual feedback states.
 
+// Workaround for Leptos 0.7 not forwarding lint attributes to the __Component inner
+// function. See: https://github.com/leptos-rs/leptos/issues/3771
+#![allow(clippy::needless_pass_by_value)]
+
 use leptos::prelude::*;
 
 use super::icons::{ChevronDownIcon, SearchIcon};
@@ -66,13 +70,17 @@ pub fn SearchInput(
 
 /// Select dropdown with custom styling.
 #[component]
+#[allow(clippy::needless_pass_by_value)]
 pub fn Select(
     #[prop(into)] name: String,
     #[prop(into)] label: String,
     #[prop(into)] options: Vec<(String, String)>,
     #[prop(optional)] value: Option<String>,
 ) -> impl IntoView {
-    // Pre-mark each option as selected; `value` is compared by reference then dropped.
+    // Prop type Option<String> is part of the Leptos component API surface and cannot
+    // change to Option<&str> without breaking callers. The value is consumed only as a
+    // borrow in the .as_deref() comparison when computing options_with_selected.
+    // Pre-mark each option as selected; `value` is compared by reference.
     let options_with_selected: Vec<(String, String, bool)> = options
         .into_iter()
         .map(|(opt_value, opt_label)| {
@@ -80,7 +88,6 @@ pub fn Select(
             (opt_value, opt_label, selected)
         })
         .collect();
-    drop(value);
     view! {
         <div class="select">
             <label class="select__label" for=name.clone()>
