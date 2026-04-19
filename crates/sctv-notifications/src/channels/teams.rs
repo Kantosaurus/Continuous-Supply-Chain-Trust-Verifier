@@ -27,11 +27,11 @@ pub struct TeamsConfig {
     pub enabled: bool,
 }
 
-fn default_timeout() -> u64 {
+const fn default_timeout() -> u64 {
     30
 }
 
-fn default_enabled() -> bool {
+const fn default_enabled() -> bool {
     true
 }
 
@@ -69,14 +69,14 @@ impl TeamsConfigBuilder {
 
     /// Sets the request timeout.
     #[must_use]
-    pub fn timeout_secs(mut self, secs: u64) -> Self {
+    pub const fn timeout_secs(mut self, secs: u64) -> Self {
         self.config.timeout_secs = secs;
         self
     }
 
     /// Sets whether the channel is enabled.
     #[must_use]
-    pub fn enabled(mut self, enabled: bool) -> Self {
+    pub const fn enabled(mut self, enabled: bool) -> Self {
         self.config.enabled = enabled;
         self
     }
@@ -137,13 +137,13 @@ enum CardElement {
         facts: Vec<Fact>,
     },
     Container {
-        items: Vec<CardElement>,
+        items: Vec<Self>,
         #[serde(skip_serializing_if = "Option::is_none")]
         style: Option<&'static str>,
     },
 }
 
-/// Fact in a FactSet.
+/// Fact in a `FactSet`.
 #[derive(Debug, Serialize)]
 struct Fact {
     title: String,
@@ -166,6 +166,10 @@ pub struct TeamsChannel {
 
 impl TeamsChannel {
     /// Creates a new Teams channel with the given configuration.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the HTTP client cannot be built (e.g. invalid TLS configuration).
     #[must_use]
     pub fn new(config: TeamsConfig) -> Self {
         let client = Client::builder()
@@ -177,68 +181,42 @@ impl TeamsChannel {
     }
 
     /// Returns the color for the given severity level.
-    fn severity_color(severity: Severity) -> &'static str {
+    const fn severity_color(severity: Severity) -> &'static str {
         match severity {
             Severity::Critical => "attention",
-            Severity::High => "warning",
-            Severity::Medium => "warning",
+            // High and Medium both map to "warning" (Teams color token)
+            Severity::High | Severity::Medium => "warning",
             Severity::Low => "accent",
             Severity::Info => "default",
         }
     }
 
     /// Returns the emoji indicator for the given severity level.
-    fn severity_indicator(severity: Severity) -> &'static str {
+    const fn severity_indicator(severity: Severity) -> &'static str {
         match severity {
-            Severity::Critical => "\u{1F6A8}", // 🚨
-            Severity::High => "\u{26A0}\u{FE0F}",  // ⚠️
-            Severity::Medium => "\u{1F536}",  // 🔶
-            Severity::Low => "\u{2139}\u{FE0F}",   // ℹ️
-            Severity::Info => "\u{1F4AC}",    // 💬
+            Severity::Critical => "\u{1F6A8}",    // 🚨
+            Severity::High => "\u{26A0}\u{FE0F}", // ⚠️
+            Severity::Medium => "\u{1F536}",      // 🔶
+            Severity::Low => "\u{2139}\u{FE0F}",  // ℹ️
+            Severity::Info => "\u{1F4AC}",        // 💬
         }
     }
 
-    /// Builds the Teams Adaptive Card message.
-    fn build_message(&self, notification: &Notification) -> TeamsMessage {
-        let mut body = Vec::new();
-
-        // Header with severity indicator
-        body.push(CardElement::TextBlock {
-            text: format!(
-                "{} {} - {}",
-                Self::severity_indicator(notification.severity),
-                notification.severity,
-                notification.title
-            ),
-            size: Some("Large"),
-            weight: Some("Bolder"),
-            color: Some(Self::severity_color(notification.severity)),
-            wrap: Some(true),
-            spacing: None,
-        });
-
-        // Main message
-        body.push(CardElement::TextBlock {
-            text: notification.message.clone(),
-            size: None,
-            weight: None,
-            color: None,
-            wrap: Some(true),
-            spacing: Some("Medium"),
-        });
-
-        // Facts section
-        let mut facts = Vec::new();
-
-        facts.push(Fact {
-            title: "Severity".to_string(),
-            value: notification.severity.to_string(),
-        });
-
-        facts.push(Fact {
-            title: "Time".to_string(),
-            value: notification.created_at.format("%Y-%m-%d %H:%M:%S UTC").to_string(),
-        });
+    /// Builds the fact list for the adaptive card.
+    fn build_facts(notification: &Notification) -> Vec<Fact> {
+        let mut facts = vec![
+            Fact {
+                title: "Severity".to_string(),
+                value: notification.severity.to_string(),
+            },
+            Fact {
+                title: "Time".to_string(),
+                value: notification
+                    .created_at
+                    .format("%Y-%m-%d %H:%M:%S UTC")
+                    .to_string(),
+            },
+        ];
 
         if let Some(project) = &notification.context.project_name {
             facts.push(Fact {
@@ -266,9 +244,38 @@ impl TeamsChannel {
             });
         }
 
-        body.push(CardElement::FactSet { facts });
+        facts
+    }
 
-        // Remediation if present
+    /// Builds the Teams Adaptive Card message.
+    fn build_message(notification: &Notification) -> TeamsMessage {
+        let mut body = vec![
+            CardElement::TextBlock {
+                text: format!(
+                    "{} {} - {}",
+                    Self::severity_indicator(notification.severity),
+                    notification.severity,
+                    notification.title
+                ),
+                size: Some("Large"),
+                weight: Some("Bolder"),
+                color: Some(Self::severity_color(notification.severity)),
+                wrap: Some(true),
+                spacing: None,
+            },
+            CardElement::TextBlock {
+                text: notification.message.clone(),
+                size: None,
+                weight: None,
+                color: None,
+                wrap: Some(true),
+                spacing: Some("Medium"),
+            },
+            CardElement::FactSet {
+                facts: Self::build_facts(notification),
+            },
+        ];
+
         if let Some(remediation) = &notification.context.remediation {
             body.push(CardElement::Container {
                 style: Some("emphasis"),
@@ -293,7 +300,6 @@ impl TeamsChannel {
             });
         }
 
-        // Actions
         let mut actions = Vec::new();
         if let Some(url) = &notification.context.dashboard_url {
             actions.push(CardAction::OpenUrl {
@@ -343,7 +349,7 @@ impl NotificationChannel for TeamsChannel {
             "Sending Teams notification"
         );
 
-        let message = self.build_message(notification);
+        let message = Self::build_message(notification);
 
         let response = self
             .client
@@ -352,7 +358,8 @@ impl NotificationChannel for TeamsChannel {
             .send()
             .await?;
 
-        let duration_ms = start.elapsed().as_millis() as u64;
+        // as_millis() returns u128; elapsed time in ms will never exceed u64::MAX (~585M years).
+        let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
         let status = response.status();
 
         if status.is_success() {
@@ -413,10 +420,7 @@ impl NotificationChannel for TeamsChannel {
         // Check for Teams webhook URL patterns
         let host = url.host_str().unwrap_or("");
         if !host.contains("webhook.office.com") && !host.contains("microsoft.com") {
-            warn!(
-                "Webhook URL does not appear to be a Teams URL: {}",
-                host
-            );
+            warn!("Webhook URL does not appear to be a Teams URL: {}", host);
         }
 
         Ok(())
@@ -443,13 +447,6 @@ mod tests {
 
     #[test]
     fn test_build_message() {
-        let config = TeamsConfig::builder()
-            .webhook_url("https://outlook.office.com/webhook/test")
-            .enabled(true)
-            .build();
-
-        let channel = TeamsChannel::new(config);
-
         let notification = Notification::new(
             Severity::Critical,
             "Supply Chain Alert",
@@ -462,7 +459,7 @@ mod tests {
                 .with_dashboard_url("https://sctv.example.com/alerts/123"),
         );
 
-        let message = channel.build_message(&notification);
+        let message = TeamsChannel::build_message(&notification);
 
         assert_eq!(message.message_type, "message");
         assert_eq!(message.attachments.len(), 1);
@@ -475,7 +472,10 @@ mod tests {
 
     #[test]
     fn test_severity_indicators() {
-        assert_eq!(TeamsChannel::severity_color(Severity::Critical), "attention");
+        assert_eq!(
+            TeamsChannel::severity_color(Severity::Critical),
+            "attention"
+        );
         assert_eq!(TeamsChannel::severity_color(Severity::High), "warning");
         assert_eq!(TeamsChannel::severity_color(Severity::Info), "default");
     }

@@ -12,7 +12,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use url::Url;
 
-use super::models::*;
+use super::models::{CrateResponse, DependenciesResponse, OwnersResponse};
 use crate::{
     retry_http, PackageMetadata, RegistryCache, RegistryClient, RegistryError, RegistryResult,
     RetryConfig, VersionMetadata,
@@ -44,6 +44,10 @@ impl CargoClient {
     }
 
     /// Creates a client with custom URLs and cache.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the HTTP client cannot be built (e.g. invalid TLS configuration).
     #[must_use]
     pub fn with_config(api_url: &str, static_url: &str, cache: Arc<RegistryCache>) -> Self {
         let http = Client::builder()
@@ -66,12 +70,15 @@ impl CargoClient {
     async fn fetch_crate(&self, name: &str) -> RegistryResult<CrateResponse> {
         let url = self
             .base_url
-            .join(&format!("/api/v1/crates/{}", name))
+            .join(&format!("/api/v1/crates/{name}"))
             .map_err(|e| RegistryError::Parse(e.to_string()))?;
 
         tracing::debug!("Fetching crate {} from {}", name, url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::PackageNotFound(name.to_string()));
@@ -102,12 +109,20 @@ impl CargoClient {
     ) -> RegistryResult<DependenciesResponse> {
         let url = self
             .base_url
-            .join(&format!("/api/v1/crates/{}/{}/dependencies", name, version))
+            .join(&format!("/api/v1/crates/{name}/{version}/dependencies"))
             .map_err(|e| RegistryError::Parse(e.to_string()))?;
 
-        tracing::debug!("Fetching dependencies for {}@{} from {}", name, version, url);
+        tracing::debug!(
+            "Fetching dependencies for {}@{} from {}",
+            name,
+            version,
+            url
+        );
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::VersionNotFound(
@@ -133,10 +148,13 @@ impl CargoClient {
     async fn fetch_owners(&self, name: &str) -> RegistryResult<Vec<String>> {
         let url = self
             .base_url
-            .join(&format!("/api/v1/crates/{}/owners", name))
+            .join(&format!("/api/v1/crates/{name}/owners"))
             .map_err(|e| RegistryError::Parse(e.to_string()))?;
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if !response.status().is_success() {
             // Non-fatal - return empty list
@@ -155,7 +173,7 @@ impl CargoClient {
     fn build_download_url(&self, name: &str, version: &str) -> RegistryResult<Url> {
         // Format: https://static.crates.io/crates/{name}/{name}-{version}.crate
         self.static_url
-            .join(&format!("/crates/{}/{}-{}.crate", name, name, version))
+            .join(&format!("/crates/{name}/{name}-{version}.crate"))
             .map_err(|e| RegistryError::Parse(e.to_string()))
     }
 }
@@ -250,7 +268,10 @@ impl RegistryClient for CargoClient {
 
     async fn get_version(&self, name: &str, version: &str) -> RegistryResult<VersionMetadata> {
         // Check cache first
-        if let Some(cached) = self.cache.get_version(PackageEcosystem::Cargo, name, version) {
+        if let Some(cached) = self
+            .cache
+            .get_version(PackageEcosystem::Cargo, name, version)
+        {
             tracing::debug!("Cache hit for {}@{}", name, version);
             return Ok(cached);
         }
@@ -262,9 +283,7 @@ impl RegistryClient for CargoClient {
             .versions
             .iter()
             .find(|v| v.num == version)
-            .ok_or_else(|| {
-                RegistryError::VersionNotFound(name.to_string(), version.to_string())
-            })?;
+            .ok_or_else(|| RegistryError::VersionNotFound(name.to_string(), version.to_string()))?;
 
         // Fetch dependencies
         let deps_result = self.fetch_dependencies(name, version).await;
@@ -333,7 +352,10 @@ impl RegistryClient for CargoClient {
 
         tracing::debug!("Downloading {}@{} from {}", name, version, url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::VersionNotFound(

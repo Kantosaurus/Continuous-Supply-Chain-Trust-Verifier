@@ -1,7 +1,7 @@
 //! SPDX 2.3 schema models.
 //!
 //! This module defines types that closely follow the SPDX 2.3 specification.
-//! See: https://spdx.github.io/spdx-spec/v2.3/
+//! See: <https://spdx.github.io/spdx-spec/v2.3>/
 
 use serde::{Deserialize, Serialize};
 
@@ -126,21 +126,20 @@ impl CreationInfo {
 
     /// Adds a tool creator.
     pub fn add_tool(&mut self, name: &str, version: &str) {
-        self.creators.push(format!("Tool: {}-{}", name, version));
+        self.creators.push(format!("Tool: {name}-{version}"));
     }
 
     /// Adds an organization creator.
     pub fn add_organization(&mut self, name: &str) {
-        self.creators.push(format!("Organization: {}", name));
+        self.creators.push(format!("Organization: {name}"));
     }
 
     /// Adds a person creator.
     pub fn add_person(&mut self, name: &str, email: Option<&str>) {
-        let creator = if let Some(email) = email {
-            format!("Person: {} ({})", name, email)
-        } else {
-            format!("Person: {}", name)
-        };
+        let creator = email.map_or_else(
+            || format!("Person: {name}"),
+            |email| format!("Person: {name} ({email})"),
+        );
         self.creators.push(creator);
     }
 }
@@ -573,19 +572,19 @@ impl Relationship {
         Self::new(source, RelationshipType::Describes, target)
     }
 
-    /// Creates a DEPENDS_ON relationship.
+    /// Creates a `DEPENDS_ON` relationship.
     #[must_use]
     pub fn depends_on(source: impl Into<String>, target: impl Into<String>) -> Self {
         Self::new(source, RelationshipType::DependsOn, target)
     }
 
-    /// Creates a DEPENDENCY_OF relationship.
+    /// Creates a `DEPENDENCY_OF` relationship.
     #[must_use]
     pub fn dependency_of(source: impl Into<String>, target: impl Into<String>) -> Self {
         Self::new(source, RelationshipType::DependencyOf, target)
     }
 
-    /// Creates a DEV_DEPENDENCY_OF relationship.
+    /// Creates a `DEV_DEPENDENCY_OF` relationship.
     #[must_use]
     pub fn dev_dependency_of(source: impl Into<String>, target: impl Into<String>) -> Self {
         Self::new(source, RelationshipType::DevDependencyOf, target)

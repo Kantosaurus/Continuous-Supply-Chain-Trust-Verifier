@@ -1,5 +1,6 @@
 //! Slack notification channel using webhooks.
 
+use std::fmt::Write as _;
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
@@ -33,11 +34,11 @@ pub struct SlackConfig {
     pub enabled: bool,
 }
 
-fn default_timeout() -> u64 {
+const fn default_timeout() -> u64 {
     30
 }
 
-fn default_enabled() -> bool {
+const fn default_enabled() -> bool {
     true
 }
 
@@ -99,14 +100,14 @@ impl SlackConfigBuilder {
 
     /// Sets the request timeout.
     #[must_use]
-    pub fn timeout_secs(mut self, secs: u64) -> Self {
+    pub const fn timeout_secs(mut self, secs: u64) -> Self {
         self.config.timeout_secs = secs;
         self
     }
 
     /// Sets whether the channel is enabled.
     #[must_use]
-    pub fn enabled(mut self, enabled: bool) -> Self {
+    pub const fn enabled(mut self, enabled: bool) -> Self {
         self.config.enabled = enabled;
         self
     }
@@ -157,6 +158,10 @@ pub struct SlackChannel {
 
 impl SlackChannel {
     /// Creates a new Slack channel with the given configuration.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the HTTP client cannot be built (e.g. invalid TLS configuration).
     #[must_use]
     pub fn new(config: SlackConfig) -> Self {
         let client = Client::builder()
@@ -168,7 +173,7 @@ impl SlackChannel {
     }
 
     /// Returns the color for the given severity level.
-    fn severity_color(severity: Severity) -> &'static str {
+    const fn severity_color(severity: Severity) -> &'static str {
         match severity {
             Severity::Critical => "#dc3545", // Red
             Severity::High => "#fd7e14",     // Orange
@@ -179,7 +184,7 @@ impl SlackChannel {
     }
 
     /// Returns the emoji for the given severity level.
-    fn severity_emoji(severity: Severity) -> &'static str {
+    const fn severity_emoji(severity: Severity) -> &'static str {
         match severity {
             Severity::Critical => ":rotating_light:",
             Severity::High => ":warning:",
@@ -235,11 +240,12 @@ impl SlackChannel {
         let mut text = notification.message.clone();
 
         if let Some(remediation) = &notification.context.remediation {
-            text.push_str(&format!("\n\n*Remediation:*\n{remediation}"));
+            write!(text, "\n\n*Remediation:*\n{remediation}")
+                .expect("write to String is infallible");
         }
 
         if let Some(url) = &notification.context.dashboard_url {
-            text.push_str(&format!("\n\n<{url}|View in Dashboard>"));
+            write!(text, "\n\n<{url}|View in Dashboard>").expect("write to String is infallible");
         }
 
         let attachment = SlackAttachment {
@@ -292,7 +298,8 @@ impl NotificationChannel for SlackChannel {
             .send()
             .await?;
 
-        let duration_ms = start.elapsed().as_millis() as u64;
+        // as_millis() returns u128; elapsed time in ms will never exceed u64::MAX (~585M years).
+        let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
         let status = response.status();
 
         if status.is_success() {

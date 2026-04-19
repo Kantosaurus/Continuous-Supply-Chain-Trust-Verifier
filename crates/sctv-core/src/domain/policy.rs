@@ -73,7 +73,9 @@ impl Policy {
                 algorithms: vec![HashAlgorithm::Sha256],
             },
             PolicyRule::BlockTyposquatting { threshold: 0.85 },
-            PolicyRule::RequireProvenance { minimum_slsa_level: 1 },
+            PolicyRule::RequireProvenance {
+                minimum_slsa_level: 1,
+            },
             PolicyRule::EnforceVersionPinning {
                 strategy: VersionPinningStrategy::Locked,
             },
@@ -164,17 +166,17 @@ impl PolicyRule {
     #[must_use]
     pub const fn default_severity(&self) -> Severity {
         match self {
-            Self::RequireHashVerification { .. } => Severity::High,
-            Self::RequireSignature { .. } => Severity::High,
-            Self::RequireProvenance { .. } => Severity::Medium,
-            Self::BlockTyposquatting { .. } => Severity::Critical,
-            Self::EnforceVersionPinning { .. } => Severity::Medium,
-            Self::AllowList { .. } => Severity::High,
-            Self::DenyList { .. } => Severity::Critical,
-            Self::RequireMinimumAge { .. } => Severity::Medium,
-            Self::RequireMinimumMaintainers { .. } => Severity::Low,
-            Self::BlockEcosystems { .. } => Severity::High,
-            Self::RequireMinimumDownloads { .. } => Severity::Low,
+            Self::RequireHashVerification { .. }
+            | Self::RequireSignature { .. }
+            | Self::AllowList { .. }
+            | Self::BlockEcosystems { .. } => Severity::High,
+            Self::RequireProvenance { .. }
+            | Self::EnforceVersionPinning { .. }
+            | Self::RequireMinimumAge { .. } => Severity::Medium,
+            Self::BlockTyposquatting { .. } | Self::DenyList { .. } => Severity::Critical,
+            Self::RequireMinimumMaintainers { .. } | Self::RequireMinimumDownloads { .. } => {
+                Severity::Low
+            }
         }
     }
 }

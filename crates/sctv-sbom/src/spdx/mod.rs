@@ -18,7 +18,7 @@
 //! - Package URL (purl) support as external references
 //! - Checksum embedding (SHA-256, SHA-512, SHA-1, MD5)
 //! - License expression support (SPDX identifiers)
-//! - Relationship tracking (DEPENDS_ON, DEPENDENCY_OF, etc.)
+//! - Relationship tracking (`DEPENDS_ON`, `DEPENDENCY_OF`, etc.)
 //! - Both JSON and tag-value output formats
 //!
 //! # Usage

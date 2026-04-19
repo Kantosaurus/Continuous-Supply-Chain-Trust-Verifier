@@ -1,7 +1,7 @@
 //! # SCTV Registries
 //!
 //! Package registry clients for the Supply Chain Trust Verifier.
-//! Supports npm, PyPI, Maven, NuGet, RubyGems, Cargo, and Go modules.
+//! Supports npm, `PyPI`, Maven, `NuGet`, `RubyGems`, Cargo, and Go modules.
 
 mod cache;
 mod retry;

@@ -35,6 +35,7 @@ pub struct Claims {
 
 impl Claims {
     /// Creates new claims for a user.
+    #[must_use]
     pub fn new(
         user_id: Uuid,
         tenant_id: TenantId,
@@ -58,16 +59,19 @@ impl Claims {
     }
 
     /// Returns the tenant ID.
-    pub fn tenant_id(&self) -> TenantId {
+    #[must_use]
+    pub const fn tenant_id(&self) -> TenantId {
         TenantId(self.tenant_id)
     }
 
     /// Checks if the user has a specific role.
+    #[must_use]
     pub fn has_role(&self, role: &str) -> bool {
         self.roles.iter().any(|r| r == role)
     }
 
     /// Checks if the user is an admin.
+    #[must_use]
     pub fn is_admin(&self) -> bool {
         self.has_role("admin")
     }
@@ -115,7 +119,7 @@ impl FromRequestParts<Arc<AppState>> for AuthUser {
         // Decode and validate JWT
         let claims = decode_token(token, &state.jwt_secret)?;
 
-        Ok(AuthUser::from(claims))
+        Ok(Self::from(claims))
     }
 }
 
@@ -130,28 +134,33 @@ impl FromRequestParts<Arc<AppState>> for MaybeAuthUser {
         parts: &mut Parts,
         state: &Arc<AppState>,
     ) -> Result<Self, Self::Rejection> {
-        match AuthUser::from_request_parts(parts, state).await {
-            Ok(user) => Ok(Self(Some(user))),
-            Err(_) => Ok(Self(None)),
-        }
+        Ok(Self(AuthUser::from_request_parts(parts, state).await.ok()))
     }
 }
 
 /// Encodes a JWT token.
+///
+/// # Errors
+///
+/// Returns an error if the JWT encoding fails.
 pub fn encode_token(claims: &Claims, secret: &str) -> Result<String, jsonwebtoken::errors::Error> {
     let key = EncodingKey::from_secret(secret.as_bytes());
     encode(&Header::default(), claims, &key)
 }
 
 /// Decodes and validates a JWT token.
+///
+/// # Errors
+///
+/// Returns [`ApiError::Unauthorized`] if the token is invalid or expired.
 pub fn decode_token(token: &str, secret: &str) -> Result<Claims, ApiError> {
     let key = DecodingKey::from_secret(secret.as_bytes());
     let mut validation = Validation::default();
     validation.set_audience(&["sctv"]);
     validation.set_issuer(&["sctv-api"]);
 
-    let token_data = decode::<Claims>(token, &key, &validation)
-        .map_err(|_| ApiError::Unauthorized)?;
+    let token_data =
+        decode::<Claims>(token, &key, &validation).map_err(|_| ApiError::Unauthorized)?;
 
     Ok(token_data.claims)
 }

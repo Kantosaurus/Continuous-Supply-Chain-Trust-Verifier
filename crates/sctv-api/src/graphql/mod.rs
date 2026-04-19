@@ -60,14 +60,20 @@ impl QueryRoot {
             .await
             .map_err(|e| async_graphql::Error::new(e.to_string()))?;
 
-        // Apply pagination
-        let offset = ((page - 1) * per_page).max(0) as usize;
-        let limit = per_page as usize;
+        // Apply pagination; page/per_page are i32 inputs, clamp to non-negative before widening.
+        let offset = usize::try_from(((page - 1) * per_page).max(0)).unwrap_or(0);
+        let limit = usize::try_from(per_page.max(0)).unwrap_or(0);
 
         let mut result = Vec::new();
         for project in projects.into_iter().skip(offset).take(limit) {
-            let deps = dep_repo.find_by_project(project.id).await.unwrap_or_default();
-            let alert_count = alert_repo.count_open_by_project(project.id).await.unwrap_or(0);
+            let deps = dep_repo
+                .find_by_project(project.id)
+                .await
+                .unwrap_or_default();
+            let alert_count = alert_repo
+                .count_open_by_project(project.id)
+                .await
+                .unwrap_or(0);
 
             result.push(Project {
                 id: ID::from(project.id.0.to_string()),
@@ -76,8 +82,9 @@ impl QueryRoot {
                 repository_url: project.repository_url.map(|u| u.to_string()),
                 status: project.status,
                 is_active: true,
-                dependency_count: deps.len() as i32,
-                alert_count: alert_count as i32,
+                // Counts are bounded in practice; saturate to i32::MAX rather than wrapping.
+                dependency_count: i32::try_from(deps.len()).unwrap_or(i32::MAX),
+                alert_count: i32::try_from(alert_count).unwrap_or(i32::MAX),
                 last_scan_at: project.last_scan_at,
                 created_at: project.created_at,
             });
@@ -109,13 +116,12 @@ impl QueryRoot {
 
         let uuid = Uuid::parse_str(&id).map_err(|_| async_graphql::Error::new("Invalid ID"))?;
 
-        let project = match project_repo
+        let Some(project) = project_repo
             .find_by_id(sctv_core::ProjectId(uuid))
             .await
             .map_err(|e| async_graphql::Error::new(e.to_string()))?
-        {
-            Some(p) => p,
-            None => return Ok(None),
+        else {
+            return Ok(None);
         };
 
         // Verify tenant access
@@ -123,8 +129,14 @@ impl QueryRoot {
             return Err(async_graphql::Error::new("Access denied"));
         }
 
-        let deps = dep_repo.find_by_project(project.id).await.unwrap_or_default();
-        let alert_count = alert_repo.count_open_by_project(project.id).await.unwrap_or(0);
+        let deps = dep_repo
+            .find_by_project(project.id)
+            .await
+            .unwrap_or_default();
+        let alert_count = alert_repo
+            .count_open_by_project(project.id)
+            .await
+            .unwrap_or(0);
 
         Ok(Some(Project {
             id: ID::from(project.id.0.to_string()),
@@ -133,8 +145,9 @@ impl QueryRoot {
             repository_url: project.repository_url.map(|u| u.to_string()),
             status: project.status,
             is_active: true,
-            dependency_count: deps.len() as i32,
-            alert_count: alert_count as i32,
+            // Counts are bounded in practice; saturate to i32::MAX rather than wrapping.
+            dependency_count: i32::try_from(deps.len()).unwrap_or(i32::MAX),
+            alert_count: i32::try_from(alert_count).unwrap_or(i32::MAX),
             last_scan_at: project.last_scan_at,
             created_at: project.created_at,
         }))
@@ -171,10 +184,11 @@ impl QueryRoot {
             alert_type: None,
         };
 
-        let offset = ((page - 1) * per_page).max(0) as u32;
+        // page and per_page are GraphQL i32 inputs; .max(0) ensures non-negative before widening.
+        let offset = ((page - 1) * per_page).max(0).cast_unsigned();
 
         let alerts = alert_repo
-            .find_with_filter(tenant_id, filter, per_page as u32, offset)
+            .find_with_filter(tenant_id, filter, per_page.max(0).cast_unsigned(), offset)
             .await
             .map_err(|e| async_graphql::Error::new(e.to_string()))?;
 
@@ -215,13 +229,12 @@ impl QueryRoot {
 
         let uuid = Uuid::parse_str(&id).map_err(|_| async_graphql::Error::new("Invalid ID"))?;
 
-        let alert = match alert_repo
+        let Some(alert) = alert_repo
             .find_by_id(sctv_core::AlertId(uuid))
             .await
             .map_err(|e| async_graphql::Error::new(e.to_string()))?
-        {
-            Some(a) => a,
-            None => return Ok(None),
+        else {
+            return Ok(None);
         };
 
         // Verify tenant access
@@ -292,20 +305,19 @@ impl QueryRoot {
                 .find_direct_by_project(sctv_core::ProjectId(uuid))
                 .await
         } else {
-            dep_repo
-                .find_by_project(sctv_core::ProjectId(uuid))
-                .await
+            dep_repo.find_by_project(sctv_core::ProjectId(uuid)).await
         }
         .map_err(|e| async_graphql::Error::new(e.to_string()))?;
 
         // Apply filters and pagination
-        let offset = ((page - 1) * per_page).max(0) as usize;
-        let limit = per_page as usize;
+        // page and per_page are GraphQL i32 inputs; .max(0) ensures non-negative before widening.
+        let offset = usize::try_from(((page - 1) * per_page).max(0)).unwrap_or(0);
+        let limit = usize::try_from(per_page.max(0)).unwrap_or(0);
 
         let filtered: Vec<_> = dependencies
             .into_iter()
-            .filter(|d| ecosystem.map_or(true, |e| d.ecosystem == e))
-            .filter(|d| is_direct.map_or(true, |direct| d.is_direct == direct))
+            .filter(|d| ecosystem.is_none_or(|e| d.ecosystem == e))
+            .filter(|d| is_direct.is_none_or(|direct| d.is_direct == direct))
             .skip(offset)
             .take(limit)
             .map(|d| Dependency {
@@ -317,7 +329,8 @@ impl QueryRoot {
                 resolved_version: d.resolved_version.to_string(),
                 is_direct: d.is_direct,
                 is_dev_dependency: d.is_dev_dependency,
-                depth: d.depth as i32,
+                // depth is u32 (always non-negative); safe to reinterpret bits as i32.
+                depth: d.depth.cast_signed(),
                 hash_sha256: d.integrity.hash_sha256,
                 signature_verified: matches!(
                     d.integrity.signature_status,
@@ -379,7 +392,11 @@ pub struct MutationRoot;
 #[Object]
 impl MutationRoot {
     /// Create a new project.
-    async fn create_project(&self, ctx: &Context<'_>, input: CreateProjectInput) -> Result<Project> {
+    async fn create_project(
+        &self,
+        ctx: &Context<'_>,
+        input: CreateProjectInput,
+    ) -> Result<Project> {
         let gql_ctx = ctx.data::<GqlContext>()?;
         let state = &gql_ctx.state;
 
@@ -442,13 +459,12 @@ impl MutationRoot {
 
         let uuid = Uuid::parse_str(&id).map_err(|_| async_graphql::Error::new("Invalid ID"))?;
 
-        let mut project = match project_repo
+        let Some(mut project) = project_repo
             .find_by_id(sctv_core::ProjectId(uuid))
             .await
             .map_err(|e| async_graphql::Error::new(e.to_string()))?
-        {
-            Some(p) => p,
-            None => return Ok(None),
+        else {
+            return Ok(None);
         };
 
         // Verify tenant access
@@ -473,8 +489,14 @@ impl MutationRoot {
             .await
             .map_err(|e| async_graphql::Error::new(e.to_string()))?;
 
-        let deps = dep_repo.find_by_project(project.id).await.unwrap_or_default();
-        let alert_count = alert_repo.count_open_by_project(project.id).await.unwrap_or(0);
+        let deps = dep_repo
+            .find_by_project(project.id)
+            .await
+            .unwrap_or_default();
+        let alert_count = alert_repo
+            .count_open_by_project(project.id)
+            .await
+            .unwrap_or(0);
 
         Ok(Some(Project {
             id: ID::from(project.id.0.to_string()),
@@ -483,8 +505,9 @@ impl MutationRoot {
             repository_url: project.repository_url.map(|u| u.to_string()),
             status: project.status,
             is_active: true,
-            dependency_count: deps.len() as i32,
-            alert_count: alert_count as i32,
+            // Counts are bounded in practice; saturate to i32::MAX rather than wrapping.
+            dependency_count: i32::try_from(deps.len()).unwrap_or(i32::MAX),
+            alert_count: i32::try_from(alert_count).unwrap_or(i32::MAX),
             last_scan_at: project.last_scan_at,
             created_at: project.created_at,
         }))
@@ -506,13 +529,12 @@ impl MutationRoot {
         let uuid = Uuid::parse_str(&id).map_err(|_| async_graphql::Error::new("Invalid ID"))?;
 
         // Verify project exists and belongs to tenant
-        let project = match project_repo
+        let Some(project) = project_repo
             .find_by_id(sctv_core::ProjectId(uuid))
             .await
             .map_err(|e| async_graphql::Error::new(e.to_string()))?
-        {
-            Some(p) => p,
-            None => return Ok(false),
+        else {
+            return Ok(false);
         };
 
         if project.tenant_id != tenant_id {
@@ -532,8 +554,10 @@ impl MutationRoot {
         &self,
         ctx: &Context<'_>,
         project_id: ID,
-        _full_scan: Option<bool>,
+        full_scan: Option<bool>,
     ) -> Result<Scan> {
+        // `full_scan` is reserved for future use (incremental vs. full scan modes).
+        let _ = full_scan;
         let gql_ctx = ctx.data::<GqlContext>()?;
         let state = &gql_ctx.state;
 
@@ -577,8 +601,10 @@ impl MutationRoot {
         &self,
         ctx: &Context<'_>,
         id: ID,
-        _notes: Option<String>,
+        notes: Option<String>,
     ) -> Result<Option<Alert>> {
+        // `notes` is reserved for future use in the acknowledgement audit trail.
+        let _ = notes;
         let gql_ctx = ctx.data::<GqlContext>()?;
         let state = &gql_ctx.state;
 
@@ -596,13 +622,12 @@ impl MutationRoot {
 
         let uuid = Uuid::parse_str(&id).map_err(|_| async_graphql::Error::new("Invalid ID"))?;
 
-        let mut alert = match alert_repo
+        let Some(mut alert) = alert_repo
             .find_by_id(sctv_core::AlertId(uuid))
             .await
             .map_err(|e| async_graphql::Error::new(e.to_string()))?
-        {
-            Some(a) => a,
-            None => return Ok(None),
+        else {
+            return Ok(None);
         };
 
         // Verify tenant access
@@ -660,13 +685,12 @@ impl MutationRoot {
 
         let uuid = Uuid::parse_str(&id).map_err(|_| async_graphql::Error::new("Invalid ID"))?;
 
-        let mut alert = match alert_repo
+        let Some(mut alert) = alert_repo
             .find_by_id(sctv_core::AlertId(uuid))
             .await
             .map_err(|e| async_graphql::Error::new(e.to_string()))?
-        {
-            Some(a) => a,
-            None => return Ok(None),
+        else {
+            return Ok(None);
         };
 
         // Verify tenant access
@@ -753,10 +777,13 @@ impl MutationRoot {
 fn extract_dependency_info(alert_type: &sctv_core::AlertType) -> (Option<String>, Option<String>) {
     use sctv_core::AlertType;
     match alert_type {
-        AlertType::DependencyTampering(d) => (Some(d.package_name.clone()), Some(d.version.clone())),
-        AlertType::DowngradeAttack(d) => {
-            (Some(d.package_name.clone()), Some(d.current_version.to_string()))
+        AlertType::DependencyTampering(d) => {
+            (Some(d.package_name.clone()), Some(d.version.clone()))
         }
+        AlertType::DowngradeAttack(d) => (
+            Some(d.package_name.clone()),
+            Some(d.current_version.to_string()),
+        ),
         AlertType::Typosquatting(d) => (Some(d.suspicious_package.clone()), None),
         AlertType::ProvenanceFailure(d) => (Some(d.package_name.clone()), Some(d.version.clone())),
         AlertType::PolicyViolation(_) => (None, None),
@@ -877,6 +904,7 @@ pub struct CreatePolicyInput {
 pub type ApiSchema = Schema<QueryRoot, MutationRoot, EmptySubscription>;
 
 /// Creates the GraphQL schema.
+#[must_use]
 pub fn create_schema(_state: Arc<AppState>) -> ApiSchema {
     Schema::build(QueryRoot, MutationRoot, EmptySubscription).finish()
 }
@@ -893,18 +921,14 @@ async fn graphql_handler(
         .get(axum::http::header::AUTHORIZATION)
         .and_then(|h| h.to_str().ok());
 
-    let (tenant_id, user_id) = if let Some(auth) = auth_header {
-        if let Some(token) = auth.strip_prefix("Bearer ") {
+    let (tenant_id, user_id) = auth_header.map_or((None, None), |auth| {
+        auth.strip_prefix("Bearer ").map_or((None, None), |token| {
             match crate::auth::decode_token(token, &state.jwt_secret) {
                 Ok(claims) => (Some(claims.tenant_id()), Some(claims.sub)),
                 Err(_) => (None, None),
             }
-        } else {
-            (None, None)
-        }
-    } else {
-        (None, None)
-    };
+        })
+    });
 
     let gql_ctx = GqlContext {
         state: state.clone(),
@@ -920,7 +944,7 @@ async fn graphql_handler(
 
 /// Creates the GraphQL router.
 pub fn routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
-    let schema = create_schema(state.clone());
+    let schema = create_schema(state);
 
     Router::new()
         .route("/", post(graphql_handler))

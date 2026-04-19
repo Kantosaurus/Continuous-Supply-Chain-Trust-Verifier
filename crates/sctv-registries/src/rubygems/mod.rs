@@ -1,6 +1,6 @@
-//! RubyGems registry client.
+//! `RubyGems` registry client.
 //!
-//! This module provides a client for interacting with the RubyGems API
+//! This module provides a client for interacting with the `RubyGems` API
 //! to fetch Ruby gem metadata, versions, and downloads.
 //!
 //! # API Endpoints

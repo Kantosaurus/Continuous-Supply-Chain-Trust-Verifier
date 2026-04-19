@@ -1,4 +1,4 @@
-//! PagerDuty notification channel using Events API v2.
+//! `PagerDuty` notification channel using Events API v2.
 
 use std::time::{Duration, Instant};
 
@@ -12,13 +12,13 @@ use super::NotificationChannel;
 use crate::error::{NotificationError, NotificationResult};
 use crate::types::{DeliveryResult, Notification};
 
-/// PagerDuty Events API v2 endpoint.
+/// `PagerDuty` Events API v2 endpoint.
 const PAGERDUTY_EVENTS_API: &str = "https://events.pagerduty.com/v2/enqueue";
 
-/// Configuration for the PagerDuty notification channel.
+/// Configuration for the `PagerDuty` notification channel.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PagerDutyConfig {
-    /// PagerDuty routing key (integration key).
+    /// `PagerDuty` routing key (integration key).
     #[serde(skip_serializing)]
     pub routing_key: String,
     /// Source identifier for events (e.g., hostname or service name).
@@ -36,7 +36,7 @@ pub struct PagerDutyConfig {
     /// Whether the channel is enabled.
     #[serde(default = "default_enabled")]
     pub enabled: bool,
-    /// Custom API URL (for testing). Defaults to PagerDuty Events API v2.
+    /// Custom API URL (for testing). Defaults to `PagerDuty` Events API v2.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub api_url: Option<String>,
 }
@@ -45,11 +45,11 @@ fn default_source() -> String {
     "supply-chain-trust-verifier".to_string()
 }
 
-fn default_timeout() -> u64 {
+const fn default_timeout() -> u64 {
     30
 }
 
-fn default_enabled() -> bool {
+const fn default_enabled() -> bool {
     true
 }
 
@@ -69,7 +69,7 @@ impl Default for PagerDutyConfig {
 }
 
 impl PagerDutyConfig {
-    /// Creates a new PagerDuty configuration builder.
+    /// Creates a new `PagerDuty` configuration builder.
     #[must_use]
     pub fn builder() -> PagerDutyConfigBuilder {
         PagerDutyConfigBuilder::default()
@@ -120,14 +120,14 @@ impl PagerDutyConfigBuilder {
 
     /// Sets the request timeout.
     #[must_use]
-    pub fn timeout_secs(mut self, secs: u64) -> Self {
+    pub const fn timeout_secs(mut self, secs: u64) -> Self {
         self.config.timeout_secs = secs;
         self
     }
 
     /// Sets whether the channel is enabled.
     #[must_use]
-    pub fn enabled(mut self, enabled: bool) -> Self {
+    pub const fn enabled(mut self, enabled: bool) -> Self {
         self.config.enabled = enabled;
         self
     }
@@ -146,7 +146,7 @@ impl PagerDutyConfigBuilder {
     }
 }
 
-/// PagerDuty event action type.
+/// `PagerDuty` event action type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
 #[allow(dead_code)] // Acknowledge and Resolve are part of the API for future use
@@ -159,7 +159,7 @@ pub enum EventAction {
     Resolve,
 }
 
-/// PagerDuty event severity.
+/// `PagerDuty` event severity.
 #[derive(Debug, Clone, Copy, Serialize)]
 #[serde(rename_all = "lowercase")]
 enum PagerDutySeverity {
@@ -180,7 +180,7 @@ impl From<Severity> for PagerDutySeverity {
     }
 }
 
-/// PagerDuty Events API v2 payload.
+/// `PagerDuty` Events API v2 payload.
 #[derive(Debug, Serialize)]
 struct PagerDutyEvent {
     routing_key: String,
@@ -194,7 +194,7 @@ struct PagerDutyEvent {
     images: Vec<EventImage>,
 }
 
-/// Payload section of a PagerDuty event.
+/// Payload section of a `PagerDuty` event.
 #[derive(Debug, Serialize)]
 struct EventPayload {
     summary: String,
@@ -212,14 +212,14 @@ struct EventPayload {
     custom_details: std::collections::HashMap<String, serde_json::Value>,
 }
 
-/// Link in a PagerDuty event.
+/// Link in a `PagerDuty` event.
 #[derive(Debug, Serialize)]
 struct EventLink {
     href: String,
     text: String,
 }
 
-/// Image in a PagerDuty event.
+/// Image in a `PagerDuty` event.
 #[derive(Debug, Serialize)]
 struct EventImage {
     src: String,
@@ -229,7 +229,7 @@ struct EventImage {
     alt: Option<String>,
 }
 
-/// PagerDuty API response.
+/// `PagerDuty` API response.
 #[derive(Debug, Deserialize)]
 struct PagerDutyResponse {
     status: String,
@@ -238,14 +238,18 @@ struct PagerDutyResponse {
     dedup_key: Option<String>,
 }
 
-/// PagerDuty notification channel using Events API v2.
+/// `PagerDuty` notification channel using Events API v2.
 pub struct PagerDutyChannel {
     config: PagerDutyConfig,
     client: Client,
 }
 
 impl PagerDutyChannel {
-    /// Creates a new PagerDuty channel with the given configuration.
+    /// Creates a new `PagerDuty` channel with the given configuration.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the HTTP client cannot be built (e.g. invalid TLS configuration).
     #[must_use]
     pub fn new(config: PagerDutyConfig) -> Self {
         let client = Client::builder()
@@ -256,7 +260,7 @@ impl PagerDutyChannel {
         Self { config, client }
     }
 
-    /// Builds the PagerDuty event payload.
+    /// Builds the `PagerDuty` event payload.
     fn build_event(&self, notification: &Notification, action: EventAction) -> PagerDutyEvent {
         let mut custom_details = std::collections::HashMap::new();
 
@@ -349,7 +353,7 @@ impl PagerDutyChannel {
         }
     }
 
-    /// Sends a PagerDuty event.
+    /// Sends a `PagerDuty` event.
     async fn send_event(
         &self,
         notification: &Notification,
@@ -365,21 +369,15 @@ impl PagerDutyChannel {
             .as_deref()
             .unwrap_or(PAGERDUTY_EVENTS_API);
 
-        let response = self
-            .client
-            .post(api_url)
-            .json(&event)
-            .send()
-            .await?;
+        let response = self.client.post(api_url).json(&event).send().await?;
 
-        let duration_ms = start.elapsed().as_millis() as u64;
+        // as_millis() returns u128; elapsed time in ms will never exceed u64::MAX (~585M years).
+        let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
         let status = response.status();
 
         if status.is_success() {
-            let pd_response: PagerDutyResponse = response
-                .json()
-                .await
-                .unwrap_or_else(|_| PagerDutyResponse {
+            let pd_response: PagerDutyResponse =
+                response.json().await.unwrap_or_else(|_| PagerDutyResponse {
                     status: "success".to_string(),
                     message: "Event accepted".to_string(),
                     dedup_key: None,
@@ -547,7 +545,10 @@ mod tests {
         assert_eq!(event.event_action, EventAction::Trigger);
         assert!(event.payload.summary.contains("Critical"));
         assert_eq!(event.payload.source, "sctv");
-        assert!(matches!(event.payload.severity, PagerDutySeverity::Critical));
+        assert!(matches!(
+            event.payload.severity,
+            PagerDutySeverity::Critical
+        ));
         assert!(!event.links.is_empty());
         assert!(event.payload.custom_details.contains_key("project"));
     }

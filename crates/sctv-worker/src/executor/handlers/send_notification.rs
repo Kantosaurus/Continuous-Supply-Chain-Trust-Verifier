@@ -22,7 +22,7 @@ use crate::jobs::{
 /// Executor for sending notifications.
 ///
 /// This executor uses the `sctv-notifications` crate to deliver alerts
-/// through various channels (Email, Slack, Teams, PagerDuty, Webhook).
+/// through various channels (Email, Slack, Teams, `PagerDuty`, Webhook).
 pub struct SendNotificationExecutor;
 
 impl SendNotificationExecutor {
@@ -101,7 +101,8 @@ impl SendNotificationExecutor {
                 Ok(SendNotificationResult {
                     sent: true,
                     response: Some(response),
-                    send_duration_ms: duration.as_millis() as u64,
+                    // as_millis() returns u128; notification duration won't exceed u64::MAX ms.
+                    send_duration_ms: u64::try_from(duration.as_millis()).unwrap_or(u64::MAX),
                 })
             }
             Err(e) => {
@@ -119,7 +120,8 @@ impl SendNotificationExecutor {
                         "error": e.to_string(),
                         "channel": format!("{:?}", payload.channel),
                     })),
-                    send_duration_ms: duration.as_millis() as u64,
+                    // as_millis() returns u128; notification duration won't exceed u64::MAX ms.
+                    send_duration_ms: u64::try_from(duration.as_millis()).unwrap_or(u64::MAX),
                 })
             }
         }
@@ -133,9 +135,7 @@ impl SendNotificationExecutor {
     ) -> WorkerResult<serde_json::Value> {
         // Parse email configuration from channel_config
         let config: EmailConfig = serde_json::from_value(payload.channel_config.clone())
-            .map_err(|e| {
-                WorkerError::Notification(format!("Invalid email configuration: {e}"))
-            })?;
+            .map_err(|e| WorkerError::Notification(format!("Invalid email configuration: {e}")))?;
 
         // Ensure the channel is enabled for this send
         let config = EmailConfig {
@@ -150,9 +150,10 @@ impl SendNotificationExecutor {
             WorkerError::Notification(format!("Email configuration validation failed: {e}"))
         })?;
 
-        let result = channel.send(notification).await.map_err(|e| {
-            WorkerError::Notification(format!("Email delivery failed: {e}"))
-        })?;
+        let result = channel
+            .send(notification)
+            .await
+            .map_err(|e| WorkerError::Notification(format!("Email delivery failed: {e}")))?;
 
         if result.success {
             Ok(serde_json::json!({
@@ -163,7 +164,9 @@ impl SendNotificationExecutor {
             }))
         } else {
             Err(WorkerError::Notification(
-                result.error.unwrap_or_else(|| "Unknown email error".to_string()),
+                result
+                    .error
+                    .unwrap_or_else(|| "Unknown email error".to_string()),
             ))
         }
     }
@@ -176,9 +179,7 @@ impl SendNotificationExecutor {
     ) -> WorkerResult<serde_json::Value> {
         // Parse Slack configuration
         let config: SlackConfig = serde_json::from_value(payload.channel_config.clone())
-            .map_err(|e| {
-                WorkerError::Notification(format!("Invalid Slack configuration: {e}"))
-            })?;
+            .map_err(|e| WorkerError::Notification(format!("Invalid Slack configuration: {e}")))?;
 
         let config = SlackConfig {
             enabled: true,
@@ -191,9 +192,10 @@ impl SendNotificationExecutor {
             WorkerError::Notification(format!("Slack configuration validation failed: {e}"))
         })?;
 
-        let result = channel.send(notification).await.map_err(|e| {
-            WorkerError::Notification(format!("Slack delivery failed: {e}"))
-        })?;
+        let result = channel
+            .send(notification)
+            .await
+            .map_err(|e| WorkerError::Notification(format!("Slack delivery failed: {e}")))?;
 
         if result.success {
             Ok(serde_json::json!({
@@ -204,7 +206,9 @@ impl SendNotificationExecutor {
             }))
         } else {
             Err(WorkerError::Notification(
-                result.error.unwrap_or_else(|| "Unknown Slack error".to_string()),
+                result
+                    .error
+                    .unwrap_or_else(|| "Unknown Slack error".to_string()),
             ))
         }
     }
@@ -217,9 +221,7 @@ impl SendNotificationExecutor {
     ) -> WorkerResult<serde_json::Value> {
         // Parse Teams configuration
         let config: TeamsConfig = serde_json::from_value(payload.channel_config.clone())
-            .map_err(|e| {
-                WorkerError::Notification(format!("Invalid Teams configuration: {e}"))
-            })?;
+            .map_err(|e| WorkerError::Notification(format!("Invalid Teams configuration: {e}")))?;
 
         let config = TeamsConfig {
             enabled: true,
@@ -232,9 +234,10 @@ impl SendNotificationExecutor {
             WorkerError::Notification(format!("Teams configuration validation failed: {e}"))
         })?;
 
-        let result = channel.send(notification).await.map_err(|e| {
-            WorkerError::Notification(format!("Teams delivery failed: {e}"))
-        })?;
+        let result = channel
+            .send(notification)
+            .await
+            .map_err(|e| WorkerError::Notification(format!("Teams delivery failed: {e}")))?;
 
         if result.success {
             Ok(serde_json::json!({
@@ -245,12 +248,14 @@ impl SendNotificationExecutor {
             }))
         } else {
             Err(WorkerError::Notification(
-                result.error.unwrap_or_else(|| "Unknown Teams error".to_string()),
+                result
+                    .error
+                    .unwrap_or_else(|| "Unknown Teams error".to_string()),
             ))
         }
     }
 
-    /// Sends notification via PagerDuty Events API.
+    /// Sends notification via `PagerDuty` Events API.
     async fn send_pagerduty(
         &self,
         payload: &SendNotificationPayload,
@@ -273,9 +278,10 @@ impl SendNotificationExecutor {
             WorkerError::Notification(format!("PagerDuty configuration validation failed: {e}"))
         })?;
 
-        let result = channel.send(notification).await.map_err(|e| {
-            WorkerError::Notification(format!("PagerDuty delivery failed: {e}"))
-        })?;
+        let result = channel
+            .send(notification)
+            .await
+            .map_err(|e| WorkerError::Notification(format!("PagerDuty delivery failed: {e}")))?;
 
         if result.success {
             Ok(serde_json::json!({
@@ -286,7 +292,9 @@ impl SendNotificationExecutor {
             }))
         } else {
             Err(WorkerError::Notification(
-                result.error.unwrap_or_else(|| "Unknown PagerDuty error".to_string()),
+                result
+                    .error
+                    .unwrap_or_else(|| "Unknown PagerDuty error".to_string()),
             ))
         }
     }
@@ -314,9 +322,10 @@ impl SendNotificationExecutor {
             WorkerError::Notification(format!("Webhook configuration validation failed: {e}"))
         })?;
 
-        let result = channel.send(notification).await.map_err(|e| {
-            WorkerError::Notification(format!("Webhook delivery failed: {e}"))
-        })?;
+        let result = channel
+            .send(notification)
+            .await
+            .map_err(|e| WorkerError::Notification(format!("Webhook delivery failed: {e}")))?;
 
         if result.success {
             Ok(serde_json::json!({
@@ -327,7 +336,9 @@ impl SendNotificationExecutor {
             }))
         } else {
             Err(WorkerError::Notification(
-                result.error.unwrap_or_else(|| "Unknown webhook error".to_string()),
+                result
+                    .error
+                    .unwrap_or_else(|| "Unknown webhook error".to_string()),
             ))
         }
     }
@@ -346,13 +357,10 @@ impl JobExecutor for SendNotificationExecutor {
     }
 
     async fn execute(&self, job: &Job, ctx: &ExecutionContext) -> WorkerResult<JobResult> {
-        let payload = match &job.payload {
-            JobPayload::SendNotification(p) => p,
-            _ => {
-                return Err(WorkerError::Execution(
-                    "Invalid payload type for SendNotification".into(),
-                ))
-            }
+        let JobPayload::SendNotification(payload) = &job.payload else {
+            return Err(WorkerError::Execution(
+                "Invalid payload type for SendNotification".into(),
+            ));
         };
 
         let result = self.execute_send(payload, ctx).await?;

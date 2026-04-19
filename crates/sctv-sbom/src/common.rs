@@ -1,11 +1,14 @@
 //! Common types shared between SBOM formats.
 //!
-//! This module provides types that are used by both CycloneDX and SPDX generators,
+//! This module provides types that are used by both `CycloneDX` and SPDX generators,
 //! ensuring consistent handling of licenses, hashes, external references, etc.
 
 use serde::{Deserialize, Serialize};
 
 /// Configuration options for SBOM generation.
+// Each bool is a distinct, independent feature toggle; grouping into an enum would
+// reduce discoverability without improving safety.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone)]
 pub struct GeneratorConfig {
     /// Include development dependencies.
@@ -62,42 +65,42 @@ impl GeneratorConfig {
 
     /// Sets whether to include development dependencies.
     #[must_use]
-    pub fn with_include_dev_dependencies(mut self, include: bool) -> Self {
+    pub const fn with_include_dev_dependencies(mut self, include: bool) -> Self {
         self.include_dev_dependencies = include;
         self
     }
 
     /// Sets whether to include transitive dependencies.
     #[must_use]
-    pub fn with_include_transitive(mut self, include: bool) -> Self {
+    pub const fn with_include_transitive(mut self, include: bool) -> Self {
         self.include_transitive = include;
         self
     }
 
     /// Sets whether to include hash information.
     #[must_use]
-    pub fn with_include_hashes(mut self, include: bool) -> Self {
+    pub const fn with_include_hashes(mut self, include: bool) -> Self {
         self.include_hashes = include;
         self
     }
 
     /// Sets whether to include license information.
     #[must_use]
-    pub fn with_include_licenses(mut self, include: bool) -> Self {
+    pub const fn with_include_licenses(mut self, include: bool) -> Self {
         self.include_licenses = include;
         self
     }
 
     /// Sets whether to include external references.
     #[must_use]
-    pub fn with_include_external_refs(mut self, include: bool) -> Self {
+    pub const fn with_include_external_refs(mut self, include: bool) -> Self {
         self.include_external_refs = include;
         self
     }
 
     /// Sets whether to include vulnerability information.
     #[must_use]
-    pub fn with_include_vulnerabilities(mut self, include: bool) -> Self {
+    pub const fn with_include_vulnerabilities(mut self, include: bool) -> Self {
         self.include_vulnerabilities = include;
         self
     }
@@ -121,7 +124,7 @@ impl GeneratorConfig {
 
     /// Sets whether to pretty-print output.
     #[must_use]
-    pub fn with_pretty_print(mut self, pretty: bool) -> Self {
+    pub const fn with_pretty_print(mut self, pretty: bool) -> Self {
         self.pretty_print = pretty;
         self
     }
@@ -146,7 +149,7 @@ pub enum HashAlgorithm {
 }
 
 impl HashAlgorithm {
-    /// Returns the CycloneDX algorithm identifier.
+    /// Returns the `CycloneDX` algorithm identifier.
     #[must_use]
     pub const fn cyclonedx_id(&self) -> &'static str {
         match self {
@@ -197,19 +200,19 @@ pub struct Hash {
 impl Hash {
     /// Creates a new hash.
     #[must_use]
-    pub fn new(algorithm: HashAlgorithm, value: String) -> Self {
+    pub const fn new(algorithm: HashAlgorithm, value: String) -> Self {
         Self { algorithm, value }
     }
 
     /// Creates a SHA-256 hash.
     #[must_use]
-    pub fn sha256(value: String) -> Self {
+    pub const fn sha256(value: String) -> Self {
         Self::new(HashAlgorithm::Sha256, value)
     }
 
     /// Creates a SHA-512 hash.
     #[must_use]
-    pub fn sha512(value: String) -> Self {
+    pub const fn sha512(value: String) -> Self {
         Self::new(HashAlgorithm::Sha512, value)
     }
 }
@@ -253,7 +256,7 @@ pub enum ExternalReferenceType {
 }
 
 impl ExternalReferenceType {
-    /// Returns the CycloneDX type identifier.
+    /// Returns the `CycloneDX` type identifier.
     #[must_use]
     pub const fn cyclonedx_type(&self) -> &'static str {
         match self {
@@ -281,7 +284,6 @@ impl ExternalReferenceType {
     pub const fn spdx_category(&self) -> &'static str {
         match self {
             Self::Vcs | Self::BuildSystem => "PACKAGE-MANAGER",
-            Self::Documentation | Self::Website => "OTHER",
             Self::SecurityAdvisory => "SECURITY",
             _ => "OTHER",
         }
@@ -302,7 +304,7 @@ pub struct ExternalReference {
 impl ExternalReference {
     /// Creates a new external reference.
     #[must_use]
-    pub fn new(reference_type: ExternalReferenceType, url: String) -> Self {
+    pub const fn new(reference_type: ExternalReferenceType, url: String) -> Self {
         Self {
             reference_type,
             url,
@@ -312,13 +314,13 @@ impl ExternalReference {
 
     /// Creates a VCS reference.
     #[must_use]
-    pub fn vcs(url: String) -> Self {
+    pub const fn vcs(url: String) -> Self {
         Self::new(ExternalReferenceType::Vcs, url)
     }
 
     /// Creates a website reference.
     #[must_use]
-    pub fn website(url: String) -> Self {
+    pub const fn website(url: String) -> Self {
         Self::new(ExternalReferenceType::Website, url)
     }
 
@@ -507,12 +509,17 @@ impl OrganizationalContact {
 }
 
 /// Generates a unique BOM reference ID from a dependency.
+#[must_use]
 pub fn generate_bom_ref(ecosystem: &str, name: &str, version: &str) -> String {
     use sha2::{Digest, Sha256};
 
-    let input = format!("{}:{}@{}", ecosystem, name, version);
+    let input = format!("{ecosystem}:{name}@{version}");
     let hash = Sha256::digest(input.as_bytes());
-    format!("{}-{}", name.replace(['/', '@', '.'], "-"), &hex::encode(&hash[..8]))
+    format!(
+        "{}-{}",
+        name.replace(['/', '@', '.'], "-"),
+        &hex::encode(&hash[..8])
+    )
 }
 
 #[cfg(test)]

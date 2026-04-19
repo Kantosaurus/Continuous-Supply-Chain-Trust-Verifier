@@ -6,7 +6,7 @@ pub mod components;
 pub mod pages;
 
 use leptos::prelude::*;
-use leptos_meta::*;
+use leptos_meta::{provide_meta_context, Link, Meta, Stylesheet, Title};
 use leptos_router::{
     components::{Route, Router, Routes},
     path,

@@ -1,4 +1,4 @@
-//! PyPI registry client.
+//! `PyPI` registry client.
 
 mod client;
 mod models;

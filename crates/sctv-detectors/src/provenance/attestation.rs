@@ -188,12 +188,21 @@ pub struct AttestationParser;
 
 impl AttestationParser {
     /// Parses a DSSE envelope from JSON.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the data is not valid JSON or does not match the DSSE schema.
     pub fn parse_dsse(data: &[u8]) -> Result<DsseEnvelope, AttestationError> {
         let envelope: DsseEnvelope = serde_json::from_slice(data)?;
         Ok(envelope)
     }
 
     /// Extracts the in-toto statement from a DSSE envelope.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the payload type is unsupported, the base64 decoding fails,
+    /// the JSON is invalid, or the statement type is not recognized.
     pub fn extract_statement(envelope: &DsseEnvelope) -> Result<InTotoStatement, AttestationError> {
         if envelope.payload_type != "application/vnd.in-toto+json" {
             return Err(AttestationError::UnsupportedType(format!(
@@ -219,6 +228,10 @@ impl AttestationParser {
     }
 
     /// Parses SLSA provenance from an in-toto statement.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the predicate type is unsupported or deserialization fails.
     pub fn parse_slsa_provenance(
         statement: &InTotoStatement,
     ) -> Result<ParsedProvenance, AttestationError> {
@@ -347,36 +360,38 @@ impl AttestationParser {
     }
 
     /// Converts parsed provenance to core domain types.
+    #[must_use]
     pub fn to_attestation(
         envelope: &DsseEnvelope,
         statement: &InTotoStatement,
         _parsed: &ParsedProvenance,
     ) -> Attestation {
-        let subject = if let Some(first_subject) = statement.subject.first() {
-            AttestationSubject {
-                name: first_subject.name.clone(),
-                digest: first_subject.digest.clone(),
-            }
-        } else {
-            AttestationSubject {
+        let subject = statement.subject.first().map_or_else(
+            || AttestationSubject {
                 name: String::new(),
                 digest: BTreeMap::new(),
-            }
-        };
+            },
+            |first_subject| AttestationSubject {
+                name: first_subject.name.clone(),
+                digest: first_subject.digest.clone(),
+            },
+        );
 
-        let signature = if let Some(sig) = envelope.signatures.first() {
-            AttestationSignature {
+        let signature = envelope.signatures.first().map_or_else(
+            || AttestationSignature::new(String::new()),
+            |sig| AttestationSignature {
                 keyid: sig.keyid.clone(),
                 sig: sig.sig.clone(),
                 verified: false,
                 certificate_chain: None,
                 transparency_log_entry: None,
-            }
-        } else {
-            AttestationSignature::new(String::new())
-        };
+            },
+        );
 
-        let attestation_type = if statement.predicate_type.starts_with("https://slsa.dev/provenance") {
+        let attestation_type = if statement
+            .predicate_type
+            .starts_with("https://slsa.dev/provenance")
+        {
             AttestationType::SlsaProvenance
         } else {
             AttestationType::InToto

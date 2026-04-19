@@ -98,8 +98,9 @@ pub struct GoRetract {
 
 impl GoMod {
     /// Parses a go.mod file content.
+    #[must_use]
     pub fn parse(content: &str) -> Self {
-        let mut result = GoMod::default();
+        let mut result = Self::default();
 
         let lines: Vec<&str> = content.lines().collect();
         let mut i = 0;
@@ -209,8 +210,8 @@ impl GoMod {
             return None;
         }
 
-        let old_parts: Vec<&str> = parts[0].trim().split_whitespace().collect();
-        let new_parts: Vec<&str> = parts[1].trim().split_whitespace().collect();
+        let old_parts: Vec<&str> = parts[0].split_whitespace().collect();
+        let new_parts: Vec<&str> = parts[1].split_whitespace().collect();
 
         if old_parts.is_empty() || new_parts.is_empty() {
             return None;
@@ -218,9 +219,9 @@ impl GoMod {
 
         Some(GoReplace {
             old_path: old_parts[0].to_string(),
-            old_version: old_parts.get(1).map(|s| s.to_string()),
+            old_version: old_parts.get(1).map(std::string::ToString::to_string),
             new_path: new_parts[0].to_string(),
-            new_version: new_parts.get(1).map(|s| s.to_string()),
+            new_version: new_parts.get(1).map(std::string::ToString::to_string),
         })
     }
 
@@ -234,16 +235,14 @@ impl GoMod {
         if line.starts_with('[') {
             let bracket_end = line.find(']')?;
             let range = &line[1..bracket_end];
-            let versions: Vec<&str> = range.split(',').map(|s| s.trim()).collect();
+            let versions: Vec<&str> = range.split(',').map(str::trim).collect();
             if versions.len() == 2 {
                 return Some(GoRetract {
                     low: versions[0].to_string(),
                     high: Some(versions[1].to_string()),
-                    rationale: line.get(bracket_end + 1..).and_then(|s| {
-                        s.trim()
-                            .strip_prefix("//")
-                            .map(|r| r.trim().to_string())
-                    }),
+                    rationale: line
+                        .get(bracket_end + 1..)
+                        .and_then(|s| s.trim().strip_prefix("//").map(|r| r.trim().to_string())),
                 });
             }
         }
@@ -267,7 +266,7 @@ mod tests {
 
     #[test]
     fn test_parse_go_mod() {
-        let content = r#"
+        let content = r"
 module github.com/example/foo
 
 go 1.21
@@ -278,7 +277,7 @@ require (
 )
 
 replace github.com/old/pkg => github.com/new/pkg v1.0.0
-"#;
+";
 
         let gomod = GoMod::parse(content);
         assert_eq!(gomod.module, "github.com/example/foo");

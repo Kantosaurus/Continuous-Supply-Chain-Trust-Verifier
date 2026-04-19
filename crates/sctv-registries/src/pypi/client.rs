@@ -1,4 +1,4 @@
-//! PyPI registry client implementation with full functionality.
+//! `PyPI` registry client implementation with full functionality.
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -12,13 +12,15 @@ use std::sync::Arc;
 use std::time::Duration;
 use url::Url;
 
-use super::models::*;
+use super::models::{
+    PyPiAttestation, PyPiDependency, PyPiPackageResponse, PyPiReleaseFile, PyPiVersionResponse,
+};
 use crate::{
     retry_http, PackageMetadata, RegistryCache, RegistryClient, RegistryError, RegistryResult,
     RetryConfig, VersionMetadata,
 };
 
-/// PyPI registry client with caching and hash verification.
+/// `PyPI` registry client with caching and hash verification.
 pub struct PyPiClient {
     http: Client,
     base_url: Url,
@@ -26,16 +28,20 @@ pub struct PyPiClient {
 }
 
 impl PyPiClient {
-    /// Default PyPI registry URL.
+    /// Default `PyPI` registry URL.
     pub const DEFAULT_REGISTRY: &'static str = "https://pypi.org";
 
-    /// Creates a new PyPI client with default settings.
+    /// Creates a new `PyPI` client with default settings.
     #[must_use]
     pub fn new() -> Self {
         Self::with_config(Self::DEFAULT_REGISTRY, Arc::new(RegistryCache::new()))
     }
 
     /// Creates a client with custom registry URL and cache.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the HTTP client cannot be built or if `registry_url` is not a valid URL.
     #[must_use]
     pub fn with_config(registry_url: &str, cache: Arc<RegistryCache>) -> Self {
         let http = Client::builder()
@@ -52,17 +58,20 @@ impl PyPiClient {
         }
     }
 
-    /// Fetches full package metadata from PyPI JSON API.
+    /// Fetches full package metadata from `PyPI` JSON API.
     async fn fetch_package(&self, name: &str) -> RegistryResult<PyPiPackageResponse> {
         let normalized = normalize_pypi_name(name);
         let url = self
             .base_url
-            .join(&format!("pypi/{}/json", normalized))
+            .join(&format!("pypi/{normalized}/json"))
             .map_err(|e| RegistryError::Parse(e.to_string()))?;
 
         tracing::debug!("Fetching PyPI package {} from {}", name, url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::PackageNotFound(name.to_string()));
@@ -86,16 +95,23 @@ impl PyPiClient {
     }
 
     /// Fetches metadata for a specific version.
-    async fn fetch_version(&self, name: &str, version: &str) -> RegistryResult<PyPiVersionResponse> {
+    async fn fetch_version(
+        &self,
+        name: &str,
+        version: &str,
+    ) -> RegistryResult<PyPiVersionResponse> {
         let normalized = normalize_pypi_name(name);
         let url = self
             .base_url
-            .join(&format!("pypi/{}/{}/json", normalized, version))
+            .join(&format!("pypi/{normalized}/{version}/json"))
             .map_err(|e| RegistryError::Parse(e.to_string()))?;
 
         tracing::debug!("Fetching PyPI version {}=={} from {}", name, version, url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::VersionNotFound(
@@ -122,6 +138,10 @@ impl PyPiClient {
     }
 
     /// Fetches attestations for a specific file (PEP 740).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the HTTP request fails or the response cannot be parsed.
     pub async fn fetch_attestations(
         &self,
         name: &str,
@@ -132,14 +152,16 @@ impl PyPiClient {
         let url = self
             .base_url
             .join(&format!(
-                "integrity/{}/{}/{}/provenance",
-                normalized, version, filename
+                "integrity/{normalized}/{version}/{filename}/provenance"
             ))
             .map_err(|e| RegistryError::Parse(e.to_string()))?;
 
         tracing::debug!("Fetching attestations from {}", url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             // No attestations available - this is not an error
@@ -157,7 +179,11 @@ impl PyPiClient {
     }
 
     /// Verifies the integrity of downloaded package bytes.
-    pub fn verify_integrity(&self, bytes: &Bytes, expected: &PackageChecksums) -> PyPiIntegrityResult {
+    pub fn verify_integrity(
+        &self,
+        bytes: &Bytes,
+        expected: &PackageChecksums,
+    ) -> PyPiIntegrityResult {
         let mut result = PyPiIntegrityResult {
             sha256_match: None,
             blake2b_256_match: None,
@@ -179,19 +205,14 @@ impl PyPiClient {
             result.sha256_match = Some(expected_sha256.to_lowercase() == sha256_hash);
         }
 
-        // Check against integrity field (might contain blake2b)
-        if let Some(integrity) = &expected.integrity {
-            if let Some(expected_blake) = integrity.strip_prefix("blake2b_256:") {
-                // Would need to compute blake2b - for now just store
-                result.blake2b_256_match = Some(false); // Placeholder
-            }
-        }
+        // blake2b_256 verification is not yet implemented; leave blake2b_256_match as None
+        // so that is_valid() treats missing checks as "not checked" rather than "failed".
 
         result
     }
 
     /// Finds the best release file for a version (prefers wheel, then sdist).
-    fn select_best_release_file<'a>(&self, files: &'a [PyPiReleaseFile]) -> Option<&'a PyPiReleaseFile> {
+    fn select_best_release_file(files: &[PyPiReleaseFile]) -> Option<&PyPiReleaseFile> {
         // Prefer wheels, then source distributions
         // Among wheels, prefer universal (py3-none-any)
         let mut best: Option<&PyPiReleaseFile> = None;
@@ -228,7 +249,7 @@ impl PyPiClient {
         best
     }
 
-    /// Converts PyPI dependencies to package dependencies.
+    /// Converts `PyPI` dependencies to package dependencies.
     fn parse_dependencies(requires_dist: Option<&Vec<String>>) -> Vec<PackageDependency> {
         requires_dist
             .map(|deps| {
@@ -363,7 +384,10 @@ impl RegistryClient for PyPiClient {
         let normalized = normalize_pypi_name(name);
 
         // Check cache first
-        if let Some(cached) = self.cache.get_version(PackageEcosystem::PyPi, &normalized, version) {
+        if let Some(cached) = self
+            .cache
+            .get_version(PackageEcosystem::PyPi, &normalized, version)
+        {
             tracing::debug!("Cache hit for {}=={}", name, version);
             return Ok(cached);
         }
@@ -375,17 +399,19 @@ impl RegistryClient for PyPiClient {
             .map_err(|e| RegistryError::Parse(format!("Invalid version: {e}")))?;
 
         // Select best release file
-        let release_file = self
-            .select_best_release_file(&pypi_version.urls)
-            .ok_or_else(|| {
-                RegistryError::Unavailable(format!("No release files for {name}=={version}"))
-            })?;
+        let release_file = Self::select_best_release_file(&pypi_version.urls).ok_or_else(|| {
+            RegistryError::Unavailable(format!("No release files for {name}=={version}"))
+        })?;
 
         let checksums = PackageChecksums {
             sha1: None,
             sha256: release_file.digests.sha256.clone(),
             sha512: None,
-            integrity: release_file.digests.blake2b_256.clone().map(|h| format!("blake2b_256:{}", h)),
+            integrity: release_file
+                .digests
+                .blake2b_256
+                .clone()
+                .map(|h| format!("blake2b_256:{h}")),
         };
 
         let download_url = Url::parse(&release_file.url).ok();
@@ -420,8 +446,12 @@ impl RegistryClient for PyPiClient {
             download_url,
         };
 
-        self.cache
-            .set_version(PackageEcosystem::PyPi, &normalized, version, metadata.clone());
+        self.cache.set_version(
+            PackageEcosystem::PyPi,
+            &normalized,
+            version,
+            metadata.clone(),
+        );
 
         Ok(metadata)
     }
@@ -431,7 +461,10 @@ impl RegistryClient for PyPiClient {
 
         tracing::debug!("Downloading {}=={} from {}", name, version, url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if !response.status().is_success() {
             return Err(RegistryError::Unavailable(format!(
@@ -519,7 +552,7 @@ impl RegistryClient for PyPiClient {
     }
 }
 
-/// Result of integrity verification for PyPI packages.
+/// Result of integrity verification for `PyPI` packages.
 #[derive(Debug, Clone)]
 pub struct PyPiIntegrityResult {
     pub sha256_match: Option<bool>,
@@ -545,7 +578,7 @@ impl PyPiIntegrityResult {
     }
 }
 
-/// Normalizes a PyPI package name according to PEP 503.
+/// Normalizes a `PyPI` package name according to PEP 503.
 /// Replaces hyphens, underscores, and dots with hyphens and lowercases.
 fn normalize_pypi_name(name: &str) -> String {
     name.to_lowercase()
@@ -557,8 +590,8 @@ fn normalize_pypi_name(name: &str) -> String {
         .collect()
 }
 
-/// Parses a PyPI version string into a semver Version.
-/// PyPI uses PEP 440 which is more flexible than strict semver.
+/// Parses a `PyPI` version string into a semver Version.
+/// `PyPI` uses PEP 440 which is more flexible than strict semver.
 fn parse_pypi_version(version: &str) -> Result<Version, String> {
     // Try direct semver parse first
     if let Ok(v) = Version::parse(version) {
@@ -582,7 +615,7 @@ fn parse_pypi_version(version: &str) -> Result<Version, String> {
             let major = parts.first().and_then(|s| extract_numeric(s)).unwrap_or(0);
             let minor = parts.get(1).and_then(|s| extract_numeric(s)).unwrap_or(0);
             let patch = parts.get(2).and_then(|s| extract_numeric(s)).unwrap_or(0);
-            format!("{}.{}.{}", major, minor, patch)
+            format!("{major}.{minor}.{patch}")
         }
     };
 
@@ -591,7 +624,7 @@ fn parse_pypi_version(version: &str) -> Result<Version, String> {
 
 /// Extracts the leading numeric portion of a string.
 fn extract_numeric(s: &str) -> Option<u64> {
-    let numeric: String = s.chars().take_while(|c| c.is_ascii_digit()).collect();
+    let numeric: String = s.chars().take_while(char::is_ascii_digit).collect();
     numeric.parse().ok()
 }
 

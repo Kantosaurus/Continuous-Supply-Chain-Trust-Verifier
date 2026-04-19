@@ -9,8 +9,9 @@ use sctv_core::{
 };
 use sqlx::{PgPool, Row};
 use std::collections::HashMap;
+use std::fmt::Write as _;
 
-/// PostgreSQL implementation of the alert repository.
+/// `PostgreSQL` implementation of the alert repository.
 pub struct PgAlertRepository {
     pool: PgPool,
 }
@@ -50,20 +51,20 @@ impl PgAlertRepository {
         };
 
         let status = match status_str.as_str() {
-            "open" => AlertStatus::Open,
             "acknowledged" => AlertStatus::Acknowledged,
             "investigating" => AlertStatus::Investigating,
             "false_positive" => AlertStatus::FalsePositive,
             "resolved" => AlertStatus::Resolved,
             "suppressed" => AlertStatus::Suppressed,
+            // "open" and any unknown status default to Open
             _ => AlertStatus::Open,
         };
 
         // Parse alert type from type string and details JSON
         let alert_type = Self::parse_alert_type(&alert_type_str, alert_details)?;
 
-        let remediation: Option<Remediation> = remediation_json
-            .and_then(|v| serde_json::from_value(v).ok());
+        let remediation: Option<Remediation> =
+            remediation_json.and_then(|v| serde_json::from_value(v).ok());
 
         let metadata: AlertMetadata = serde_json::from_value(metadata_json)
             .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
@@ -88,10 +89,7 @@ impl PgAlertRepository {
         })
     }
 
-    fn parse_alert_type(
-        type_str: &str,
-        details: serde_json::Value,
-    ) -> RepositoryResult<AlertType> {
+    fn parse_alert_type(type_str: &str, details: serde_json::Value) -> RepositoryResult<AlertType> {
         match type_str {
             "dependency_tampering" => {
                 let details = serde_json::from_value(details)
@@ -129,13 +127,12 @@ impl PgAlertRepository {
                 Ok(AlertType::SuspiciousMaintainer(details))
             }
             _ => Err(RepositoryError::InvalidData(format!(
-                "Unknown alert type: {}",
-                type_str
+                "Unknown alert type: {type_str}"
             ))),
         }
     }
 
-    fn severity_to_str(severity: Severity) -> &'static str {
+    const fn severity_to_str(severity: Severity) -> &'static str {
         match severity {
             Severity::Critical => "critical",
             Severity::High => "high",
@@ -145,7 +142,7 @@ impl PgAlertRepository {
         }
     }
 
-    fn status_to_str(status: AlertStatus) -> &'static str {
+    const fn status_to_str(status: AlertStatus) -> &'static str {
         match status {
             AlertStatus::Open => "open",
             AlertStatus::Acknowledged => "acknowledged",
@@ -174,12 +171,12 @@ impl PgAlertRepository {
 impl AlertRepository for PgAlertRepository {
     async fn find_by_id(&self, id: AlertId) -> RepositoryResult<Option<Alert>> {
         let record = sqlx::query(
-            r#"
+            r"
             SELECT id, tenant_id, project_id, dependency_id, alert_type, alert_details,
                    severity, title, description, status, remediation, metadata,
                    created_at, acknowledged_at, acknowledged_by, resolved_at, resolved_by
             FROM alerts WHERE id = $1
-            "#,
+            ",
         )
         .bind(id.0)
         .fetch_optional(&self.pool)
@@ -194,14 +191,14 @@ impl AlertRepository for PgAlertRepository {
 
     async fn find_by_project(&self, project_id: ProjectId) -> RepositoryResult<Vec<Alert>> {
         let records = sqlx::query(
-            r#"
+            r"
             SELECT id, tenant_id, project_id, dependency_id, alert_type, alert_details,
                    severity, title, description, status, remediation, metadata,
                    created_at, acknowledged_at, acknowledged_by, resolved_at, resolved_by
             FROM alerts
             WHERE project_id = $1
             ORDER BY created_at DESC
-            "#,
+            ",
         )
         .bind(project_id.0)
         .fetch_all(&self.pool)
@@ -220,42 +217,48 @@ impl AlertRepository for PgAlertRepository {
     ) -> RepositoryResult<Vec<Alert>> {
         // Build dynamic query based on filters
         let mut query = String::from(
-            r#"
+            r"
             SELECT id, tenant_id, project_id, dependency_id, alert_type, alert_details,
                    severity, title, description, status, remediation, metadata,
                    created_at, acknowledged_at, acknowledged_by, resolved_at, resolved_by
             FROM alerts
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_count = 1;
 
         if filter.project_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND project_id = ${}", param_count));
+            write!(query, " AND project_id = ${param_count}")
+                .expect("write to String is infallible");
         }
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ANY(${})", param_count));
+            write!(query, " AND status = ANY(${param_count})")
+                .expect("write to String is infallible");
         }
 
         if filter.severity.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND severity = ANY(${})", param_count));
+            write!(query, " AND severity = ANY(${param_count})")
+                .expect("write to String is infallible");
         }
 
         if filter.alert_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND alert_type = ANY(${})", param_count));
+            write!(query, " AND alert_type = ANY(${param_count})")
+                .expect("write to String is infallible");
         }
 
-        query.push_str(&format!(
+        write!(
+            query,
             " ORDER BY created_at DESC LIMIT ${} OFFSET ${}",
             param_count + 1,
             param_count + 2
-        ));
+        )
+        .expect("write to String is infallible");
 
         // Execute with appropriate bindings
         let mut query_builder = sqlx::query(&query).bind(tenant_id.0);
@@ -282,8 +285,8 @@ impl AlertRepository for PgAlertRepository {
         }
 
         let records = query_builder
-            .bind(limit as i64)
-            .bind(offset as i64)
+            .bind(i64::from(limit))
+            .bind(i64::from(offset))
             .fetch_all(&self.pool)
             .await
             .map_err(|e| RepositoryError::Database(e.to_string()))?;
@@ -301,22 +304,26 @@ impl AlertRepository for PgAlertRepository {
 
         if filter.project_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND project_id = ${param_count}"));
+            write!(query, " AND project_id = ${param_count}")
+                .expect("write to String is infallible");
         }
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ANY(${param_count})"));
+            write!(query, " AND status = ANY(${param_count})")
+                .expect("write to String is infallible");
         }
 
         if filter.severity.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND severity = ANY(${param_count})"));
+            write!(query, " AND severity = ANY(${param_count})")
+                .expect("write to String is infallible");
         }
 
         if filter.alert_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND alert_type = ANY(${param_count})"));
+            write!(query, " AND alert_type = ANY(${param_count})")
+                .expect("write to String is infallible");
         }
 
         let mut query_builder = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id.0);
@@ -347,7 +354,8 @@ impl AlertRepository for PgAlertRepository {
             .await
             .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
-        Ok(total.max(0) as u64)
+        // SQL COUNT() is always non-negative; saturating cast is safe here.
+        Ok(u64::try_from(total.max(0)).unwrap_or(u64::MAX))
     }
 
     async fn create(&self, alert: &Alert) -> RepositoryResult<()> {
@@ -356,7 +364,7 @@ impl AlertRepository for PgAlertRepository {
         let remediation = alert
             .remediation
             .as_ref()
-            .map(|r| serde_json::to_value(r))
+            .map(serde_json::to_value)
             .transpose()
             .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
@@ -364,13 +372,13 @@ impl AlertRepository for PgAlertRepository {
             .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
         sqlx::query(
-            r#"
+            r"
             INSERT INTO alerts (
                 id, tenant_id, project_id, dependency_id, alert_type, alert_details,
                 severity, title, description, status, remediation, metadata,
                 created_at, acknowledged_at, acknowledged_by, resolved_at, resolved_by
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-            "#,
+            ",
         )
         .bind(alert.id.0)
         .bind(alert.tenant_id.0)
@@ -402,7 +410,7 @@ impl AlertRepository for PgAlertRepository {
         let remediation = alert
             .remediation
             .as_ref()
-            .map(|r| serde_json::to_value(r))
+            .map(serde_json::to_value)
             .transpose()
             .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
@@ -410,13 +418,13 @@ impl AlertRepository for PgAlertRepository {
             .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE alerts SET
                 alert_type = $2, alert_details = $3, severity = $4, title = $5,
                 description = $6, status = $7, remediation = $8, metadata = $9,
                 acknowledged_at = $10, acknowledged_by = $11, resolved_at = $12, resolved_by = $13
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(alert.id.0)
         .bind(alert.alert_type.type_name())
@@ -444,10 +452,10 @@ impl AlertRepository for PgAlertRepository {
 
     async fn count_open_by_project(&self, project_id: ProjectId) -> RepositoryResult<u32> {
         let record = sqlx::query(
-            r#"
+            r"
             SELECT COUNT(*) as count FROM alerts
             WHERE project_id = $1 AND status IN ('open', 'acknowledged', 'investigating')
-            "#,
+            ",
         )
         .bind(project_id.0)
         .fetch_one(&self.pool)
@@ -455,7 +463,8 @@ impl AlertRepository for PgAlertRepository {
         .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
         let count: i64 = record.get("count");
-        Ok(count as u32)
+        // SQL COUNT() is always non-negative and bounded by row count; safe cast.
+        Ok(u32::try_from(count.max(0)).unwrap_or(u32::MAX))
     }
 
     async fn count_by_severity(
@@ -463,11 +472,11 @@ impl AlertRepository for PgAlertRepository {
         project_id: ProjectId,
     ) -> RepositoryResult<HashMap<Severity, u32>> {
         let records = sqlx::query(
-            r#"
+            r"
             SELECT severity, COUNT(*) as count FROM alerts
             WHERE project_id = $1 AND status IN ('open', 'acknowledged', 'investigating')
             GROUP BY severity
-            "#,
+            ",
         )
         .bind(project_id.0)
         .fetch_all(&self.pool)
@@ -487,7 +496,8 @@ impl AlertRepository for PgAlertRepository {
                 _ => Severity::Info,
             };
 
-            result.insert(severity, count as u32);
+            // SQL COUNT() is non-negative and fits in u32 for any realistic dataset.
+            result.insert(severity, u32::try_from(count.max(0)).unwrap_or(u32::MAX));
         }
 
         Ok(result)

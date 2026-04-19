@@ -1,9 +1,9 @@
-//! PyPI API response models.
+//! `PyPI` API response models.
 
 use serde::Deserialize;
 use std::collections::HashMap;
 
-/// Full package response from PyPI JSON API.
+/// Full package response from `PyPI` JSON API.
 #[derive(Debug, Deserialize)]
 pub struct PyPiPackageResponse {
     pub info: PyPiPackageInfo,
@@ -13,7 +13,7 @@ pub struct PyPiPackageResponse {
     pub urls: Vec<PyPiReleaseFile>,
 }
 
-/// Package metadata from PyPI.
+/// Package metadata from `PyPI`.
 #[derive(Debug, Deserialize)]
 pub struct PyPiPackageInfo {
     pub name: String,
@@ -43,7 +43,7 @@ pub struct PyPiPackageInfo {
     pub yanked_reason: Option<String>,
 }
 
-/// A release file (wheel, sdist, etc.) from PyPI.
+/// A release file (wheel, sdist, etc.) from `PyPI`.
 #[derive(Debug, Clone, Deserialize)]
 pub struct PyPiReleaseFile {
     /// Comment text (usually empty).
@@ -58,7 +58,7 @@ pub struct PyPiReleaseFile {
     pub has_sig: Option<bool>,
     /// MD5 digest (deprecated).
     pub md5_digest: Option<String>,
-    /// Package type (e.g., "bdist_wheel", "sdist").
+    /// Package type (e.g., "`bdist_wheel`", "sdist").
     pub packagetype: Option<String>,
     /// Python version (e.g., "py3", "source").
     pub python_version: Option<String>,
@@ -78,7 +78,7 @@ pub struct PyPiReleaseFile {
     pub yanked_reason: Option<String>,
 }
 
-/// File digests from PyPI.
+/// File digests from `PyPI`.
 #[derive(Debug, Clone, Deserialize)]
 pub struct PyPiDigests {
     pub md5: Option<String>,
@@ -87,7 +87,7 @@ pub struct PyPiDigests {
     pub blake2b_256: Option<String>,
 }
 
-/// Version-specific response from PyPI.
+/// Version-specific response from `PyPI`.
 #[derive(Debug, Deserialize)]
 pub struct PyPiVersionResponse {
     pub info: PyPiPackageInfo,
@@ -95,7 +95,7 @@ pub struct PyPiVersionResponse {
     pub urls: Vec<PyPiReleaseFile>,
 }
 
-/// Provenance attestation from PyPI (PEP 740).
+/// Provenance attestation from `PyPI` (PEP 740).
 #[derive(Debug, Clone, Deserialize)]
 pub struct PyPiAttestation {
     pub version: u32,
@@ -129,7 +129,7 @@ pub struct PyPiSimpleProject {
     pub name: String,
 }
 
-/// Parsed dependency from requires_dist.
+/// Parsed dependency from `requires_dist`.
 #[derive(Debug, Clone)]
 pub struct PyPiDependency {
     pub name: String,
@@ -140,7 +140,8 @@ pub struct PyPiDependency {
 }
 
 impl PyPiDependency {
-    /// Parses a requires_dist entry into a dependency.
+    /// Parses a `requires_dist` entry into a dependency.
+    #[must_use]
     pub fn parse(spec: &str) -> Option<Self> {
         let spec = spec.trim();
         if spec.is_empty() {
@@ -148,35 +149,38 @@ impl PyPiDependency {
         }
 
         // Parse format: "name[extra1,extra2] (>=1.0,<2.0); marker"
-        let (rest, markers) = if let Some(idx) = spec.find(';') {
+        let (rest, markers) = spec.find(';').map_or((spec, None), |idx| {
             (&spec[..idx], Some(spec[idx + 1..].trim().to_string()))
-        } else {
-            (spec, None)
-        };
+        });
 
-        let (rest, version_constraint) = if let Some(idx) = rest.find('(') {
-            let end_idx = rest.rfind(')').unwrap_or(rest.len());
-            (
-                &rest[..idx],
-                Some(rest[idx + 1..end_idx].trim().to_string()),
-            )
-        } else if let Some(idx) = rest.find(|c: char| c == '<' || c == '>' || c == '=' || c == '~' || c == '!') {
-            (&rest[..idx], Some(rest[idx..].trim().to_string()))
-        } else {
-            (rest, None)
-        };
+        let (rest, version_constraint) = rest.find('(').map_or_else(
+            || {
+                rest.find(['<', '>', '=', '~', '!'])
+                    .map_or((rest, None), |idx| {
+                        (&rest[..idx], Some(rest[idx..].trim().to_string()))
+                    })
+            },
+            |idx| {
+                let end_idx = rest.rfind(')').unwrap_or(rest.len());
+                (
+                    &rest[..idx],
+                    Some(rest[idx + 1..end_idx].trim().to_string()),
+                )
+            },
+        );
 
-        let (name, extras) = if let Some(idx) = rest.find('[') {
-            let end_idx = rest.find(']').unwrap_or(rest.len());
-            let extras: Vec<String> = rest[idx + 1..end_idx]
-                .split(',')
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty())
-                .collect();
-            (&rest[..idx], extras)
-        } else {
-            (rest, Vec::new())
-        };
+        let (name, extras) = rest.find('[').map_or_else(
+            || (rest, Vec::new()),
+            |idx| {
+                let end_idx = rest.find(']').unwrap_or(rest.len());
+                let extras: Vec<String> = rest[idx + 1..end_idx]
+                    .split(',')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect();
+                (&rest[..idx], extras)
+            },
+        );
 
         let name = name.trim().to_string();
         if name.is_empty() {
@@ -186,8 +190,7 @@ impl PyPiDependency {
         // Check if this is an optional dependency (has environment marker)
         let is_optional = markers
             .as_ref()
-            .map(|m| m.contains("extra ==") || m.contains("extra=="))
-            .unwrap_or(false);
+            .is_some_and(|m| m.contains("extra ==") || m.contains("extra=="));
 
         Some(Self {
             name,

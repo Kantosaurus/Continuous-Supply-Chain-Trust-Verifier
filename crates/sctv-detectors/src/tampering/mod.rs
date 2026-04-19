@@ -35,10 +35,7 @@ impl Default for TamperingConfig {
             PackageEcosystem::Npm,
             vec!["https://registry.npmjs.org".to_string()],
         );
-        trusted.insert(
-            PackageEcosystem::PyPi,
-            vec!["https://pypi.org".to_string()],
-        );
+        trusted.insert(PackageEcosystem::PyPi, vec!["https://pypi.org".to_string()]);
         trusted.insert(
             PackageEcosystem::Maven,
             vec!["https://repo1.maven.org/maven2".to_string()],
@@ -96,11 +93,12 @@ impl TamperingType {
     #[must_use]
     pub const fn severity(&self) -> Severity {
         match self {
-            Self::HashMismatch => Severity::Critical,
-            Self::SignatureInvalid => Severity::Critical,
+            // Three distinct tampering types are all critical
+            Self::HashMismatch | Self::SignatureInvalid | Self::ModifiedSinceVerification => {
+                Severity::Critical
+            }
             Self::SignatureMissing => Severity::Medium,
             Self::ChecksumMissing => Severity::Low,
-            Self::ModifiedSinceVerification => Severity::Critical,
             Self::UntrustedSource => Severity::High,
         }
     }
@@ -135,7 +133,7 @@ pub enum TamperingSource {
 impl TamperingSource {
     fn as_str(&self) -> String {
         match self {
-            Self::Registry(url) => format!("registry:{}", url),
+            Self::Registry(url) => format!("registry:{url}"),
             Self::LockFile => "lock_file".to_string(),
             Self::PreviousVerification => "previous_verification".to_string(),
             Self::Sbom => "sbom".to_string(),
@@ -210,6 +208,7 @@ impl TamperingDetector {
     }
 
     /// Verifies a hash matches the expected value.
+    #[must_use]
     pub fn verify_hash(
         computed: &str,
         expected: &str,
@@ -219,7 +218,9 @@ impl TamperingDetector {
         let computed_lower = computed.to_lowercase();
         let expected_lower = expected.to_lowercase();
 
-        if computed_lower != expected_lower {
+        if computed_lower == expected_lower {
+            None
+        } else {
             Some(TamperingFinding {
                 finding_type: TamperingType::HashMismatch,
                 algorithm: Some(algorithm),
@@ -228,8 +229,6 @@ impl TamperingDetector {
                 source,
                 confidence: 1.0,
             })
-        } else {
-            None
         }
     }
 
@@ -245,16 +244,15 @@ impl TamperingDetector {
         let provider = self.registry_provider.as_ref().unwrap();
 
         // Get expected checksums from registry
-        let registry_checksums = match provider
+        let Ok(registry_checksums) = provider
             .get_checksums(
                 dependency.ecosystem,
                 &dependency.package_name,
                 &dependency.resolved_version.to_string(),
             )
             .await
-        {
-            Ok(c) => c,
-            Err(_) => return findings,
+        else {
+            return findings;
         };
 
         let registry_url = self
@@ -298,7 +296,10 @@ impl TamperingDetector {
         // Check for missing checksums when they should exist
         if dependency.integrity.hash_sha256.is_none()
             && registry_checksums.sha256.is_some()
-            && self.config.required_algorithms.contains(&HashAlgorithm::Sha256)
+            && self
+                .config
+                .required_algorithms
+                .contains(&HashAlgorithm::Sha256)
         {
             findings.push(TamperingFinding {
                 finding_type: TamperingType::ChecksumMissing,
@@ -321,22 +322,20 @@ impl TamperingDetector {
             return findings;
         }
 
-        let provider = match &self.registry_provider {
-            Some(p) => p,
-            None => return findings,
+        let Some(provider) = &self.registry_provider else {
+            return findings;
         };
 
         // Download package
-        let bytes = match provider
+        let Ok(bytes) = provider
             .download_package(
                 dependency.ecosystem,
                 &dependency.package_name,
                 &dependency.resolved_version.to_string(),
             )
             .await
-        {
-            Ok(b) => b,
-            Err(_) => return findings,
+        else {
+            return findings;
         };
 
         // Compute hashes
@@ -447,15 +446,11 @@ impl Detector for TamperingDetector {
         }
     }
 
-    fn create_alerts(
-        &self,
-        dependency: &Dependency,
-        results: &[DetectionResult],
-    ) -> Vec<Alert> {
+    fn create_alerts(&self, dependency: &Dependency, results: &[DetectionResult]) -> Vec<Alert> {
         results
             .iter()
             .filter(|r| r.detected)
-            .filter_map(|result| {
+            .map(|result| {
                 let details_value = &result.details;
 
                 let algorithm = details_value
@@ -508,7 +503,7 @@ impl Detector for TamperingDetector {
                     This may indicate the package has been tampered with.",
                     dependency.package_name,
                     dependency.resolved_version,
-                    format!("{:?}", algorithm).to_lowercase(),
+                    format!("{algorithm:?}").to_lowercase(),
                     tampering_details.expected_hash,
                     tampering_details.actual_hash,
                 );
@@ -522,7 +517,7 @@ impl Detector for TamperingDetector {
                 );
                 alert.dependency_id = Some(dependency.id);
 
-                Some(alert)
+                alert
             })
             .collect()
     }
@@ -550,11 +545,14 @@ impl IntegrityVerifier {
     }
 
     /// Verifies all sources match and returns any mismatches.
+    #[must_use]
     pub fn verify_all(&self) -> Vec<IntegrityMismatch> {
         let mut mismatches = Vec::new();
 
         // Compare registry vs computed
-        if let (Some(registry), Some(computed)) = (&self.registry_checksums, &self.computed_checksums) {
+        if let (Some(registry), Some(computed)) =
+            (&self.registry_checksums, &self.computed_checksums)
+        {
             if let (Some(r_sha256), Some(c_sha256)) = (&registry.sha256, &computed.sha256) {
                 if r_sha256.to_lowercase() != c_sha256.to_lowercase() {
                     mismatches.push(IntegrityMismatch {
@@ -569,7 +567,9 @@ impl IntegrityVerifier {
         }
 
         // Compare lockfile vs computed
-        if let (Some(lockfile), Some(computed)) = (&self.lockfile_checksums, &self.computed_checksums) {
+        if let (Some(lockfile), Some(computed)) =
+            (&self.lockfile_checksums, &self.computed_checksums)
+        {
             if let (Some(l_sha256), Some(c_sha256)) = (&lockfile.sha256, &computed.sha256) {
                 if l_sha256.to_lowercase() != c_sha256.to_lowercase() {
                     mismatches.push(IntegrityMismatch {
@@ -584,7 +584,9 @@ impl IntegrityVerifier {
         }
 
         // Compare registry vs lockfile
-        if let (Some(registry), Some(lockfile)) = (&self.registry_checksums, &self.lockfile_checksums) {
+        if let (Some(registry), Some(lockfile)) =
+            (&self.registry_checksums, &self.lockfile_checksums)
+        {
             if let (Some(r_sha256), Some(l_sha256)) = (&registry.sha256, &lockfile.sha256) {
                 if r_sha256.to_lowercase() != l_sha256.to_lowercase() {
                     mismatches.push(IntegrityMismatch {
@@ -671,7 +673,11 @@ mod tests {
         assert!(result.is_some());
         let finding = result.unwrap();
         assert_eq!(finding.finding_type, TamperingType::HashMismatch);
-        assert_eq!(finding.confidence, 1.0);
+        // confidence is set to exactly 1.0 (a whole-number literal) for hash mismatches.
+        #[allow(clippy::float_cmp)]
+        {
+            assert_eq!(finding.confidence, 1.0);
+        }
     }
 
     #[test]

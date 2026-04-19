@@ -4,13 +4,13 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sctv_core::traits::{DependencyRepository, RepositoryError, RepositoryResult};
 use sctv_core::{
-    Dependency, DependencyId, DependencyIntegrity, PackageEcosystem, ProjectId,
-    ProvenanceDetails, ProvenanceStatus, SignatureStatus, TenantId,
+    Dependency, DependencyId, DependencyIntegrity, PackageEcosystem, ProjectId, ProvenanceDetails,
+    ProvenanceStatus, SignatureStatus, TenantId,
 };
 use semver::Version;
 use sqlx::{PgPool, Row};
 
-/// PostgreSQL implementation of the dependency repository.
+/// `PostgreSQL` implementation of the dependency repository.
 pub struct PgDependencyRepository {
     pool: PgPool,
 }
@@ -44,10 +44,10 @@ impl PgDependencyRepository {
 
         let ecosystem: PackageEcosystem = ecosystem
             .parse()
-            .map_err(|_| RepositoryError::InvalidData(format!("Invalid ecosystem: {}", ecosystem)))?;
+            .map_err(|_| RepositoryError::InvalidData(format!("Invalid ecosystem: {ecosystem}")))?;
 
         let resolved_version = Version::parse(&resolved_version)
-            .map_err(|e| RepositoryError::InvalidData(format!("Invalid version: {}", e)))?;
+            .map_err(|e| RepositoryError::InvalidData(format!("Invalid version: {e}")))?;
 
         let signature_status = match signature_status.as_str() {
             "verified" => SignatureStatus::Verified,
@@ -65,8 +65,8 @@ impl PgDependencyRepository {
             _ => ProvenanceStatus::Unknown,
         };
 
-        let provenance_details: Option<ProvenanceDetails> = provenance_details
-            .and_then(|v| serde_json::from_value(v).ok());
+        let provenance_details: Option<ProvenanceDetails> =
+            provenance_details.and_then(|v| serde_json::from_value(v).ok());
 
         let integrity = DependencyIntegrity {
             hash_sha256,
@@ -86,7 +86,8 @@ impl PgDependencyRepository {
             resolved_version,
             is_direct,
             is_dev_dependency,
-            depth: depth as u32,
+            // DB stores depth as i32; it is always non-negative in valid data.
+            depth: u32::try_from(depth).unwrap_or(0),
             parent_id: parent_id.map(DependencyId),
             integrity,
             first_seen_at,
@@ -94,7 +95,7 @@ impl PgDependencyRepository {
         })
     }
 
-    fn signature_status_to_str(status: SignatureStatus) -> &'static str {
+    const fn signature_status_to_str(status: SignatureStatus) -> &'static str {
         match status {
             SignatureStatus::Verified => "verified",
             SignatureStatus::Invalid => "invalid",
@@ -103,7 +104,7 @@ impl PgDependencyRepository {
         }
     }
 
-    fn provenance_status_to_str(status: ProvenanceStatus) -> &'static str {
+    const fn provenance_status_to_str(status: ProvenanceStatus) -> &'static str {
         match status {
             ProvenanceStatus::SlsaLevel0 => "slsa_level0",
             ProvenanceStatus::SlsaLevel1 => "slsa_level1",
@@ -119,13 +120,13 @@ impl PgDependencyRepository {
 impl DependencyRepository for PgDependencyRepository {
     async fn find_by_id(&self, id: DependencyId) -> RepositoryResult<Option<Dependency>> {
         let record = sqlx::query(
-            r#"
+            r"
             SELECT id, project_id, tenant_id, package_name, ecosystem, version_constraint,
                    resolved_version, is_direct, is_dev_dependency, depth, parent_id,
                    hash_sha256, hash_sha512, signature_status, provenance_status,
                    provenance_details, first_seen_at, last_verified_at
             FROM dependencies WHERE id = $1
-            "#,
+            ",
         )
         .bind(id.0)
         .fetch_optional(&self.pool)
@@ -140,7 +141,7 @@ impl DependencyRepository for PgDependencyRepository {
 
     async fn find_by_project(&self, project_id: ProjectId) -> RepositoryResult<Vec<Dependency>> {
         let records = sqlx::query(
-            r#"
+            r"
             SELECT id, project_id, tenant_id, package_name, ecosystem, version_constraint,
                    resolved_version, is_direct, is_dev_dependency, depth, parent_id,
                    hash_sha256, hash_sha512, signature_status, provenance_status,
@@ -148,7 +149,7 @@ impl DependencyRepository for PgDependencyRepository {
             FROM dependencies
             WHERE project_id = $1
             ORDER BY is_direct DESC, depth ASC, package_name ASC
-            "#,
+            ",
         )
         .bind(project_id.0)
         .fetch_all(&self.pool)
@@ -163,7 +164,7 @@ impl DependencyRepository for PgDependencyRepository {
         project_id: ProjectId,
     ) -> RepositoryResult<Vec<Dependency>> {
         let records = sqlx::query(
-            r#"
+            r"
             SELECT id, project_id, tenant_id, package_name, ecosystem, version_constraint,
                    resolved_version, is_direct, is_dev_dependency, depth, parent_id,
                    hash_sha256, hash_sha512, signature_status, provenance_status,
@@ -171,7 +172,7 @@ impl DependencyRepository for PgDependencyRepository {
             FROM dependencies
             WHERE project_id = $1 AND is_direct = true
             ORDER BY package_name ASC
-            "#,
+            ",
         )
         .bind(project_id.0)
         .fetch_all(&self.pool)
@@ -186,19 +187,19 @@ impl DependencyRepository for PgDependencyRepository {
             .integrity
             .provenance_details
             .as_ref()
-            .map(|d| serde_json::to_value(d))
+            .map(serde_json::to_value)
             .transpose()
             .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
         sqlx::query(
-            r#"
+            r"
             INSERT INTO dependencies (
                 id, project_id, tenant_id, package_name, ecosystem, version_constraint,
                 resolved_version, is_direct, is_dev_dependency, depth, parent_id,
                 hash_sha256, hash_sha512, signature_status, provenance_status,
                 provenance_details, first_seen_at, last_verified_at
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
-            "#,
+            ",
         )
         .bind(dependency.id.0)
         .bind(dependency.project_id.0)
@@ -213,7 +214,8 @@ impl DependencyRepository for PgDependencyRepository {
         .bind(dependency.resolved_version.to_string())
         .bind(dependency.is_direct)
         .bind(dependency.is_dev_dependency)
-        .bind(dependency.depth as i32)
+        // Dependency nesting depth fits comfortably in i32 (never > a few hundred).
+        .bind(i32::try_from(dependency.depth).unwrap_or(i32::MAX))
         .bind(dependency.parent_id.map(|p| p.0))
         .bind(&dependency.integrity.hash_sha256)
         .bind(&dependency.integrity.hash_sha512)
@@ -241,7 +243,10 @@ impl DependencyRepository for PgDependencyRepository {
         }
 
         // Use a transaction for batch insert
-        let mut tx = self.pool.begin().await
+        let mut tx = self
+            .pool
+            .begin()
+            .await
             .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
         for dependency in dependencies {
@@ -249,12 +254,12 @@ impl DependencyRepository for PgDependencyRepository {
                 .integrity
                 .provenance_details
                 .as_ref()
-                .map(|d| serde_json::to_value(d))
+                .map(serde_json::to_value)
                 .transpose()
                 .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
             sqlx::query(
-                r#"
+                r"
                 INSERT INTO dependencies (
                     id, project_id, tenant_id, package_name, ecosystem, version_constraint,
                     resolved_version, is_direct, is_dev_dependency, depth, parent_id,
@@ -269,7 +274,7 @@ impl DependencyRepository for PgDependencyRepository {
                     provenance_status = EXCLUDED.provenance_status,
                     provenance_details = EXCLUDED.provenance_details,
                     last_verified_at = EXCLUDED.last_verified_at
-                "#,
+                ",
             )
             .bind(dependency.id.0)
             .bind(dependency.project_id.0)
@@ -284,7 +289,8 @@ impl DependencyRepository for PgDependencyRepository {
             .bind(dependency.resolved_version.to_string())
             .bind(dependency.is_direct)
             .bind(dependency.is_dev_dependency)
-            .bind(dependency.depth as i32)
+            // Dependency nesting depth fits comfortably in i32 (never > a few hundred).
+        .bind(i32::try_from(dependency.depth).unwrap_or(i32::MAX))
             .bind(dependency.parent_id.map(|p| p.0))
             .bind(&dependency.integrity.hash_sha256)
             .bind(&dependency.integrity.hash_sha512)
@@ -298,7 +304,8 @@ impl DependencyRepository for PgDependencyRepository {
             .map_err(|e| RepositoryError::Database(e.to_string()))?;
         }
 
-        tx.commit().await
+        tx.commit()
+            .await
             .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
         Ok(())
@@ -309,12 +316,12 @@ impl DependencyRepository for PgDependencyRepository {
             .integrity
             .provenance_details
             .as_ref()
-            .map(|d| serde_json::to_value(d))
+            .map(serde_json::to_value)
             .transpose()
             .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE dependencies SET
                 package_name = $2, ecosystem = $3, version_constraint = $4,
                 resolved_version = $5, is_direct = $6, is_dev_dependency = $7,
@@ -322,7 +329,7 @@ impl DependencyRepository for PgDependencyRepository {
                 signature_status = $12, provenance_status = $13, provenance_details = $14,
                 last_verified_at = $15
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(dependency.id.0)
         .bind(&dependency.package_name)
@@ -335,12 +342,17 @@ impl DependencyRepository for PgDependencyRepository {
         .bind(dependency.resolved_version.to_string())
         .bind(dependency.is_direct)
         .bind(dependency.is_dev_dependency)
-        .bind(dependency.depth as i32)
+        // Dependency nesting depth fits comfortably in i32 (never > a few hundred).
+        .bind(i32::try_from(dependency.depth).unwrap_or(i32::MAX))
         .bind(dependency.parent_id.map(|p| p.0))
         .bind(&dependency.integrity.hash_sha256)
         .bind(&dependency.integrity.hash_sha512)
-        .bind(Self::signature_status_to_str(dependency.integrity.signature_status))
-        .bind(Self::provenance_status_to_str(dependency.integrity.provenance_status))
+        .bind(Self::signature_status_to_str(
+            dependency.integrity.signature_status,
+        ))
+        .bind(Self::provenance_status_to_str(
+            dependency.integrity.provenance_status,
+        ))
         .bind(provenance_details)
         .bind(dependency.last_verified_at)
         .execute(&self.pool)
@@ -375,7 +387,8 @@ impl DependencyRepository for PgDependencyRepository {
             .await
             .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
-        Ok(result.rows_affected() as u32)
+        // rows_affected() fits in u32 for any realistic number of deleted rows.
+        Ok(u32::try_from(result.rows_affected()).unwrap_or(u32::MAX))
     }
 
     async fn find_by_package(
@@ -386,14 +399,14 @@ impl DependencyRepository for PgDependencyRepository {
         version: &str,
     ) -> RepositoryResult<Option<Dependency>> {
         let record = sqlx::query(
-            r#"
+            r"
             SELECT id, project_id, tenant_id, package_name, ecosystem, version_constraint,
                    resolved_version, is_direct, is_dev_dependency, depth, parent_id,
                    hash_sha256, hash_sha512, signature_status, provenance_status,
                    provenance_details, first_seen_at, last_verified_at
             FROM dependencies
             WHERE project_id = $1 AND ecosystem = $2 AND package_name = $3 AND resolved_version = $4
-            "#,
+            ",
         )
         .bind(project_id.0)
         .bind(ecosystem.to_string().to_lowercase())

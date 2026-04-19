@@ -16,6 +16,9 @@ use crate::jobs::{Job, JobId, JobPayload, JobType};
 use crate::pool::{WorkerPool, WorkerPoolConfig, WorkerPoolHandle, WorkerPoolStatsSnapshot};
 use crate::queue::{EnqueueOptions, JobFilter, JobQueue, PgJobQueue, QueueStats};
 
+/// Boxed closure used to register custom executors into an [`ExecutorRegistry`].
+type ExecutorRegistrationFn = Box<dyn FnOnce(&mut ExecutorRegistry)>;
+
 /// Configuration for the worker service.
 #[derive(Debug, Clone)]
 pub struct WorkerServiceConfig {
@@ -63,7 +66,7 @@ impl WorkerServiceConfig {
 
     /// Sets the job retention period.
     #[must_use]
-    pub fn with_retention(mut self, days: u32) -> Self {
+    pub const fn with_retention(mut self, days: u32) -> Self {
         self.job_retention_days = days;
         self
     }
@@ -74,7 +77,7 @@ pub struct WorkerServiceBuilder {
     db_pool: Option<PgPool>,
     config: WorkerServiceConfig,
     http_client: Option<reqwest::Client>,
-    custom_executors: Vec<Box<dyn FnOnce(&mut ExecutorRegistry)>>,
+    custom_executors: Vec<ExecutorRegistrationFn>,
 }
 
 impl WorkerServiceBuilder {
@@ -111,6 +114,7 @@ impl WorkerServiceBuilder {
     }
 
     /// Adds a custom executor registration function.
+    #[must_use]
     pub fn with_custom_executor<F>(mut self, f: F) -> Self
     where
         F: FnOnce(&mut ExecutorRegistry) + 'static,
@@ -120,10 +124,14 @@ impl WorkerServiceBuilder {
     }
 
     /// Builds the worker service.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the database pool has not been configured.
     pub fn build(self) -> WorkerResult<WorkerService> {
-        let db_pool = self
-            .db_pool
-            .ok_or_else(|| crate::error::WorkerError::Configuration("Database pool required".into()))?;
+        let db_pool = self.db_pool.ok_or_else(|| {
+            crate::error::WorkerError::Configuration("Database pool required".into())
+        })?;
 
         // Create executor registry with default executors
         let mut registry = ExecutorRegistry::new();
@@ -138,8 +146,8 @@ impl WorkerServiceBuilder {
         }
 
         // Create execution context
-        let mut context = ExecutionContext::new(db_pool.clone())
-            .with_config(self.config.executor.clone());
+        let mut context =
+            ExecutionContext::new(db_pool.clone()).with_config(self.config.executor.clone());
 
         if let Some(http_client) = self.http_client {
             context = context.with_http_client(http_client);
@@ -181,11 +189,19 @@ impl WorkerService {
     }
 
     /// Enqueues a job for processing.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any queue storage error.
     pub async fn enqueue(&self, payload: JobPayload) -> WorkerResult<JobId> {
         self.queue.enqueue(payload, EnqueueOptions::default()).await
     }
 
     /// Enqueues a job with options.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any queue storage error.
     pub async fn enqueue_with_options(
         &self,
         payload: JobPayload,
@@ -195,6 +211,10 @@ impl WorkerService {
     }
 
     /// Enqueues multiple jobs.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any queue storage error.
     pub async fn enqueue_batch(
         &self,
         jobs: Vec<(JobPayload, EnqueueOptions)>,
@@ -203,11 +223,19 @@ impl WorkerService {
     }
 
     /// Gets a job by ID.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any queue storage error.
     pub async fn get_job(&self, job_id: JobId) -> WorkerResult<Option<Job>> {
         self.queue.get(job_id).await
     }
 
     /// Lists jobs with optional filters.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any queue storage error.
     pub async fn list_jobs(
         &self,
         filter: JobFilter,
@@ -218,26 +246,46 @@ impl WorkerService {
     }
 
     /// Retries a failed job.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any queue storage error.
     pub async fn retry_job(&self, job_id: JobId) -> WorkerResult<()> {
         self.queue.retry(job_id).await
     }
 
     /// Cancels a pending job.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any queue storage error.
     pub async fn cancel_job(&self, job_id: JobId) -> WorkerResult<()> {
         self.queue.cancel(job_id).await
     }
 
     /// Gets queue statistics.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any queue storage error.
     pub async fn queue_stats(&self) -> WorkerResult<QueueStats> {
         self.queue.stats().await
     }
 
     /// Checks if there are pending jobs.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any queue storage error.
     pub async fn has_pending_jobs(&self, job_types: &[JobType]) -> WorkerResult<bool> {
         self.queue.has_pending(job_types).await
     }
 
     /// Cleans up old completed/failed jobs.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any queue storage error.
     pub async fn cleanup_old_jobs(&self) -> WorkerResult<u32> {
         self.queue
             .cleanup_old_jobs(self.config.job_retention_days)
@@ -245,6 +293,10 @@ impl WorkerService {
     }
 
     /// Releases stale running jobs.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any queue storage error.
     pub async fn release_stale_jobs(&self) -> WorkerResult<u32> {
         self.queue
             .release_stale_jobs(self.config.pool.stale_job_timeout_minutes)
@@ -252,6 +304,8 @@ impl WorkerService {
     }
 
     /// Starts the worker pool.
+    ///
+    /// # Errors
     ///
     /// Returns an error if the pool is already running.
     pub fn start(&mut self) -> WorkerResult<()> {
@@ -281,16 +335,19 @@ impl WorkerService {
     }
 
     /// Gets worker pool statistics.
+    #[must_use]
     pub fn pool_stats(&self) -> Option<WorkerPoolStatsSnapshot> {
-        self.pool_handle.as_ref().map(|h| h.stats())
+        self.pool_handle
+            .as_ref()
+            .map(super::pool::WorkerPoolHandle::stats)
     }
 
     /// Checks if the worker pool is running.
+    #[must_use]
     pub fn is_running(&self) -> bool {
         self.pool_handle
             .as_ref()
-            .map(|h| h.is_running())
-            .unwrap_or(false)
+            .is_some_and(super::pool::WorkerPoolHandle::is_running)
     }
 
     /// Initiates graceful shutdown of the worker pool.
@@ -301,6 +358,10 @@ impl WorkerService {
     }
 
     /// Stops the worker pool and waits for completion.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any error from the worker pool handle.
     pub async fn stop(&mut self) -> WorkerResult<()> {
         if let Some(handle) = self.pool_handle.take() {
             handle.stop().await?;
@@ -310,6 +371,7 @@ impl WorkerService {
     }
 
     /// Returns the registered job types.
+    #[must_use]
     pub fn registered_job_types(&self) -> Vec<JobType> {
         self.registry.registered_types()
     }
@@ -318,6 +380,10 @@ impl WorkerService {
 /// Convenience functions for creating common jobs.
 impl WorkerService {
     /// Creates and enqueues a project scan job.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any queue storage error.
     pub async fn scan_project(
         &self,
         project_id: sctv_core::ProjectId,
@@ -330,6 +396,10 @@ impl WorkerService {
     }
 
     /// Creates and enqueues a registry monitoring job.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any queue storage error.
     pub async fn monitor_registry(
         &self,
         ecosystem: sctv_core::PackageEcosystem,
@@ -341,6 +411,10 @@ impl WorkerService {
     }
 
     /// Creates and enqueues a provenance verification job.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any queue storage error.
     pub async fn verify_provenance(
         &self,
         dependency_id: sctv_core::DependencyId,
@@ -362,6 +436,10 @@ impl WorkerService {
     }
 
     /// Creates and enqueues a notification job.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any queue storage error.
     pub async fn send_notification(
         &self,
         alert_id: sctv_core::AlertId,

@@ -33,13 +33,22 @@ async fn test_create_and_find_sbom_by_id() {
     let sbom_repo = PgSbomRepository::new(db.pool.clone());
 
     let tenant = create_test_tenant();
-    tenant_repo.create(&tenant).await.expect("Failed to create tenant");
+    tenant_repo
+        .create(&tenant)
+        .await
+        .expect("Failed to create tenant");
 
     let project = create_test_project(tenant.id);
-    project_repo.create(&project).await.expect("Failed to create project");
+    project_repo
+        .create(&project)
+        .await
+        .expect("Failed to create project");
 
     let sbom = create_test_sbom(project.id, tenant.id, SbomFormat::CycloneDx);
-    sbom_repo.create(&sbom).await.expect("Failed to create SBOM");
+    sbom_repo
+        .create(&sbom)
+        .await
+        .expect("Failed to create SBOM");
 
     let found = sbom_repo
         .find_by_id(sbom.id)
@@ -60,26 +69,38 @@ async fn test_find_sboms_by_project() {
     let sbom_repo = PgSbomRepository::new(db.pool.clone());
 
     let tenant = create_test_tenant();
-    tenant_repo.create(&tenant).await.expect("Failed to create tenant");
+    tenant_repo
+        .create(&tenant)
+        .await
+        .expect("Failed to create tenant");
 
     let project = create_test_project(tenant.id);
-    project_repo.create(&project).await.expect("Failed to create project");
+    project_repo
+        .create(&project)
+        .await
+        .expect("Failed to create project");
 
     // Create multiple SBOMs
     let sbom1 = create_test_sbom(project.id, tenant.id, SbomFormat::CycloneDx);
     let sbom2 = create_test_sbom(project.id, tenant.id, SbomFormat::Spdx);
-    sbom_repo.create(&sbom1).await.expect("Failed to create SBOM 1");
+    sbom_repo
+        .create(&sbom1)
+        .await
+        .expect("Failed to create SBOM 1");
 
     // Add small delay to ensure different timestamps
     tokio::time::sleep(std::time::Duration::from_millis(10)).await;
-    sbom_repo.create(&sbom2).await.expect("Failed to create SBOM 2");
+    sbom_repo
+        .create(&sbom2)
+        .await
+        .expect("Failed to create SBOM 2");
 
-    let sboms = sbom_repo
+    let found_sboms = sbom_repo
         .find_by_project(project.id)
         .await
         .expect("Failed to find SBOMs");
 
-    assert_eq!(sboms.len(), 2);
+    assert_eq!(found_sboms.len(), 2);
 }
 
 #[tokio::test]
@@ -90,19 +111,31 @@ async fn test_find_latest_sbom() {
     let sbom_repo = PgSbomRepository::new(db.pool.clone());
 
     let tenant = create_test_tenant();
-    tenant_repo.create(&tenant).await.expect("Failed to create tenant");
+    tenant_repo
+        .create(&tenant)
+        .await
+        .expect("Failed to create tenant");
 
     let project = create_test_project(tenant.id);
-    project_repo.create(&project).await.expect("Failed to create project");
+    project_repo
+        .create(&project)
+        .await
+        .expect("Failed to create project");
 
     // Create SBOMs with some delay between them
     let sbom1 = create_test_sbom(project.id, tenant.id, SbomFormat::CycloneDx);
-    sbom_repo.create(&sbom1).await.expect("Failed to create SBOM 1");
+    sbom_repo
+        .create(&sbom1)
+        .await
+        .expect("Failed to create SBOM 1");
 
     tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
     let sbom2 = create_test_sbom(project.id, tenant.id, SbomFormat::CycloneDx);
-    sbom_repo.create(&sbom2).await.expect("Failed to create SBOM 2");
+    sbom_repo
+        .create(&sbom2)
+        .await
+        .expect("Failed to create SBOM 2");
 
     // Find latest should return sbom2
     let latest = sbom_repo
@@ -122,18 +155,30 @@ async fn test_find_latest_sbom_by_format() {
     let sbom_repo = PgSbomRepository::new(db.pool.clone());
 
     let tenant = create_test_tenant();
-    tenant_repo.create(&tenant).await.expect("Failed to create tenant");
+    tenant_repo
+        .create(&tenant)
+        .await
+        .expect("Failed to create tenant");
 
     let project = create_test_project(tenant.id);
-    project_repo.create(&project).await.expect("Failed to create project");
+    project_repo
+        .create(&project)
+        .await
+        .expect("Failed to create project");
 
     // Create CycloneDX SBOM
     let cyclonedx = create_test_sbom(project.id, tenant.id, SbomFormat::CycloneDx);
-    sbom_repo.create(&cyclonedx).await.expect("Failed to create CycloneDX SBOM");
+    sbom_repo
+        .create(&cyclonedx)
+        .await
+        .expect("Failed to create CycloneDX SBOM");
 
     // Create SPDX SBOM
     let spdx = create_test_sbom(project.id, tenant.id, SbomFormat::Spdx);
-    sbom_repo.create(&spdx).await.expect("Failed to create SPDX SBOM");
+    sbom_repo
+        .create(&spdx)
+        .await
+        .expect("Failed to create SPDX SBOM");
 
     // Find latest CycloneDX
     let found_cyclonedx = sbom_repo
@@ -162,16 +207,28 @@ async fn test_delete_sbom() {
     let sbom_repo = PgSbomRepository::new(db.pool.clone());
 
     let tenant = create_test_tenant();
-    tenant_repo.create(&tenant).await.expect("Failed to create tenant");
+    tenant_repo
+        .create(&tenant)
+        .await
+        .expect("Failed to create tenant");
 
     let project = create_test_project(tenant.id);
-    project_repo.create(&project).await.expect("Failed to create project");
+    project_repo
+        .create(&project)
+        .await
+        .expect("Failed to create project");
 
     let sbom = create_test_sbom(project.id, tenant.id, SbomFormat::CycloneDx);
-    sbom_repo.create(&sbom).await.expect("Failed to create SBOM");
+    sbom_repo
+        .create(&sbom)
+        .await
+        .expect("Failed to create SBOM");
 
     // Delete SBOM
-    sbom_repo.delete(sbom.id).await.expect("Failed to delete SBOM");
+    sbom_repo
+        .delete(sbom.id)
+        .await
+        .expect("Failed to delete SBOM");
 
     // Verify deletion
     let result = sbom_repo
@@ -190,15 +247,24 @@ async fn test_cleanup_old_sboms() {
     let sbom_repo = PgSbomRepository::new(db.pool.clone());
 
     let tenant = create_test_tenant();
-    tenant_repo.create(&tenant).await.expect("Failed to create tenant");
+    tenant_repo
+        .create(&tenant)
+        .await
+        .expect("Failed to create tenant");
 
     let project = create_test_project(tenant.id);
-    project_repo.create(&project).await.expect("Failed to create project");
+    project_repo
+        .create(&project)
+        .await
+        .expect("Failed to create project");
 
     // Create 5 SBOMs
     for i in 0..5 {
         let sbom = create_test_sbom(project.id, tenant.id, SbomFormat::CycloneDx);
-        sbom_repo.create(&sbom).await.expect(&format!("Failed to create SBOM {}", i));
+        sbom_repo
+            .create(&sbom)
+            .await
+            .unwrap_or_else(|_| panic!("Failed to create SBOM {i}"));
         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     }
 
@@ -227,10 +293,16 @@ async fn test_sbom_with_scan_id() {
     let sbom_repo = PgSbomRepository::new(db.pool.clone());
 
     let tenant = create_test_tenant();
-    tenant_repo.create(&tenant).await.expect("Failed to create tenant");
+    tenant_repo
+        .create(&tenant)
+        .await
+        .expect("Failed to create tenant");
 
     let project = create_test_project(tenant.id);
-    project_repo.create(&project).await.expect("Failed to create project");
+    project_repo
+        .create(&project)
+        .await
+        .expect("Failed to create project");
 
     let scan_id = uuid::Uuid::new_v4();
     let sbom = Sbom::from_scan(
@@ -242,7 +314,10 @@ async fn test_sbom_with_scan_id() {
         scan_id,
     );
 
-    sbom_repo.create(&sbom).await.expect("Failed to create SBOM");
+    sbom_repo
+        .create(&sbom)
+        .await
+        .expect("Failed to create SBOM");
 
     let found = sbom_repo
         .find_by_id(sbom.id)
@@ -261,10 +336,16 @@ async fn test_find_latest_returns_none_for_empty_project() {
     let sbom_repo = PgSbomRepository::new(db.pool.clone());
 
     let tenant = create_test_tenant();
-    tenant_repo.create(&tenant).await.expect("Failed to create tenant");
+    tenant_repo
+        .create(&tenant)
+        .await
+        .expect("Failed to create tenant");
 
     let project = create_test_project(tenant.id);
-    project_repo.create(&project).await.expect("Failed to create project");
+    project_repo
+        .create(&project)
+        .await
+        .expect("Failed to create project");
 
     // No SBOMs created
     let result = sbom_repo

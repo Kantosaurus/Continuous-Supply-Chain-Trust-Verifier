@@ -13,7 +13,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use url::Url;
 
-use super::models::*;
+use super::models::{NpmAbbreviatedPackage, NpmPackageDocument, NpmVersionResponse};
 use crate::{
     retry_http, PackageMetadata, RegistryCache, RegistryClient, RegistryError, RegistryResult,
     RetryConfig, VersionMetadata,
@@ -37,6 +37,10 @@ impl NpmClient {
     }
 
     /// Creates a client with custom registry URL and cache.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the HTTP client cannot be built or if `registry_url` is not a valid URL.
     #[must_use]
     pub fn with_config(registry_url: &str, cache: Arc<RegistryCache>) -> Self {
         let http = Client::builder()
@@ -100,7 +104,10 @@ impl NpmClient {
 
         tracing::debug!("Fetching full metadata for {} from {}", name, url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::PackageNotFound(name.to_string()));
@@ -132,7 +139,10 @@ impl NpmClient {
 
         tracing::debug!("Fetching version {}@{} from {}", name, version, url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::VersionNotFound(
@@ -219,7 +229,9 @@ impl NpmClient {
     }
 
     /// Converts npm dependencies map to package dependencies.
-    fn parse_dependencies(deps: Option<&std::collections::HashMap<String, String>>) -> Vec<PackageDependency> {
+    fn parse_dependencies(
+        deps: Option<&std::collections::HashMap<String, String>>,
+    ) -> Vec<PackageDependency> {
         deps.map(|d| {
             d.iter()
                 .map(|(name, constraint)| PackageDependency {
@@ -402,7 +414,10 @@ impl RegistryClient for NpmClient {
 
         tracing::debug!("Downloading {}@{} from {}", name, version, url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if !response.status().is_success() {
             return Err(RegistryError::Unavailable(format!(
@@ -512,10 +527,7 @@ impl IntegrityResult {
             self.sha512_match,
             self.integrity_match,
         ];
-        checks
-            .iter()
-            .filter_map(|c| *c)
-            .all(|matched| matched)
+        checks.iter().filter_map(|c| *c).all(|matched| matched)
     }
 
     /// Returns true if any check failed.
@@ -565,7 +577,10 @@ mod tests {
     #[test]
     fn test_parse_integrity_hash() {
         let integrity = "sha512-abc123def456";
-        assert_eq!(parse_integrity_hash(integrity), Some("abc123def456".to_string()));
+        assert_eq!(
+            parse_integrity_hash(integrity),
+            Some("abc123def456".to_string())
+        );
 
         let invalid = "invalid";
         assert_eq!(parse_integrity_hash(invalid), None);

@@ -21,7 +21,11 @@ pub struct VersionHistoryKey {
 impl VersionHistoryKey {
     /// Creates a new version history key.
     #[must_use]
-    pub fn new(project_id: ProjectId, ecosystem: PackageEcosystem, package_name: String) -> Self {
+    pub const fn new(
+        project_id: ProjectId,
+        ecosystem: PackageEcosystem,
+        package_name: String,
+    ) -> Self {
         Self {
             project_id,
             ecosystem,
@@ -94,7 +98,7 @@ impl PackageVersionHistory {
         }
 
         // Update max version
-        if self.max_version.as_ref().map_or(true, |max| version > max) {
+        if self.max_version.as_ref().is_none_or(|max| version > max) {
             self.max_version = Some(version.clone());
         }
 
@@ -104,20 +108,20 @@ impl PackageVersionHistory {
 
     /// Gets the latest (most recently seen) version.
     #[must_use]
-    pub fn latest(&self) -> Option<&Version> {
+    pub const fn latest(&self) -> Option<&Version> {
         self.current_version.as_ref()
     }
 
     /// Gets the highest version ever recorded.
     #[must_use]
-    pub fn max(&self) -> Option<&Version> {
+    pub const fn max(&self) -> Option<&Version> {
         self.max_version.as_ref()
     }
 
     /// Checks if a version would be a downgrade from the max.
     #[must_use]
     pub fn is_downgrade_from_max(&self, version: &Version) -> bool {
-        self.max_version.as_ref().map_or(false, |max| version < max)
+        self.max_version.as_ref().is_some_and(|max| version < max)
     }
 
     /// Checks if a version would be a downgrade from the current.
@@ -125,7 +129,7 @@ impl PackageVersionHistory {
     pub fn is_downgrade_from_current(&self, version: &Version) -> bool {
         self.current_version
             .as_ref()
-            .map_or(false, |current| version < current)
+            .is_some_and(|current| version < current)
     }
 
     /// Gets the version history in chronological order.
@@ -162,10 +166,7 @@ impl VersionHistoryStore {
     /// Records a version for a package.
     pub fn record_version(&self, key: &VersionHistoryKey, version: &Version) {
         let mut histories = self.histories.write();
-        histories
-            .entry(key.clone())
-            .or_insert_with(PackageVersionHistory::new)
-            .record(version);
+        histories.entry(key.clone()).or_default().record(version);
     }
 
     /// Gets the latest version for a package.
@@ -180,7 +181,10 @@ impl VersionHistoryStore {
     /// Gets the maximum version ever recorded for a package.
     #[must_use]
     pub fn get_max_version(&self, key: &VersionHistoryKey) -> Option<Version> {
-        self.histories.read().get(key).and_then(|h| h.max().cloned())
+        self.histories
+            .read()
+            .get(key)
+            .and_then(|h| h.max().cloned())
     }
 
     /// Gets the full history for a package.
@@ -195,7 +199,7 @@ impl VersionHistoryStore {
         self.histories
             .read()
             .get(key)
-            .map_or(false, |h| h.is_downgrade_from_current(version))
+            .is_some_and(|h| h.is_downgrade_from_current(version))
     }
 
     /// Clears all history.
@@ -236,7 +240,10 @@ pub trait VersionHistoryPersistence: Send + Sync {
     async fn load(
         &self,
         project_id: ProjectId,
-    ) -> Result<HashMap<VersionHistoryKey, PackageVersionHistory>, Box<dyn std::error::Error + Send + Sync>>;
+    ) -> Result<
+        HashMap<VersionHistoryKey, PackageVersionHistory>,
+        Box<dyn std::error::Error + Send + Sync>,
+    >;
 
     /// Saves history for a project.
     async fn save(
@@ -264,8 +271,10 @@ impl VersionHistoryPersistence for MemoryPersistence {
     async fn load(
         &self,
         project_id: ProjectId,
-    ) -> Result<HashMap<VersionHistoryKey, PackageVersionHistory>, Box<dyn std::error::Error + Send + Sync>>
-    {
+    ) -> Result<
+        HashMap<VersionHistoryKey, PackageVersionHistory>,
+        Box<dyn std::error::Error + Send + Sync>,
+    > {
         Ok(self
             .data
             .read()

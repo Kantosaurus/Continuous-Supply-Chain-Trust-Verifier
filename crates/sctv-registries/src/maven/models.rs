@@ -1,5 +1,7 @@
 //! Maven Central API and XML response models.
 
+use std::fmt;
+
 use serde::Deserialize;
 
 /// Maven coordinate (groupId:artifactId).
@@ -19,6 +21,7 @@ impl MavenCoordinate {
     }
 
     /// Parses a coordinate from "groupId:artifactId" format.
+    #[must_use]
     pub fn parse(name: &str) -> Option<Self> {
         let parts: Vec<&str> = name.split(':').collect();
         if parts.len() >= 2 {
@@ -32,15 +35,13 @@ impl MavenCoordinate {
     }
 
     /// Returns the repository path for this coordinate.
+    #[must_use]
     pub fn repo_path(&self) -> String {
-        format!(
-            "{}/{}",
-            self.group_id.replace('.', "/"),
-            self.artifact_id
-        )
+        format!("{}/{}", self.group_id.replace('.', "/"), self.artifact_id)
     }
 
     /// Returns the artifact path for a specific version.
+    #[must_use]
     pub fn artifact_path(&self, version: &str, extension: &str) -> String {
         format!(
             "{}/{}/{}-{}.{}",
@@ -51,10 +52,11 @@ impl MavenCoordinate {
             extension
         )
     }
+}
 
-    /// Returns the full coordinate string.
-    pub fn to_string(&self) -> String {
-        format!("{}:{}", self.group_id, self.artifact_id)
+impl fmt::Display for MavenCoordinate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", self.group_id, self.artifact_id)
     }
 }
 
@@ -200,24 +202,28 @@ pub struct MavenDependency {
 
 impl MavenDependency {
     /// Returns the full coordinate for this dependency.
+    #[must_use]
     pub fn coordinate(&self) -> Option<String> {
         match (&self.group_id, &self.artifact_id) {
-            (Some(g), Some(a)) => Some(format!("{}:{}", g, a)),
+            (Some(g), Some(a)) => Some(format!("{g}:{a}")),
             _ => None,
         }
     }
 
     /// Returns true if this is an optional dependency.
+    #[must_use]
     pub fn is_optional(&self) -> bool {
         self.optional.as_deref() == Some("true")
     }
 
     /// Returns true if this is a test-scoped dependency.
+    #[must_use]
     pub fn is_test(&self) -> bool {
         self.scope.as_deref() == Some("test")
     }
 
     /// Returns true if this is a provided-scoped dependency.
+    #[must_use]
     pub fn is_provided(&self) -> bool {
         self.scope.as_deref() == Some("provided")
     }

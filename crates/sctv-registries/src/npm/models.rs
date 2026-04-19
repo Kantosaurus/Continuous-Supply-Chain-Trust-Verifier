@@ -85,6 +85,7 @@ pub enum NpmRepository {
 
 impl NpmRepository {
     /// Extracts the repository URL.
+    #[must_use]
     pub fn url(&self) -> &str {
         match self {
             Self::Simple(s) => s,

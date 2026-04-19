@@ -19,7 +19,7 @@ impl TenantId {
 
     /// Creates a tenant ID from a slug (for subdomain-based routing).
     #[must_use]
-    pub fn from_slug(_slug: &str) -> Option<Self> {
+    pub const fn from_slug(_slug: &str) -> Option<Self> {
         // In a real implementation, this would look up the tenant by slug
         None
     }

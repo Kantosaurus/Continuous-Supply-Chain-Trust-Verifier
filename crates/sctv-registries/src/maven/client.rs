@@ -13,7 +13,9 @@ use std::sync::Arc;
 use std::time::Duration;
 use url::Url;
 
-use super::models::*;
+use super::models::{
+    MavenCoordinate, MavenMetadata, MavenPom, MavenSearchDoc, MavenSearchResponse,
+};
 use crate::{
     retry_http, PackageMetadata, RegistryCache, RegistryClient, RegistryError, RegistryResult,
     RetryConfig, VersionMetadata,
@@ -41,6 +43,10 @@ impl MavenClient {
     }
 
     /// Creates a client with custom registry URL and cache.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the HTTP client cannot be built or if a URL argument is invalid.
     #[must_use]
     pub fn with_config(registry_url: &str, cache: Arc<RegistryCache>) -> Self {
         let http = Client::builder()
@@ -67,7 +73,10 @@ impl MavenClient {
 
         tracing::debug!("Fetching Maven metadata from {}", url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::PackageNotFound(coord.to_string()));
@@ -86,7 +95,7 @@ impl MavenClient {
 
         let xml_text = response.text().await?;
         quick_xml::de::from_str(&xml_text)
-            .map_err(|e| RegistryError::Parse(format!("Failed to parse metadata: {}", e)))
+            .map_err(|e| RegistryError::Parse(format!("Failed to parse metadata: {e}")))
     }
 
     /// Fetches POM file for a specific version.
@@ -99,7 +108,10 @@ impl MavenClient {
 
         tracing::debug!("Fetching POM from {}", url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::VersionNotFound(
@@ -117,17 +129,20 @@ impl MavenClient {
 
         let xml_text = response.text().await?;
         quick_xml::de::from_str(&xml_text)
-            .map_err(|e| RegistryError::Parse(format!("Failed to parse POM: {}", e)))
+            .map_err(|e| RegistryError::Parse(format!("Failed to parse POM: {e}")))
     }
 
     /// Fetches the SHA-1 checksum for an artifact.
     async fn fetch_sha1(&self, artifact_path: &str) -> RegistryResult<Option<String>> {
         let url = self
             .base_url
-            .join(&format!("{}.sha1", artifact_path))
+            .join(&format!("{artifact_path}.sha1"))
             .map_err(|e| RegistryError::Parse(e.to_string()))?;
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if !response.status().is_success() {
             return Ok(None);
@@ -143,10 +158,13 @@ impl MavenClient {
     async fn fetch_sha256(&self, artifact_path: &str) -> RegistryResult<Option<String>> {
         let url = self
             .base_url
-            .join(&format!("{}.sha256", artifact_path))
+            .join(&format!("{artifact_path}.sha256"))
             .map_err(|e| RegistryError::Parse(e.to_string()))?;
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if !response.status().is_success() {
             return Ok(None);
@@ -158,14 +176,14 @@ impl MavenClient {
     }
 
     /// Searches Maven Central for artifacts.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the HTTP request fails or the response cannot be parsed.
     pub async fn search(&self, query: &str, limit: usize) -> RegistryResult<Vec<MavenSearchDoc>> {
         let url = format!("{}?q={}&rows={}&wt=json", self.search_url, query, limit);
 
-        let response = self
-            .http
-            .get(&url)
-            .send()
-            .await?;
+        let response = self.http.get(&url).send().await?;
 
         if !response.status().is_success() {
             return Err(RegistryError::Unavailable(format!(
@@ -179,7 +197,11 @@ impl MavenClient {
     }
 
     /// Verifies the integrity of downloaded artifact bytes.
-    pub fn verify_integrity(&self, bytes: &Bytes, expected: &PackageChecksums) -> MavenIntegrityResult {
+    pub fn verify_integrity(
+        &self,
+        bytes: &Bytes,
+        expected: &PackageChecksums,
+    ) -> MavenIntegrityResult {
         let mut result = MavenIntegrityResult {
             sha1_match: None,
             sha256_match: None,
@@ -239,7 +261,7 @@ impl MavenClient {
     }
 
     /// Determines the best artifact extension (jar, war, pom-only, etc.).
-    fn get_artifact_extension(&self, pom: &MavenPom) -> &'static str {
+    fn get_artifact_extension(pom: &MavenPom) -> &'static str {
         match pom.packaging.as_deref() {
             Some("war") => "war",
             Some("ear") => "ear",
@@ -274,7 +296,7 @@ impl RegistryClient for MavenClient {
         }
 
         let coord = MavenCoordinate::parse(name)
-            .ok_or_else(|| RegistryError::Parse(format!("Invalid Maven coordinate: {}", name)))?;
+            .ok_or_else(|| RegistryError::Parse(format!("Invalid Maven coordinate: {name}")))?;
 
         let metadata = self.fetch_metadata(&coord).await?;
 
@@ -298,34 +320,33 @@ impl RegistryClient for MavenClient {
             .and_then(|s| parse_maven_timestamp(s));
 
         // Try to get more info from the latest POM
-        let (description, homepage, repository, maintainers) =
-            if let Some(ref version) = latest {
-                match self.fetch_pom(&coord, version).await {
-                    Ok(pom) => {
-                        let desc = pom.description.clone().or_else(|| pom.name.clone());
-                        let home = pom.url.as_ref().and_then(|u| Url::parse(u).ok());
-                        let repo = pom
-                            .scm
-                            .as_ref()
-                            .and_then(|s| s.url.as_ref())
-                            .and_then(|u| Url::parse(u).ok());
-                        let maintainers: Vec<String> = pom
-                            .developers
-                            .as_ref()
-                            .map(|d| {
-                                d.developer
-                                    .iter()
-                                    .filter_map(|dev| dev.name.clone().or_else(|| dev.id.clone()))
-                                    .collect()
-                            })
-                            .unwrap_or_default();
-                        (desc, home, repo, maintainers)
-                    }
-                    Err(_) => (None, None, None, Vec::new()),
+        let (description, homepage, repository, maintainers) = if let Some(ref version) = latest {
+            match self.fetch_pom(&coord, version).await {
+                Ok(pom) => {
+                    let desc = pom.description.clone().or_else(|| pom.name.clone());
+                    let home = pom.url.as_ref().and_then(|u| Url::parse(u).ok());
+                    let repo = pom
+                        .scm
+                        .as_ref()
+                        .and_then(|s| s.url.as_ref())
+                        .and_then(|u| Url::parse(u).ok());
+                    let maintainers: Vec<String> = pom
+                        .developers
+                        .as_ref()
+                        .map(|d| {
+                            d.developer
+                                .iter()
+                                .filter_map(|dev| dev.name.clone().or_else(|| dev.id.clone()))
+                                .collect()
+                        })
+                        .unwrap_or_default();
+                    (desc, home, repo, maintainers)
                 }
-            } else {
-                (None, None, None, Vec::new())
-            };
+                Err(_) => (None, None, None, Vec::new()),
+            }
+        } else {
+            (None, None, None, Vec::new())
+        };
 
         let package = Package {
             id: PackageId::new(),
@@ -357,13 +378,16 @@ impl RegistryClient for MavenClient {
 
     async fn get_version(&self, name: &str, version: &str) -> RegistryResult<VersionMetadata> {
         // Check cache first
-        if let Some(cached) = self.cache.get_version(PackageEcosystem::Maven, name, version) {
+        if let Some(cached) = self
+            .cache
+            .get_version(PackageEcosystem::Maven, name, version)
+        {
             tracing::debug!("Cache hit for {}:{}", name, version);
             return Ok(cached);
         }
 
         let coord = MavenCoordinate::parse(name)
-            .ok_or_else(|| RegistryError::Parse(format!("Invalid Maven coordinate: {}", name)))?;
+            .ok_or_else(|| RegistryError::Parse(format!("Invalid Maven coordinate: {name}")))?;
 
         let pom = self.fetch_pom(&coord, version).await?;
 
@@ -372,7 +396,7 @@ impl RegistryClient for MavenClient {
             .map_err(|e| RegistryError::Parse(format!("Invalid version: {e}")))?;
 
         // Determine artifact extension
-        let extension = self.get_artifact_extension(&pom);
+        let extension = Self::get_artifact_extension(&pom);
         let artifact_path = coord.artifact_path(version, extension);
 
         // Fetch checksums in parallel
@@ -388,10 +412,7 @@ impl RegistryClient for MavenClient {
             integrity: None,
         };
 
-        let download_url = self
-            .base_url
-            .join(&artifact_path)
-            .ok();
+        let download_url = self.base_url.join(&artifact_path).ok();
 
         // Parse dependencies
         let dependencies = Self::parse_dependencies(&pom);
@@ -427,7 +448,10 @@ impl RegistryClient for MavenClient {
 
         tracing::debug!("Downloading {}:{} from {}", name, version, url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if !response.status().is_success() {
             return Err(RegistryError::Unavailable(format!(
@@ -478,9 +502,8 @@ impl RegistryClient for MavenClient {
     }
 
     async fn package_exists(&self, name: &str) -> RegistryResult<bool> {
-        let coord = match MavenCoordinate::parse(name) {
-            Some(c) => c,
-            None => return Ok(false),
+        let Some(coord) = MavenCoordinate::parse(name) else {
+            return Ok(false);
         };
 
         match self.fetch_metadata(&coord).await {
@@ -494,7 +517,7 @@ impl RegistryClient for MavenClient {
         let version_meta = self.get_version(name, version).await?;
 
         version_meta.download_url.ok_or_else(|| {
-            RegistryError::Unavailable(format!("No download URL for {}:{}", name, version))
+            RegistryError::Unavailable(format!("No download URL for {name}:{version}"))
         })
     }
 }
@@ -525,7 +548,7 @@ impl MavenIntegrityResult {
     }
 }
 
-/// Parses a Maven timestamp (YYYYMMDDHHmmss format).
+/// Parses a Maven timestamp (`YYYYMMDDHHmmss` format).
 fn parse_maven_timestamp(s: &str) -> Option<chrono::DateTime<chrono::Utc>> {
     if s.len() < 14 {
         return None;
@@ -570,7 +593,7 @@ fn parse_maven_version(version: &str) -> Result<Version, String> {
             let major = extract_numeric_prefix(parts[0]);
             let minor = extract_numeric_prefix(parts[1]);
             let patch = extract_numeric_prefix(parts[2]);
-            format!("{}.{}.{}", major, minor, patch)
+            format!("{major}.{minor}.{patch}")
         }
     };
 
@@ -579,7 +602,7 @@ fn parse_maven_version(version: &str) -> Result<Version, String> {
 
 /// Extracts the leading numeric portion of a version segment.
 fn extract_numeric_prefix(s: &str) -> u64 {
-    let numeric: String = s.chars().take_while(|c| c.is_ascii_digit()).collect();
+    let numeric: String = s.chars().take_while(char::is_ascii_digit).collect();
     numeric.parse().unwrap_or(0)
 }
 

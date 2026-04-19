@@ -1,8 +1,8 @@
-//! NuGet API v3 response models.
+//! `NuGet` API v3 response models.
 
 use serde::Deserialize;
 
-/// NuGet service index response.
+/// `NuGet` service index response.
 #[derive(Debug, Clone, Deserialize)]
 pub struct ServiceIndex {
     pub version: String,
@@ -21,6 +21,7 @@ pub struct ServiceResource {
 
 impl ServiceIndex {
     /// Gets the URL for a specific service type.
+    #[must_use]
     pub fn get_service_url(&self, service_type: &str) -> Option<&str> {
         self.resources
             .iter()
@@ -29,6 +30,7 @@ impl ServiceIndex {
     }
 
     /// Gets the registration base URL.
+    #[must_use]
     pub fn registration_base(&self) -> Option<&str> {
         // Try different registration endpoints in order of preference
         self.get_service_url("RegistrationsBaseUrl/3.6.0")
@@ -38,11 +40,13 @@ impl ServiceIndex {
     }
 
     /// Gets the package content base URL.
+    #[must_use]
     pub fn package_content_base(&self) -> Option<&str> {
         self.get_service_url("PackageBaseAddress/3.0.0")
     }
 
     /// Gets the search query service URL.
+    #[must_use]
     pub fn search_service(&self) -> Option<&str> {
         self.get_service_url("SearchQueryService")
             .or_else(|| self.get_service_url("SearchQueryService/3.5.0"))
@@ -127,10 +131,11 @@ pub enum AuthorsField {
 }
 
 impl AuthorsField {
+    #[must_use]
     pub fn to_vec(&self) -> Vec<String> {
         match self {
-            AuthorsField::Single(s) => s.split(',').map(|s| s.trim().to_string()).collect(),
-            AuthorsField::Multiple(v) => v.clone(),
+            Self::Single(s) => s.split(',').map(|s| s.trim().to_string()).collect(),
+            Self::Multiple(v) => v.clone(),
         }
     }
 }

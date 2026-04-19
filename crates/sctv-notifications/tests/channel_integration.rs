@@ -480,8 +480,7 @@ mod pagerduty {
 
             assert_eq!(
                 body["payload"]["severity"], expected_pd_severity,
-                "Severity {:?} should map to {}",
-                severity, expected_pd_severity
+                "Severity {severity:?} should map to {expected_pd_severity}"
             );
 
             mock_server.reset().await;

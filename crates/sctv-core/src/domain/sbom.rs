@@ -33,17 +33,13 @@ impl std::fmt::Display for SbomId {
 /// SBOM format specification.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum SbomFormat {
-    /// CycloneDX format (recommended).
+    /// `CycloneDX` format (recommended).
+    #[default]
     CycloneDx,
     /// SPDX format.
     Spdx,
-}
-
-impl Default for SbomFormat {
-    fn default() -> Self {
-        Self::CycloneDx
-    }
 }
 
 impl std::fmt::Display for SbomFormat {
@@ -62,7 +58,7 @@ impl std::str::FromStr for SbomFormat {
         match s.to_lowercase().as_str() {
             "cyclonedx" => Ok(Self::CycloneDx),
             "spdx" => Ok(Self::Spdx),
-            _ => Err(format!("Unknown SBOM format: {}", s)),
+            _ => Err(format!("Unknown SBOM format: {s}")),
         }
     }
 }
@@ -126,7 +122,7 @@ impl Sbom {
         }
     }
 
-    /// Creates a new CycloneDX SBOM.
+    /// Creates a new `CycloneDX` SBOM.
     #[must_use]
     pub fn cyclonedx(
         project_id: ProjectId,

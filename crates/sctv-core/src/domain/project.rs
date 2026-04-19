@@ -79,11 +79,10 @@ impl Project {
     #[must_use]
     pub fn should_scan_now(&self) -> bool {
         match &self.scan_schedule {
-            ScanSchedule::Manual => false,
-            ScanSchedule::Hourly => {
-                self.last_scan_at
-                    .map_or(true, |last| Utc::now() - last >= chrono::Duration::hours(1))
-            }
+            ScanSchedule::Manual | ScanSchedule::OnPush => false, // Triggered externally via webhook
+            ScanSchedule::Hourly => self
+                .last_scan_at
+                .is_none_or(|last| Utc::now() - last >= chrono::Duration::hours(1)),
             ScanSchedule::Daily { hour } => {
                 let now = Utc::now();
                 let current_hour = now.hour();
@@ -91,7 +90,7 @@ impl Project {
                     return false;
                 }
                 self.last_scan_at
-                    .map_or(true, |last| Utc::now() - last >= chrono::Duration::hours(20))
+                    .is_none_or(|last| Utc::now() - last >= chrono::Duration::hours(20))
             }
             ScanSchedule::Weekly { day, hour } => {
                 let now = Utc::now();
@@ -101,9 +100,8 @@ impl Project {
                     return false;
                 }
                 self.last_scan_at
-                    .map_or(true, |last| Utc::now() - last >= chrono::Duration::days(6))
+                    .is_none_or(|last| Utc::now() - last >= chrono::Duration::days(6))
             }
-            ScanSchedule::OnPush => false, // Triggered externally via webhook
         }
     }
 
@@ -111,9 +109,7 @@ impl Project {
     pub fn update_status(&mut self, critical_count: u32, high_count: u32, medium_count: u32) {
         self.status = if critical_count > 0 {
             ProjectStatus::Critical
-        } else if high_count > 0 {
-            ProjectStatus::Warning
-        } else if medium_count > 0 {
+        } else if high_count > 0 || medium_count > 0 {
             ProjectStatus::Warning
         } else {
             ProjectStatus::Healthy

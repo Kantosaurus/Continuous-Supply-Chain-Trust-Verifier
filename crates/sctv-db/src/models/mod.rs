@@ -1,4 +1,4 @@
-//! Database models for SQLx queries.
+//! Database models for `SQLx` queries.
 //!
 //! These models represent the database row structures and provide
 //! conversions to/from domain models.
@@ -6,6 +6,7 @@
 use sctv_core::{PackageEcosystem, ProjectStatus};
 
 /// Parses an ecosystem string to the enum variant.
+#[must_use]
 pub fn parse_ecosystem(s: &str) -> Option<PackageEcosystem> {
     match s.to_lowercase().as_str() {
         "npm" => Some(PackageEcosystem::Npm),
@@ -20,6 +21,7 @@ pub fn parse_ecosystem(s: &str) -> Option<PackageEcosystem> {
 }
 
 /// Parses a status string to the enum variant.
+#[must_use]
 pub fn parse_status(s: &str) -> ProjectStatus {
     match s.to_lowercase().as_str() {
         "healthy" => ProjectStatus::Healthy,
@@ -30,7 +32,8 @@ pub fn parse_status(s: &str) -> ProjectStatus {
 }
 
 /// Converts a project status to a database string.
-pub fn status_to_string(status: ProjectStatus) -> &'static str {
+#[must_use]
+pub const fn status_to_string(status: ProjectStatus) -> &'static str {
     match status {
         ProjectStatus::Healthy => "healthy",
         ProjectStatus::Warning => "warning",

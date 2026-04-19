@@ -11,11 +11,10 @@
 use chrono::{Duration, Utc};
 use sctv_core::{AlertId, DependencyId, PackageEcosystem, ProjectId, Severity, TenantId};
 use sctv_worker::{
-    Job, JobId, JobPayload, JobPriority, JobResult, JobStatus, JobType,
-    MonitorRegistryPayload, MonitorRegistryResult, NotificationChannel, NotificationContext,
-    ProvenanceVerificationStatus, ScanProjectPayload, ScanProjectResult,
-    SendNotificationPayload, SendNotificationResult, SigstoreDetails,
-    VerifyProvenancePayload, VerifyProvenanceResult,
+    Job, JobId, JobPayload, JobPriority, JobResult, JobStatus, JobType, MonitorRegistryPayload,
+    MonitorRegistryResult, NotificationChannel, NotificationContext, ProvenanceVerificationStatus,
+    ScanProjectPayload, ScanProjectResult, SendNotificationPayload, SendNotificationResult,
+    SigstoreDetails, VerifyProvenancePayload, VerifyProvenanceResult,
 };
 use uuid::Uuid;
 
@@ -384,7 +383,11 @@ mod job_payloads {
     fn test_monitor_registry_payload() {
         let payload = MonitorRegistryPayload {
             ecosystem: PackageEcosystem::Cargo,
-            packages: vec!["serde".to_string(), "tokio".to_string(), "reqwest".to_string()],
+            packages: vec![
+                "serde".to_string(),
+                "tokio".to_string(),
+                "reqwest".to_string(),
+            ],
             check_new_versions: true,
             check_removals: true,
             check_maintainer_changes: true,
@@ -443,15 +446,12 @@ mod job_payloads {
 
     #[test]
     fn test_payload_job_type_mapping() {
-        let scan_payload = JobPayload::ScanProject(ScanProjectPayload::new(
-            ProjectId::new(),
-            TenantId::new(),
-        ));
+        let scan_payload =
+            JobPayload::ScanProject(ScanProjectPayload::new(ProjectId::new(), TenantId::new()));
         assert_eq!(scan_payload.job_type(), JobType::ScanProject);
 
-        let monitor_payload = JobPayload::MonitorRegistry(
-            MonitorRegistryPayload::new(PackageEcosystem::Npm),
-        );
+        let monitor_payload =
+            JobPayload::MonitorRegistry(MonitorRegistryPayload::new(PackageEcosystem::Npm));
         assert_eq!(monitor_payload.job_type(), JobType::MonitorRegistry);
 
         let provenance_payload = JobPayload::VerifyProvenance(VerifyProvenancePayload::new(
@@ -720,7 +720,7 @@ mod job_id {
     #[test]
     fn test_job_id_display() {
         let id = JobId::new();
-        let display = format!("{}", id);
+        let display = format!("{id}");
 
         // Should be a valid UUID string
         assert_eq!(display.len(), 36); // UUID format: 8-4-4-4-12
@@ -729,7 +729,7 @@ mod job_id {
 
     #[test]
     fn test_job_id_default() {
-        let id: JobId = Default::default();
+        let id = JobId::default();
 
         // Should create a new random ID
         assert!(!id.0.is_nil());

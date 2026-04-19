@@ -93,10 +93,8 @@ impl Dependency {
     /// Checks if this dependency has been verified.
     #[must_use]
     pub const fn is_verified(&self) -> bool {
-        matches!(
-            self.integrity.signature_status,
-            SignatureStatus::Verified
-        ) || self.integrity.hash_sha256.is_some()
+        matches!(self.integrity.signature_status, SignatureStatus::Verified)
+            || self.integrity.hash_sha256.is_some()
     }
 }
 

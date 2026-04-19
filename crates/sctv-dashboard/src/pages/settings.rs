@@ -6,8 +6,8 @@
 use leptos::prelude::*;
 
 use crate::components::{
-    Button, ButtonVariant, Checkbox, Divider, FieldGroup, FormActions, PageHeader,
-    Section, Select, TabNav, TextInput, Textarea, Toggle,
+    Button, ButtonVariant, Checkbox, Divider, FieldGroup, FormActions, PageHeader, Section, Select,
+    TabNav, TextInput, Textarea, Toggle,
 };
 
 /// Application settings page.
@@ -40,7 +40,6 @@ pub fn SettingsPage() -> impl IntoView {
 
                 <main class="settings-content">
                     {move || match active_tab.get().as_str() {
-                        "general" => view! { <GeneralSettings/> }.into_any(),
                         "notifications" => view! { <NotificationSettings/> }.into_any(),
                         "integrations" => view! { <IntegrationSettings/> }.into_any(),
                         "security" => view! { <SecuritySettings/> }.into_any(),

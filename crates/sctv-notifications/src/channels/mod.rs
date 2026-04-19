@@ -4,7 +4,7 @@
 //! - [`EmailChannel`] - SMTP-based email delivery
 //! - [`SlackChannel`] - Slack webhook integration
 //! - [`TeamsChannel`] - Microsoft Teams webhook integration
-//! - [`PagerDutyChannel`] - PagerDuty Events API v2 integration
+//! - [`PagerDutyChannel`] - `PagerDuty` Events API v2 integration
 //! - [`WebhookChannel`] - Generic HTTP webhook support
 
 mod email;

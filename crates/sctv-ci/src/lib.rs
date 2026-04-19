@@ -23,18 +23,19 @@ pub struct SarifReport {
 
 impl SarifReport {
     /// Create a SARIF report from alerts.
+    #[must_use]
     pub fn from_alerts(alerts: &[Alert]) -> Self {
-        let results: Vec<SarifResult> = alerts
-            .iter()
-            .map(|alert| SarifResult::from_alert(alert))
-            .collect();
+        let results: Vec<SarifResult> = alerts.iter().map(SarifResult::from_alert).collect();
 
         // Collect unique rules
         let mut rules_map: HashMap<String, SarifRule> = HashMap::new();
         for alert in alerts {
             let rule_id = alert.alert_type.type_name().to_string();
             if !rules_map.contains_key(&rule_id) {
-                rules_map.insert(rule_id.clone(), SarifRule::from_alert_type(&alert.alert_type));
+                rules_map.insert(
+                    rule_id.clone(),
+                    SarifRule::from_alert_type(&alert.alert_type),
+                );
             }
         }
         let rules: Vec<SarifRule> = rules_map.into_values().collect();
@@ -47,7 +48,8 @@ impl SarifReport {
                     driver: SarifDriver {
                         name: "Supply Chain Trust Verifier".to_string(),
                         semantic_version: env!("CARGO_PKG_VERSION").to_string(),
-                        information_uri: "https://github.com/example/supply-chain-trust-verifier".to_string(),
+                        information_uri: "https://github.com/example/supply-chain-trust-verifier"
+                            .to_string(),
                         rules,
                     },
                 },
@@ -61,11 +63,19 @@ impl SarifReport {
     }
 
     /// Convert to JSON string.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails.
     pub fn to_json(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string_pretty(self)
     }
 
     /// Convert to compact JSON string.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization fails.
     pub fn to_json_compact(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string(self)
     }
@@ -173,11 +183,15 @@ impl SarifRule {
         Self {
             id: id.to_string(),
             name: name.to_string(),
-            short_description: SarifMessage { text: short_desc.to_string() },
-            full_description: SarifMessage { text: full_desc.to_string() },
+            short_description: SarifMessage {
+                text: short_desc.to_string(),
+            },
+            full_description: SarifMessage {
+                text: full_desc.to_string(),
+            },
             help: SarifHelp {
                 text: help_text.to_string(),
-                markdown: format!("**Recommendation:** {}", help_text),
+                markdown: format!("**Recommendation:** {help_text}"),
             },
             default_configuration: SarifDefaultConfiguration {
                 level: match alert_type.default_severity() {
@@ -239,13 +253,27 @@ pub struct SarifResult {
 impl SarifResult {
     fn from_alert(alert: &Alert) -> Self {
         let (package_name, ecosystem, version) = match &alert.alert_type {
-            AlertType::DependencyTampering(d) => (d.package_name.clone(), d.ecosystem, d.version.clone()),
-            AlertType::DowngradeAttack(d) => (d.package_name.clone(), d.ecosystem, d.current_version.to_string()),
-            AlertType::Typosquatting(d) => (d.suspicious_package.clone(), d.ecosystem, String::new()),
-            AlertType::ProvenanceFailure(d) => (d.package_name.clone(), d.ecosystem, d.version.clone()),
-            AlertType::PolicyViolation(d) => (d.policy_name.clone(), PackageEcosystem::Npm, String::new()),
+            AlertType::DependencyTampering(d) => {
+                (d.package_name.clone(), d.ecosystem, d.version.clone())
+            }
+            AlertType::DowngradeAttack(d) => (
+                d.package_name.clone(),
+                d.ecosystem,
+                d.current_version.to_string(),
+            ),
+            AlertType::Typosquatting(d) => {
+                (d.suspicious_package.clone(), d.ecosystem, String::new())
+            }
+            AlertType::ProvenanceFailure(d) => {
+                (d.package_name.clone(), d.ecosystem, d.version.clone())
+            }
+            AlertType::PolicyViolation(d) => {
+                (d.policy_name.clone(), PackageEcosystem::Npm, String::new())
+            }
             AlertType::NewPackage(d) => (d.package_name.clone(), d.ecosystem, d.version.clone()),
-            AlertType::SuspiciousMaintainer(d) => (d.package_name.clone(), d.ecosystem, String::new()),
+            AlertType::SuspiciousMaintainer(d) => {
+                (d.package_name.clone(), d.ecosystem, String::new())
+            }
         };
 
         Self {
@@ -255,7 +283,8 @@ impl SarifResult {
                 Severity::Critical | Severity::High => "error",
                 Severity::Medium => "warning",
                 _ => "note",
-            }.to_string(),
+            }
+            .to_string(),
             message: SarifMessage {
                 text: format!("{}: {}", alert.title, alert.description),
             },
@@ -274,13 +303,20 @@ impl SarifResult {
                 }],
             }],
             partial_fingerprints: SarifPartialFingerprints {
-                primary_location_line_hash: format!("{:x}", md5_hash(&format!("{}:{}:{}", package_name, ecosystem, version))),
+                primary_location_line_hash: format!(
+                    "{:x}",
+                    md5_hash(&format!("{package_name}:{ecosystem}:{version}"))
+                ),
             },
             properties: SarifResultProperties {
                 alert_id: alert.id.to_string(),
                 ecosystem: ecosystem.to_string(),
                 package_name,
-                version: if version.is_empty() { None } else { Some(version) },
+                version: if version.is_empty() {
+                    None
+                } else {
+                    Some(version)
+                },
                 created_at: alert.created_at.to_rfc3339(),
             },
         }
@@ -367,8 +403,8 @@ pub struct SarifInvocation {
 
 /// Simple MD5 hash for fingerprinting (not for security).
 fn md5_hash(input: &str) -> u64 {
-    use std::hash::{Hash, Hasher};
     use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
 
     let mut hasher = DefaultHasher::new();
     input.hash(&mut hasher);
@@ -400,6 +436,7 @@ impl Default for CiConfig {
 }
 
 /// Determines CI exit code based on alerts.
+#[must_use]
 pub fn determine_exit_code(alerts: &[Alert], config: &CiConfig) -> i32 {
     for alert in alerts {
         match alert.severity {
@@ -414,7 +451,7 @@ pub fn determine_exit_code(alerts: &[Alert], config: &CiConfig) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sctv_core::{AlertType, TamperingDetails, HashAlgorithm, ProjectId, TenantId};
+    use sctv_core::{AlertType, HashAlgorithm, ProjectId, TamperingDetails, TenantId};
 
     fn create_test_alert() -> Alert {
         Alert::new(

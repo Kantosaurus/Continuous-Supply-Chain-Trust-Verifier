@@ -26,9 +26,9 @@ pub enum WebhookMethod {
 impl From<WebhookMethod> for Method {
     fn from(method: WebhookMethod) -> Self {
         match method {
-            WebhookMethod::Post => Method::POST,
-            WebhookMethod::Put => Method::PUT,
-            WebhookMethod::Patch => Method::PATCH,
+            WebhookMethod::Post => Self::POST,
+            WebhookMethod::Put => Self::PUT,
+            WebhookMethod::Patch => Self::PATCH,
         }
     }
 }
@@ -36,8 +36,10 @@ impl From<WebhookMethod> for Method {
 /// Authentication method for webhooks.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
+#[derive(Default)]
 pub enum WebhookAuth {
     /// No authentication.
+    #[default]
     None,
     /// Bearer token authentication.
     Bearer {
@@ -63,12 +65,6 @@ pub enum WebhookAuth {
         secret: String,
         algorithm: HmacAlgorithm,
     },
-}
-
-impl Default for WebhookAuth {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 /// HMAC algorithm for signature-based auth.
@@ -110,19 +106,19 @@ pub struct WebhookConfig {
     pub enabled: bool,
 }
 
-fn default_timeout() -> u64 {
+const fn default_timeout() -> u64 {
     30
 }
 
-fn default_retries() -> u32 {
+const fn default_retries() -> u32 {
     3
 }
 
-fn default_retry_delay() -> u64 {
+const fn default_retry_delay() -> u64 {
     1000
 }
 
-fn default_enabled() -> bool {
+const fn default_enabled() -> bool {
     true
 }
 
@@ -166,7 +162,7 @@ impl WebhookConfigBuilder {
 
     /// Sets the HTTP method.
     #[must_use]
-    pub fn method(mut self, method: WebhookMethod) -> Self {
+    pub const fn method(mut self, method: WebhookMethod) -> Self {
         self.config.method = method;
         self
     }
@@ -229,21 +225,21 @@ impl WebhookConfigBuilder {
 
     /// Sets the request timeout.
     #[must_use]
-    pub fn timeout_secs(mut self, secs: u64) -> Self {
+    pub const fn timeout_secs(mut self, secs: u64) -> Self {
         self.config.timeout_secs = secs;
         self
     }
 
     /// Sets the maximum number of retries.
     #[must_use]
-    pub fn max_retries(mut self, retries: u32) -> Self {
+    pub const fn max_retries(mut self, retries: u32) -> Self {
         self.config.max_retries = retries;
         self
     }
 
     /// Sets the retry delay.
     #[must_use]
-    pub fn retry_delay_ms(mut self, delay_ms: u64) -> Self {
+    pub const fn retry_delay_ms(mut self, delay_ms: u64) -> Self {
         self.config.retry_delay_ms = delay_ms;
         self
     }
@@ -257,7 +253,7 @@ impl WebhookConfigBuilder {
 
     /// Sets whether the channel is enabled.
     #[must_use]
-    pub fn enabled(mut self, enabled: bool) -> Self {
+    pub const fn enabled(mut self, enabled: bool) -> Self {
         self.config.enabled = enabled;
         self
     }
@@ -315,6 +311,10 @@ pub struct WebhookChannel {
 
 impl WebhookChannel {
     /// Creates a new webhook channel with the given configuration.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the HTTP client cannot be built (e.g. invalid TLS configuration).
     #[must_use]
     pub fn new(config: WebhookConfig) -> Self {
         let client = Client::builder()
@@ -353,7 +353,7 @@ impl WebhookChannel {
     }
 
     /// Computes HMAC signature for the payload.
-    fn compute_signature(&self, payload: &[u8], secret: &str, algorithm: HmacAlgorithm) -> String {
+    fn compute_signature(payload: &[u8], secret: &str, algorithm: HmacAlgorithm) -> String {
         use hmac::{Hmac, Mac};
         use sha1::Sha1;
         use sha2::Sha256;
@@ -416,7 +416,9 @@ impl WebhookChannel {
                         retryable,
                         "Webhook request failed"
                     );
-                    let duration_ms = start.elapsed().as_millis() as u64;
+                    // as_millis() returns u128; elapsed time in ms will never exceed u64::MAX (~585M years).
+                    let duration_ms =
+                        u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
                     if !retryable {
                         return Ok(DeliveryResult::failure(duration_ms, e.to_string()));
                     }
@@ -442,7 +444,9 @@ impl WebhookChannel {
         request = match &self.config.auth {
             WebhookAuth::None => request,
             WebhookAuth::Bearer { token } => request.bearer_auth(token),
-            WebhookAuth::Basic { username, password } => request.basic_auth(username, Some(password)),
+            WebhookAuth::Basic { username, password } => {
+                request.basic_auth(username, Some(password))
+            }
             WebhookAuth::ApiKey {
                 header_name,
                 api_key,
@@ -452,7 +456,7 @@ impl WebhookChannel {
                 secret,
                 algorithm,
             } => {
-                let signature = self.compute_signature(payload, secret, *algorithm);
+                let signature = Self::compute_signature(payload, secret, *algorithm);
                 request.header(header_name, signature)
             }
         };
@@ -464,14 +468,12 @@ impl WebhookChannel {
 
         let response = request.body(payload.to_vec()).send().await?;
 
-        let duration_ms = start.elapsed().as_millis() as u64;
+        // as_millis() returns u128; elapsed time in ms will never exceed u64::MAX (~585M years).
+        let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
         let status = response.status();
 
         if status.is_success() {
-            let body: serde_json::Value = response
-                .json()
-                .await
-                .unwrap_or(serde_json::Value::Null);
+            let body: serde_json::Value = response.json().await.unwrap_or(serde_json::Value::Null);
 
             Ok(DeliveryResult::success_with_response(
                 duration_ms,
@@ -592,7 +594,10 @@ mod tests {
         assert_eq!(config.url, "https://api.example.com/webhooks/alerts");
         assert_eq!(config.method, WebhookMethod::Post);
         assert!(matches!(config.auth, WebhookAuth::Bearer { .. }));
-        assert_eq!(config.headers.get("X-Custom-Header"), Some(&"custom-value".to_string()));
+        assert_eq!(
+            config.headers.get("X-Custom-Header"),
+            Some(&"custom-value".to_string())
+        );
         assert_eq!(config.max_retries, 5);
     }
 

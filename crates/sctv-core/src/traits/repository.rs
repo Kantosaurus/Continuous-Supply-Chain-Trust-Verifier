@@ -233,7 +233,11 @@ pub trait UserRepository: Send + Sync {
     async fn find_by_id(&self, id: UserId) -> RepositoryResult<Option<User>>;
 
     /// Finds a user by email within a tenant.
-    async fn find_by_email(&self, tenant_id: TenantId, email: &str) -> RepositoryResult<Option<User>>;
+    async fn find_by_email(
+        &self,
+        tenant_id: TenantId,
+        email: &str,
+    ) -> RepositoryResult<Option<User>>;
 
     /// Finds a user by API key hash.
     async fn find_by_api_key(&self, api_key_hash: &str) -> RepositoryResult<Option<User>>;
@@ -327,7 +331,11 @@ pub trait SbomRepository: Send + Sync {
     async fn delete(&self, id: SbomId) -> RepositoryResult<()>;
 
     /// Deletes old SBOMs for a project, keeping the most recent N.
-    async fn cleanup_old_sboms(&self, project_id: ProjectId, keep_count: u32) -> RepositoryResult<u32>;
+    async fn cleanup_old_sboms(
+        &self,
+        project_id: ProjectId,
+        keep_count: u32,
+    ) -> RepositoryResult<u32>;
 }
 
 /// Repository for API key operations.
@@ -346,11 +354,11 @@ pub trait ApiKeyRepository: Send + Sync {
     /// Creates a new API key row.
     async fn create(&self, key: &ApiKey) -> RepositoryResult<()>;
 
-    /// Marks an API key revoked (soft-delete). Returns NotFound if the row
+    /// Marks an API key revoked (soft-delete). Returns `NotFound` if the row
     /// doesn't exist or is already revoked.
     async fn revoke(&self, id: ApiKeyId) -> RepositoryResult<()>;
 
-    /// Updates the last_used_at timestamp. Intended to be called on each
+    /// Updates the `last_used_at` timestamp. Intended to be called on each
     /// successful auth but is best-effort; errors are logged, not propagated.
     async fn touch_last_used(&self, id: ApiKeyId) -> RepositoryResult<()>;
 }

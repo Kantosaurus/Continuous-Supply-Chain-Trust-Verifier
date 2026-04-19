@@ -70,7 +70,7 @@ pub enum DowngradeSeverity {
 impl DowngradeSeverity {
     /// Converts to alert severity.
     #[must_use]
-    pub fn to_alert_severity(self) -> Severity {
+    pub const fn to_alert_severity(self) -> Severity {
         match self {
             Self::Prerelease => Severity::Low,
             Self::Patch => Severity::Medium,
@@ -164,7 +164,10 @@ impl DowngradeDetector {
 
     /// Creates a detector with custom configuration and history store.
     #[must_use]
-    pub fn with_config_and_store(config: DowngradeConfig, store: VersionHistoryStore) -> Self {
+    pub const fn with_config_and_store(
+        config: DowngradeConfig,
+        store: VersionHistoryStore,
+    ) -> Self {
         Self {
             config,
             history_store: store,
@@ -188,16 +191,17 @@ impl DowngradeDetector {
         let previous_version = self.history_store.get_latest_version(&key);
 
         // Compare versions
-        let result = match previous_version {
-            Some(prev) => self.compare_versions(&prev, &dependency.resolved_version),
-            None => DowngradeAnalysisResult::no_downgrade(&dependency.resolved_version),
-        };
+        let result = previous_version.map_or_else(
+            || DowngradeAnalysisResult::no_downgrade(&dependency.resolved_version),
+            |prev| self.compare_versions(&prev, &dependency.resolved_version),
+        );
 
         // Update history with current version
-        self.history_store.record_version(&key, &dependency.resolved_version);
+        self.history_store
+            .record_version(&key, &dependency.resolved_version);
 
         // Enhance result with additional analysis
-        self.enhance_result(result, dependency)
+        Self::enhance_result(result, dependency)
     }
 
     /// Compares two versions and determines if there's a downgrade.
@@ -208,7 +212,7 @@ impl DowngradeDetector {
         }
 
         // Determine downgrade severity
-        let severity = self.determine_severity(previous, current);
+        let severity = Self::determine_severity(previous, current);
 
         // Check if this severity level should be reported
         if severity < self.config.minimum_severity {
@@ -224,7 +228,7 @@ impl DowngradeDetector {
     }
 
     /// Determines the severity of a version downgrade.
-    fn determine_severity(&self, previous: &Version, current: &Version) -> DowngradeSeverity {
+    const fn determine_severity(previous: &Version, current: &Version) -> DowngradeSeverity {
         if previous.major != current.major {
             DowngradeSeverity::Major
         } else if previous.minor != current.minor {
@@ -238,7 +242,7 @@ impl DowngradeDetector {
     }
 
     /// Checks if a downgrade is allowed by configuration.
-    fn is_allowed_downgrade(
+    const fn is_allowed_downgrade(
         &self,
         _previous: &Version,
         _current: &Version,
@@ -262,7 +266,6 @@ impl DowngradeDetector {
 
     /// Enhances the analysis result with additional checks.
     fn enhance_result(
-        &self,
         mut result: DowngradeAnalysisResult,
         dependency: &Dependency,
     ) -> DowngradeAnalysisResult {
@@ -274,13 +277,11 @@ impl DowngradeDetector {
         if let Some(prev_str) = &result.previous_version {
             if let Ok(prev) = Version::parse(prev_str) {
                 // Suspicious: Major or minor downgrade with significant version gap
-                let version_gap = self.calculate_version_gap(&prev, &dependency.resolved_version);
+                let version_gap = Self::calculate_version_gap(&prev, &dependency.resolved_version);
                 if version_gap > 5 {
                     result.is_suspicious = true;
-                    result.suspicious_reason = Some(format!(
-                        "Large version gap of {} versions",
-                        version_gap
-                    ));
+                    result.suspicious_reason =
+                        Some(format!("Large version gap of {version_gap} versions"));
                 }
 
                 // Suspicious: Downgrade crosses a major security release boundary
@@ -292,7 +293,7 @@ impl DowngradeDetector {
     }
 
     /// Calculates the "gap" between two versions (rough estimate).
-    fn calculate_version_gap(&self, previous: &Version, current: &Version) -> u64 {
+    const fn calculate_version_gap(previous: &Version, current: &Version) -> u64 {
         let prev_score = (previous.major * 10000) + (previous.minor * 100) + previous.patch;
         let curr_score = (current.major * 10000) + (current.minor * 100) + current.patch;
         prev_score.saturating_sub(curr_score)
@@ -300,7 +301,7 @@ impl DowngradeDetector {
 
     /// Gets a reference to the history store.
     #[must_use]
-    pub fn history_store(&self) -> &VersionHistoryStore {
+    pub const fn history_store(&self) -> &VersionHistoryStore {
         &self.history_store
     }
 }
@@ -371,7 +372,9 @@ impl Detector for DowngradeDetector {
                     ecosystem: dependency.ecosystem,
                     previous_version: previous.clone(),
                     current_version: dependency.resolved_version.clone(),
-                    lock_file_version: analysis.lock_file_version.and_then(|v| Version::parse(&v).ok()),
+                    lock_file_version: analysis
+                        .lock_file_version
+                        .and_then(|v| Version::parse(&v).ok()),
                 };
 
                 let severity_text = match analysis.severity {
@@ -413,8 +416,7 @@ impl Detector for DowngradeDetector {
                 alert.dependency_id = Some(dependency.id);
                 alert.severity = analysis
                     .severity
-                    .map(|s| s.to_alert_severity())
-                    .unwrap_or(Severity::Medium);
+                    .map_or(Severity::Medium, DowngradeSeverity::to_alert_severity);
 
                 Some(alert)
             })
@@ -493,8 +495,10 @@ mod tests {
     #[test]
     fn test_patch_downgrade_detected() {
         // Use config that detects patch downgrades
-        let mut config = DowngradeConfig::default();
-        config.minimum_severity = DowngradeSeverity::Patch;
+        let config = DowngradeConfig {
+            minimum_severity: DowngradeSeverity::Patch,
+            ..DowngradeConfig::default()
+        };
 
         let detector = DowngradeDetector::with_config(config);
         let project_id = ProjectId::new();
@@ -622,8 +626,10 @@ mod tests {
 
     #[test]
     fn test_allow_patch_downgrades() {
-        let mut config = DowngradeConfig::default();
-        config.allow_patch_downgrades = true;
+        let config = DowngradeConfig {
+            allow_patch_downgrades: true,
+            ..DowngradeConfig::default()
+        };
 
         let detector = DowngradeDetector::with_config(config);
         let project_id = ProjectId::new();
@@ -655,9 +661,18 @@ mod tests {
 
     #[test]
     fn test_severity_conversion() {
-        assert_eq!(DowngradeSeverity::Major.to_alert_severity(), Severity::Critical);
+        assert_eq!(
+            DowngradeSeverity::Major.to_alert_severity(),
+            Severity::Critical
+        );
         assert_eq!(DowngradeSeverity::Minor.to_alert_severity(), Severity::High);
-        assert_eq!(DowngradeSeverity::Patch.to_alert_severity(), Severity::Medium);
-        assert_eq!(DowngradeSeverity::Prerelease.to_alert_severity(), Severity::Low);
+        assert_eq!(
+            DowngradeSeverity::Patch.to_alert_severity(),
+            Severity::Medium
+        );
+        assert_eq!(
+            DowngradeSeverity::Prerelease.to_alert_severity(),
+            Severity::Low
+        );
     }
 }

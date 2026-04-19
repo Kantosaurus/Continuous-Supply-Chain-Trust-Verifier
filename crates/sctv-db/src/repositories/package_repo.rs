@@ -7,7 +7,7 @@ use sctv_core::{Package, PackageEcosystem, PackageId};
 use sqlx::{PgPool, Row};
 use url::Url;
 
-/// PostgreSQL implementation of the package repository.
+/// `PostgreSQL` implementation of the package repository.
 pub struct PgPackageRepository {
     pool: PgPool,
 }
@@ -36,7 +36,7 @@ impl PgPackageRepository {
 
         let ecosystem: PackageEcosystem = ecosystem
             .parse()
-            .map_err(|_| RepositoryError::InvalidData(format!("Invalid ecosystem: {}", ecosystem)))?;
+            .map_err(|_| RepositoryError::InvalidData(format!("Invalid ecosystem: {ecosystem}")))?;
 
         let homepage = homepage.and_then(|u| Url::parse(&u).ok());
         let repository = repository.and_then(|u| Url::parse(&u).ok());
@@ -52,7 +52,8 @@ impl PgPackageRepository {
             description,
             homepage,
             repository,
-            popularity_rank: popularity_rank.map(|r| r as u32),
+            // DB stores popularity_rank as i32; it is always non-negative.
+            popularity_rank: popularity_rank.map(|r| u32::try_from(r).unwrap_or(0)),
             is_popular,
             maintainers,
             first_published,
@@ -66,11 +67,11 @@ impl PgPackageRepository {
 impl PackageRepository for PgPackageRepository {
     async fn find_by_id(&self, id: PackageId) -> RepositoryResult<Option<Package>> {
         let record = sqlx::query(
-            r#"
+            r"
             SELECT id, ecosystem, name, normalized_name, description, homepage, repository,
                    popularity_rank, is_popular, maintainers, first_published, last_updated, cached_at
             FROM packages WHERE id = $1
-            "#,
+            ",
         )
         .bind(id.0)
         .fetch_optional(&self.pool)
@@ -89,12 +90,12 @@ impl PackageRepository for PgPackageRepository {
         name: &str,
     ) -> RepositoryResult<Option<Package>> {
         let record = sqlx::query(
-            r#"
+            r"
             SELECT id, ecosystem, name, normalized_name, description, homepage, repository,
                    popularity_rank, is_popular, maintainers, first_published, last_updated, cached_at
             FROM packages
             WHERE ecosystem = $1 AND name = $2
-            "#,
+            ",
         )
         .bind(ecosystem.to_string().to_lowercase())
         .bind(name)
@@ -113,7 +114,7 @@ impl PackageRepository for PgPackageRepository {
             .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
         sqlx::query(
-            r#"
+            r"
             INSERT INTO packages (
                 id, ecosystem, name, normalized_name, description, homepage, repository,
                 popularity_rank, is_popular, maintainers, first_published, last_updated, cached_at
@@ -130,16 +131,21 @@ impl PackageRepository for PgPackageRepository {
                 first_published = COALESCE(packages.first_published, EXCLUDED.first_published),
                 last_updated = EXCLUDED.last_updated,
                 cached_at = EXCLUDED.cached_at
-            "#,
+            ",
         )
         .bind(package.id.0)
         .bind(package.ecosystem.to_string().to_lowercase())
         .bind(&package.name)
         .bind(&package.normalized_name)
         .bind(&package.description)
-        .bind(package.homepage.as_ref().map(|u| u.as_str()))
-        .bind(package.repository.as_ref().map(|u| u.as_str()))
-        .bind(package.popularity_rank.map(|r| r as i32))
+        .bind(package.homepage.as_ref().map(url::Url::as_str))
+        .bind(package.repository.as_ref().map(url::Url::as_str))
+        // Popularity rank fits in i32; u32::MAX would be unusual but we clamp.
+        .bind(
+            package
+                .popularity_rank
+                .map(|r| i32::try_from(r).unwrap_or(i32::MAX)),
+        )
         .bind(package.is_popular)
         .bind(maintainers)
         .bind(package.first_published)
@@ -158,17 +164,17 @@ impl PackageRepository for PgPackageRepository {
         limit: u32,
     ) -> RepositoryResult<Vec<Package>> {
         let records = sqlx::query(
-            r#"
+            r"
             SELECT id, ecosystem, name, normalized_name, description, homepage, repository,
                    popularity_rank, is_popular, maintainers, first_published, last_updated, cached_at
             FROM packages
             WHERE ecosystem = $1 AND is_popular = true
             ORDER BY popularity_rank ASC NULLS LAST
             LIMIT $2
-            "#,
+            ",
         )
         .bind(ecosystem.to_string().to_lowercase())
-        .bind(limit as i64)
+        .bind(i64::from(limit))
         .fetch_all(&self.pool)
         .await
         .map_err(|e| RepositoryError::Database(e.to_string()))?;
@@ -184,7 +190,7 @@ impl PackageRepository for PgPackageRepository {
     ) -> RepositoryResult<Vec<Package>> {
         // Use the pg_trgm extension for fuzzy matching
         let records = sqlx::query(
-            r#"
+            r"
             SELECT id, ecosystem, name, normalized_name, description, homepage, repository,
                    popularity_rank, is_popular, maintainers, first_published, last_updated, cached_at
             FROM packages
@@ -198,11 +204,11 @@ impl PackageRepository for PgPackageRepository {
                 similarity(name, $2) DESC,
                 popularity_rank ASC NULLS LAST
             LIMIT $3
-            "#,
+            ",
         )
         .bind(ecosystem.to_string().to_lowercase())
         .bind(prefix)
-        .bind(limit as i64)
+        .bind(i64::from(limit))
         .fetch_all(&self.pool)
         .await
         .map_err(|e| RepositoryError::Database(e.to_string()))?;
@@ -224,18 +230,22 @@ impl PgPackageVersionRepository {
     }
 
     /// Finds a specific version of a package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the database query or deserialization fails.
     pub async fn find_version(
         &self,
         package_id: PackageId,
         version: &str,
     ) -> RepositoryResult<Option<sctv_core::PackageVersion>> {
         let record = sqlx::query(
-            r#"
+            r"
             SELECT package_id, version, published_at, yanked, deprecated, deprecation_message,
                    checksums, download_url, size_bytes, attestations, dependencies, cached_at
             FROM package_versions
             WHERE package_id = $1 AND version = $2
-            "#,
+            ",
         )
         .bind(package_id.0)
         .bind(version)
@@ -259,18 +269,20 @@ impl PgPackageVersionRepository {
                 let cached_at: DateTime<Utc> = row.get("cached_at");
 
                 let version = semver::Version::parse(&version_str)
-                    .map_err(|e| RepositoryError::InvalidData(format!("Invalid version: {}", e)))?;
+                    .map_err(|e| RepositoryError::InvalidData(format!("Invalid version: {e}")))?;
 
                 let checksums: sctv_core::PackageChecksums = serde_json::from_value(checksums)
                     .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
                 let download_url = download_url.and_then(|u| Url::parse(&u).ok());
 
-                let attestations: Vec<sctv_core::Attestation> = serde_json::from_value(attestations)
-                    .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
+                let attestations: Vec<sctv_core::Attestation> =
+                    serde_json::from_value(attestations)
+                        .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
-                let dependencies: Vec<sctv_core::PackageDependency> = serde_json::from_value(dependencies)
-                    .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
+                let dependencies: Vec<sctv_core::PackageDependency> =
+                    serde_json::from_value(dependencies)
+                        .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
                 Ok(Some(sctv_core::PackageVersion {
                     package_id: PackageId(package_id),
@@ -281,7 +293,8 @@ impl PgPackageVersionRepository {
                     deprecation_message,
                     checksums,
                     download_url,
-                    size_bytes: size_bytes.map(|s| s as u64),
+                    // DB stores size_bytes as i64; it is always non-negative for real files.
+                    size_bytes: size_bytes.map(|s| u64::try_from(s).unwrap_or(0)),
                     attestations,
                     dependencies,
                     cached_at,
@@ -292,6 +305,10 @@ impl PgPackageVersionRepository {
     }
 
     /// Upserts a package version.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization or the database query fails.
     pub async fn upsert(&self, version: &sctv_core::PackageVersion) -> RepositoryResult<()> {
         let checksums = serde_json::to_value(&version.checksums)
             .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
@@ -303,7 +320,7 @@ impl PgPackageVersionRepository {
             .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
         sqlx::query(
-            r#"
+            r"
             INSERT INTO package_versions (
                 package_id, version, published_at, yanked, deprecated, deprecation_message,
                 checksums, download_url, size_bytes, attestations, dependencies, cached_at
@@ -320,7 +337,7 @@ impl PgPackageVersionRepository {
                 attestations = EXCLUDED.attestations,
                 dependencies = EXCLUDED.dependencies,
                 cached_at = EXCLUDED.cached_at
-            "#,
+            ",
         )
         .bind(version.package_id.0)
         .bind(version.version.to_string())
@@ -329,8 +346,13 @@ impl PgPackageVersionRepository {
         .bind(version.deprecated)
         .bind(&version.deprecation_message)
         .bind(checksums)
-        .bind(version.download_url.as_ref().map(|u| u.as_str()))
-        .bind(version.size_bytes.map(|s| s as i64))
+        .bind(version.download_url.as_ref().map(url::Url::as_str))
+        // File sizes fit in i64 (max ~9.2 EB); any valid package is well within range.
+        .bind(
+            version
+                .size_bytes
+                .map(|s| i64::try_from(s).unwrap_or(i64::MAX)),
+        )
         .bind(attestations)
         .bind(dependencies)
         .bind(version.cached_at)
@@ -342,18 +364,22 @@ impl PgPackageVersionRepository {
     }
 
     /// Lists all versions for a package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the database query or deserialization fails.
     pub async fn list_versions(
         &self,
         package_id: PackageId,
     ) -> RepositoryResult<Vec<sctv_core::PackageVersion>> {
         let records = sqlx::query(
-            r#"
+            r"
             SELECT package_id, version, published_at, yanked, deprecated, deprecation_message,
                    checksums, download_url, size_bytes, attestations, dependencies, cached_at
             FROM package_versions
             WHERE package_id = $1
             ORDER BY published_at DESC NULLS LAST
-            "#,
+            ",
         )
         .bind(package_id.0)
         .fetch_all(&self.pool)
@@ -381,11 +407,13 @@ impl PgPackageVersionRepository {
 
                 let download_url = download_url.and_then(|u| Url::parse(&u).ok());
 
-                let attestations: Vec<sctv_core::Attestation> = serde_json::from_value(attestations)
-                    .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
+                let attestations: Vec<sctv_core::Attestation> =
+                    serde_json::from_value(attestations)
+                        .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
-                let dependencies: Vec<sctv_core::PackageDependency> = serde_json::from_value(dependencies)
-                    .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
+                let dependencies: Vec<sctv_core::PackageDependency> =
+                    serde_json::from_value(dependencies)
+                        .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
                 versions.push(sctv_core::PackageVersion {
                     package_id: PackageId(package_id),
@@ -396,7 +424,8 @@ impl PgPackageVersionRepository {
                     deprecation_message,
                     checksums,
                     download_url,
-                    size_bytes: size_bytes.map(|s| s as u64),
+                    // DB stores size_bytes as i64; it is always non-negative for real files.
+                    size_bytes: size_bytes.map(|s| u64::try_from(s).unwrap_or(0)),
                     attestations,
                     dependencies,
                     cached_at,

@@ -55,7 +55,7 @@
 //!
 //! # Reliability Features
 //!
-//! - **Atomic job claiming**: Uses PostgreSQL's `SKIP LOCKED` for safe concurrent access
+//! - **Atomic job claiming**: Uses `PostgreSQL`'s `SKIP LOCKED` for safe concurrent access
 //! - **Automatic retries**: Configurable retry count with exponential backoff potential
 //! - **Stale job recovery**: Automatically releases jobs that appear stuck
 //! - **Graceful shutdown**: Waits for running jobs to complete before stopping
@@ -70,18 +70,35 @@ pub mod service;
 
 // Re-export commonly used types at the crate root
 pub use error::{WorkerError, WorkerResult};
-pub use jobs::{
-    Job, JobId, JobPayload, JobPriority, JobResult, JobStatus, JobType,
-    // Payloads
-    MonitorRegistryPayload, MonitorRegistryResult, NotificationChannel, NotificationContext,
-    ProvenanceVerificationStatus, ScanProjectPayload, ScanProjectResult, SendNotificationPayload,
-    SendNotificationResult, SigstoreDetails, VerifyProvenancePayload, VerifyProvenanceResult,
-};
-pub use pool::{WorkerPool, WorkerPoolConfig, WorkerPoolHandle, WorkerPoolStats, WorkerPoolStatsSnapshot};
-pub use queue::{EnqueueOptions, JobFilter, JobQueue, PgJobQueue, QueueStats};
-pub use service::{WorkerService, WorkerServiceBuilder, WorkerServiceConfig};
 pub use executor::{
     BoxedExecutor, ExecutionContext, ExecutorConfig, ExecutorRegistry, JobExecutor,
     MonitorRegistryExecutor, ScanProjectExecutor, SendNotificationExecutor,
     VerifyProvenanceExecutor,
 };
+pub use jobs::{
+    Job,
+    JobId,
+    JobPayload,
+    JobPriority,
+    JobResult,
+    JobStatus,
+    JobType,
+    // Payloads
+    MonitorRegistryPayload,
+    MonitorRegistryResult,
+    NotificationChannel,
+    NotificationContext,
+    ProvenanceVerificationStatus,
+    ScanProjectPayload,
+    ScanProjectResult,
+    SendNotificationPayload,
+    SendNotificationResult,
+    SigstoreDetails,
+    VerifyProvenancePayload,
+    VerifyProvenanceResult,
+};
+pub use pool::{
+    WorkerPool, WorkerPoolConfig, WorkerPoolHandle, WorkerPoolStats, WorkerPoolStatsSnapshot,
+};
+pub use queue::{EnqueueOptions, JobFilter, JobQueue, PgJobQueue, QueueStats};
+pub use service::{WorkerService, WorkerServiceBuilder, WorkerServiceConfig};

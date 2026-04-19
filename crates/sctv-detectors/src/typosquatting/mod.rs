@@ -4,11 +4,10 @@
 //! which may indicate a typosquatting attack.
 
 use async_trait::async_trait;
-use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use sctv_core::{
-    Alert, AlertType, Dependency, PackageEcosystem, TyposquattingDetails, TyposquattingMethod,
-    normalize_package_name,
+    normalize_package_name, Alert, AlertType, Dependency, PackageEcosystem, TyposquattingDetails,
+    TyposquattingMethod,
 };
 use serde::Serialize;
 use std::collections::HashMap;
@@ -56,6 +55,9 @@ impl Default for PopularPackagesStore {
 
 impl PopularPackagesStore {
     /// Creates a new store with default popular packages.
+    // The length comes entirely from static package-name list literals; extracting
+    // them would add indirection without improving readability.
+    #[allow(clippy::too_many_lines)]
     #[must_use]
     pub fn new() -> Self {
         let mut packages = HashMap::new();
@@ -64,11 +66,38 @@ impl PopularPackagesStore {
         packages.insert(
             PackageEcosystem::Npm,
             vec![
-                "lodash", "chalk", "react", "express", "axios", "moment", "uuid",
-                "commander", "debug", "fs-extra", "async", "request", "underscore",
-                "bluebird", "webpack", "typescript", "jest", "mocha", "eslint",
-                "prettier", "next", "vue", "angular", "rxjs", "ramda", "inquirer",
-                "yargs", "glob", "minimist", "semver", "dotenv", "cross-env",
+                "lodash",
+                "chalk",
+                "react",
+                "express",
+                "axios",
+                "moment",
+                "uuid",
+                "commander",
+                "debug",
+                "fs-extra",
+                "async",
+                "request",
+                "underscore",
+                "bluebird",
+                "webpack",
+                "typescript",
+                "jest",
+                "mocha",
+                "eslint",
+                "prettier",
+                "next",
+                "vue",
+                "angular",
+                "rxjs",
+                "ramda",
+                "inquirer",
+                "yargs",
+                "glob",
+                "minimist",
+                "semver",
+                "dotenv",
+                "cross-env",
             ]
             .into_iter()
             .map(String::from)
@@ -79,10 +108,31 @@ impl PopularPackagesStore {
         packages.insert(
             PackageEcosystem::PyPi,
             vec![
-                "requests", "numpy", "pandas", "boto3", "django", "flask", "pytest",
-                "pyyaml", "cryptography", "pillow", "setuptools", "pip", "wheel",
-                "urllib3", "certifi", "idna", "chardet", "six", "python-dateutil",
-                "pytz", "packaging", "attrs", "click", "jinja2", "markupsafe",
+                "requests",
+                "numpy",
+                "pandas",
+                "boto3",
+                "django",
+                "flask",
+                "pytest",
+                "pyyaml",
+                "cryptography",
+                "pillow",
+                "setuptools",
+                "pip",
+                "wheel",
+                "urllib3",
+                "certifi",
+                "idna",
+                "chardet",
+                "six",
+                "python-dateutil",
+                "pytz",
+                "packaging",
+                "attrs",
+                "click",
+                "jinja2",
+                "markupsafe",
             ]
             .into_iter()
             .map(String::from)
@@ -93,9 +143,26 @@ impl PopularPackagesStore {
         packages.insert(
             PackageEcosystem::Cargo,
             vec![
-                "serde", "tokio", "rand", "clap", "log", "regex", "chrono", "reqwest",
-                "futures", "hyper", "lazy_static", "serde_json", "thiserror", "anyhow",
-                "tracing", "bytes", "syn", "quote", "proc-macro2", "itertools",
+                "serde",
+                "tokio",
+                "rand",
+                "clap",
+                "log",
+                "regex",
+                "chrono",
+                "reqwest",
+                "futures",
+                "hyper",
+                "lazy_static",
+                "serde_json",
+                "thiserror",
+                "anyhow",
+                "tracing",
+                "bytes",
+                "syn",
+                "quote",
+                "proc-macro2",
+                "itertools",
             ]
             .into_iter()
             .map(String::from)
@@ -123,7 +190,8 @@ impl PopularPackagesStore {
 }
 
 /// Global popular packages store.
-static POPULAR_PACKAGES: Lazy<PopularPackagesStore> = Lazy::new(PopularPackagesStore::new);
+static POPULAR_PACKAGES: std::sync::LazyLock<PopularPackagesStore> =
+    std::sync::LazyLock::new(PopularPackagesStore::new);
 
 /// A potential typosquatting candidate.
 #[derive(Debug, Clone, Serialize, serde::Deserialize)]
@@ -144,7 +212,7 @@ pub enum Confidence {
 }
 
 impl Confidence {
-    fn to_score(self) -> f64 {
+    const fn to_score(self) -> f64 {
         match self {
             Self::Low => 0.5,
             Self::Medium => 0.75,
@@ -174,6 +242,10 @@ impl TyposquattingDetector {
     }
 
     /// Checks a package name for potential typosquatting.
+    // The usize→f64 casts in this function are for a similarity ratio on package name
+    // lengths (< 1000 chars). All values fit exactly in f64 (< 2^53), so no precision
+    // is lost.
+    #[allow(clippy::cast_precision_loss)]
     pub fn check(&self, ecosystem: PackageEcosystem, name: &str) -> Vec<TyposquatCandidate> {
         if name.len() < self.config.min_name_length {
             return Vec::new();
@@ -196,7 +268,8 @@ impl TyposquattingDetector {
             if distance > 0 && distance <= self.config.levenshtein_threshold {
                 let max_len = normalized.len().max(popular_normalized.len());
                 let similarity = 1.0 - (distance as f64 / max_len as f64);
-                let confidence = self.calculate_confidence(distance, &normalized, &popular_normalized);
+                let confidence =
+                    Self::calculate_confidence(distance, &normalized, &popular_normalized);
 
                 candidates.push(TyposquatCandidate {
                     suspicious_name: name.to_string(),
@@ -224,7 +297,7 @@ impl TyposquattingDetector {
             }
 
             // Check for combosquatting (word order swapping)
-            if self.is_combosquat(&normalized, &popular_normalized) {
+            if Self::is_combosquat(&normalized, &popular_normalized) {
                 candidates.push(TyposquatCandidate {
                     suspicious_name: name.to_string(),
                     popular_name: popular_name.clone(),
@@ -245,16 +318,11 @@ impl TyposquattingDetector {
     }
 
     /// Calculates confidence based on edit distance and name characteristics.
-    fn calculate_confidence(
-        &self,
-        distance: usize,
-        suspicious: &str,
-        popular: &str,
-    ) -> Confidence {
+    fn calculate_confidence(distance: usize, suspicious: &str, popular: &str) -> Confidence {
         // Single character difference is very suspicious
         if distance == 1 {
             // Check if it's a common typo pattern
-            if self.is_common_typo(suspicious, popular) {
+            if Self::is_common_typo(suspicious, popular) {
                 return Confidence::High;
             }
             return Confidence::High;
@@ -263,7 +331,7 @@ impl TyposquattingDetector {
         // Two character differences
         if distance == 2 {
             // Transposition is common
-            if self.has_transposition(suspicious, popular) {
+            if Self::has_transposition(suspicious, popular) {
                 return Confidence::High;
             }
             return Confidence::Medium;
@@ -273,7 +341,7 @@ impl TyposquattingDetector {
     }
 
     /// Checks if the difference looks like a common typo.
-    fn is_common_typo(&self, suspicious: &str, popular: &str) -> bool {
+    fn is_common_typo(suspicious: &str, popular: &str) -> bool {
         // Common typo patterns:
         // - Adjacent key typos (e.g., 'a' -> 's')
         // - Missing/extra character
@@ -307,7 +375,7 @@ impl TyposquattingDetector {
     }
 
     /// Checks if there's a character transposition.
-    fn has_transposition(&self, suspicious: &str, popular: &str) -> bool {
+    fn has_transposition(suspicious: &str, popular: &str) -> bool {
         if suspicious.len() != popular.len() {
             return false;
         }
@@ -332,9 +400,9 @@ impl TyposquattingDetector {
     }
 
     /// Checks if names are combosquatting variants.
-    fn is_combosquat(&self, suspicious: &str, popular: &str) -> bool {
-        let s_parts: Vec<&str> = suspicious.split(|c| c == '-' || c == '_').collect();
-        let p_parts: Vec<&str> = popular.split(|c| c == '-' || c == '_').collect();
+    fn is_combosquat(suspicious: &str, popular: &str) -> bool {
+        let s_parts: Vec<&str> = suspicious.split(['-', '_']).collect();
+        let p_parts: Vec<&str> = popular.split(['-', '_']).collect();
 
         if s_parts.len() != p_parts.len() || s_parts.len() < 2 {
             return false;
@@ -343,8 +411,8 @@ impl TyposquattingDetector {
         // Check if parts are the same but in different order
         let mut s_sorted = s_parts.clone();
         let mut p_sorted = p_parts.clone();
-        s_sorted.sort();
-        p_sorted.sort();
+        s_sorted.sort_unstable();
+        p_sorted.sort_unstable();
 
         s_sorted == p_sorted && s_parts != p_parts
     }

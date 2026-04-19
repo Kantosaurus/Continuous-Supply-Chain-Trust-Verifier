@@ -1,4 +1,4 @@
-//! NuGet registry client implementation.
+//! `NuGet` registry client implementation.
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -13,13 +13,13 @@ use std::time::Duration;
 use tokio::sync::OnceCell;
 use url::Url;
 
-use super::models::*;
+use super::models::{RegistrationIndex, RegistrationLeaf, RegistrationPage, ServiceIndex};
 use crate::{
     retry_http, PackageMetadata, RegistryCache, RegistryClient, RegistryError, RegistryResult,
     RetryConfig, VersionMetadata,
 };
 
-/// NuGet registry client with caching and service discovery.
+/// `NuGet` registry client with caching and service discovery.
 pub struct NuGetClient {
     http: Client,
     base_url: Url,
@@ -28,16 +28,20 @@ pub struct NuGetClient {
 }
 
 impl NuGetClient {
-    /// Default NuGet API URL.
+    /// Default `NuGet` API URL.
     pub const DEFAULT_REGISTRY: &'static str = "https://api.nuget.org/v3/index.json";
 
-    /// Creates a new NuGet client with default settings.
+    /// Creates a new `NuGet` client with default settings.
     #[must_use]
     pub fn new() -> Self {
         Self::with_config(Self::DEFAULT_REGISTRY, Arc::new(RegistryCache::new()))
     }
 
     /// Creates a client with custom URL and cache.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the HTTP client cannot be built or if `service_url` is not a valid URL.
     #[must_use]
     pub fn with_config(service_url: &str, cache: Arc<RegistryCache>) -> Self {
         let http = Client::builder()
@@ -88,7 +92,7 @@ impl NuGetClient {
 
         // NuGet uses lowercase package IDs in URLs
         let package_id = name.to_lowercase();
-        let url = format!("{}{}/index.json", base_url, package_id);
+        let url = format!("{base_url}{package_id}/index.json");
 
         tracing::debug!("Fetching registration for {} from {}", name, url);
 
@@ -135,7 +139,10 @@ impl NuGetClient {
     }
 
     /// Gets all versions from a registration index, fetching pages if needed.
-    async fn get_all_versions(&self, index: &RegistrationIndex) -> RegistryResult<Vec<RegistrationLeaf>> {
+    async fn get_all_versions(
+        &self,
+        index: &RegistrationIndex,
+    ) -> RegistryResult<Vec<RegistrationLeaf>> {
         let mut all_items = Vec::new();
 
         for page in &index.items {
@@ -162,15 +169,13 @@ impl NuGetClient {
         // Format: {base}/{id-lower}/{version}/{id-lower}.{version}.nupkg
         let package_id = name.to_lowercase();
         let version_lower = version.to_lowercase();
-        let url_str = format!(
-            "{}{}/{}/{}.{}.nupkg",
-            base_url, package_id, version_lower, package_id, version_lower
-        );
+        let url_str =
+            format!("{base_url}{package_id}/{version_lower}/{package_id}.{version_lower}.nupkg");
 
         Url::parse(&url_str).map_err(|e| RegistryError::Parse(e.to_string()))
     }
 
-    /// Parses a NuGet timestamp.
+    /// Parses a `NuGet` timestamp.
     fn parse_timestamp(s: &str) -> Option<chrono::DateTime<chrono::Utc>> {
         chrono::DateTime::parse_from_rfc3339(s)
             .ok()
@@ -240,7 +245,7 @@ impl RegistryClient for NuGetClient {
         let maintainers = latest_entry
             .authors
             .as_ref()
-            .map(|a| a.to_vec())
+            .map(super::models::AuthorsField::to_vec)
             .unwrap_or_default();
 
         // Parse timestamps
@@ -268,7 +273,10 @@ impl RegistryClient for NuGetClient {
             ecosystem: PackageEcosystem::NuGet,
             name: latest_entry.package_id.clone(),
             normalized_name: normalize_package_name(&latest_entry.package_id),
-            description: latest_entry.description.clone().or_else(|| latest_entry.summary.clone()),
+            description: latest_entry
+                .description
+                .clone()
+                .or_else(|| latest_entry.summary.clone()),
             homepage,
             repository,
             popularity_rank: None,
@@ -293,7 +301,10 @@ impl RegistryClient for NuGetClient {
 
     async fn get_version(&self, name: &str, version: &str) -> RegistryResult<VersionMetadata> {
         // Check cache first
-        if let Some(cached) = self.cache.get_version(PackageEcosystem::NuGet, name, version) {
+        if let Some(cached) = self
+            .cache
+            .get_version(PackageEcosystem::NuGet, name, version)
+        {
             tracing::debug!("Cache hit for {}@{}", name, version);
             return Ok(cached);
         }
@@ -305,9 +316,7 @@ impl RegistryClient for NuGetClient {
         let version_data = all_versions
             .iter()
             .find(|v| v.catalog_entry.version.to_lowercase() == version.to_lowercase())
-            .ok_or_else(|| {
-                RegistryError::VersionNotFound(name.to_string(), version.to_string())
-            })?;
+            .ok_or_else(|| RegistryError::VersionNotFound(name.to_string(), version.to_string()))?;
 
         let entry = &version_data.catalog_entry;
 
@@ -340,13 +349,15 @@ impl RegistryClient for NuGetClient {
             .unwrap_or_default();
 
         // Check deprecation
-        let (deprecated, deprecation_message) = if let Some(dep) = &entry.deprecation {
-            (true, dep.message.clone())
-        } else {
-            (false, None)
-        };
+        let (deprecated, deprecation_message) = entry
+            .deprecation
+            .as_ref()
+            .map_or((false, None), |dep| (true, dep.message.clone()));
 
-        let published_at = entry.published.as_ref().and_then(|s| Self::parse_timestamp(s));
+        let published_at = entry
+            .published
+            .as_ref()
+            .and_then(|s| Self::parse_timestamp(s));
 
         // NuGet doesn't provide checksums in the registration API
         let checksums = PackageChecksums::default();
@@ -382,7 +393,10 @@ impl RegistryClient for NuGetClient {
 
         tracing::debug!("Downloading {}@{} from {}", name, version, url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::VersionNotFound(

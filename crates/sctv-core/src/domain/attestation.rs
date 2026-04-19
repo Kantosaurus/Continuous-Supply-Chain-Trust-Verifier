@@ -64,10 +64,8 @@ pub enum AttestationType {
 
 impl AttestationType {
     /// Returns the predicate type URI for SLSA provenance.
-    pub const SLSA_PROVENANCE_V1: &'static str =
-        "https://slsa.dev/provenance/v1";
-    pub const SLSA_PROVENANCE_V02: &'static str =
-        "https://slsa.dev/provenance/v0.2";
+    pub const SLSA_PROVENANCE_V1: &'static str = "https://slsa.dev/provenance/v1";
+    pub const SLSA_PROVENANCE_V02: &'static str = "https://slsa.dev/provenance/v0.2";
 }
 
 /// Subject of an attestation (the artifact being attested).
@@ -115,7 +113,7 @@ pub struct AttestationSignature {
 impl AttestationSignature {
     /// Creates a new unverified signature.
     #[must_use]
-    pub fn new(sig: String) -> Self {
+    pub const fn new(sig: String) -> Self {
         Self {
             keyid: None,
             sig,
@@ -126,7 +124,7 @@ impl AttestationSignature {
     }
 
     /// Marks the signature as verified.
-    pub fn mark_verified(&mut self) {
+    pub const fn mark_verified(&mut self) {
         self.verified = true;
     }
 }

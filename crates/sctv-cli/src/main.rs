@@ -92,10 +92,10 @@ async fn main() -> anyhow::Result<()> {
 
     match cli.command {
         Commands::Scan { path, ecosystem } => {
-            commands::scan::run(path, ecosystem, cli.format).await?;
+            commands::scan::run(path, ecosystem.as_deref(), cli.format)?;
         }
         Commands::Check { name, ecosystem } => {
-            commands::check::run(&name, &ecosystem, cli.format).await?;
+            commands::check::run(&name, &ecosystem, cli.format)?;
         }
         Commands::Verify {
             name,
@@ -105,7 +105,7 @@ async fn main() -> anyhow::Result<()> {
             commands::verify::run(&name, &version, &ecosystem, cli.format).await?;
         }
         Commands::Policy { policy, path } => {
-            commands::policy::run(&policy, path, cli.format).await?;
+            commands::policy::run(&policy, path, cli.format)?;
         }
     }
 

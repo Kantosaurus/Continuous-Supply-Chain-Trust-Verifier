@@ -21,10 +21,12 @@ pub struct MonitorRegistryExecutor;
 impl MonitorRegistryExecutor {
     /// Creates a new monitor registry executor.
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self
     }
 
+    // Monitoring logic is a sequential pipeline; splitting it would obscure the flow.
+    #[allow(clippy::too_many_lines)]
     async fn execute_monitor(
         &self,
         payload: &MonitorRegistryPayload,
@@ -88,17 +90,17 @@ impl MonitorRegistryExecutor {
                         }
 
                         // Check for maintainer changes
-                        if payload.check_maintainer_changes {
-                            if metadata.package.maintainers != cached_pkg.maintainers {
-                                maintainer_changes_detected += 1;
-                                tracing::warn!(
-                                    package = package_name,
-                                    old_maintainers = ?cached_pkg.maintainers,
-                                    new_maintainers = ?metadata.package.maintainers,
-                                    "Maintainer change detected"
-                                );
-                                // In a real implementation, create an alert here
-                            }
+                        if payload.check_maintainer_changes
+                            && metadata.package.maintainers != cached_pkg.maintainers
+                        {
+                            maintainer_changes_detected += 1;
+                            tracing::warn!(
+                                package = package_name,
+                                old_maintainers = ?cached_pkg.maintainers,
+                                new_maintainers = ?metadata.package.maintainers,
+                                "Maintainer change detected"
+                            );
+                            // In a real implementation, create an alert here
                         }
 
                         // Update cached package
@@ -170,13 +172,10 @@ impl JobExecutor for MonitorRegistryExecutor {
     }
 
     async fn execute(&self, job: &Job, ctx: &ExecutionContext) -> WorkerResult<JobResult> {
-        let payload = match &job.payload {
-            JobPayload::MonitorRegistry(p) => p,
-            _ => {
-                return Err(WorkerError::Execution(
-                    "Invalid payload type for MonitorRegistry".into(),
-                ))
-            }
+        let JobPayload::MonitorRegistry(payload) = &job.payload else {
+            return Err(WorkerError::Execution(
+                "Invalid payload type for MonitorRegistry".into(),
+            ));
         };
 
         let result = self.execute_monitor(payload, ctx).await?;

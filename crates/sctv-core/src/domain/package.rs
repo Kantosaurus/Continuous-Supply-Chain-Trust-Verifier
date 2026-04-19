@@ -132,7 +132,7 @@ impl PackageVersion {
     /// Checks if this version is considered new (published within N days).
     #[must_use]
     pub fn is_new(&self, threshold_days: i64) -> bool {
-        self.age_days().map_or(false, |age| age < threshold_days)
+        self.age_days().is_some_and(|age| age < threshold_days)
     }
 }
 
@@ -149,7 +149,7 @@ pub struct PackageChecksums {
 impl PackageChecksums {
     /// Checks if any checksum is available.
     #[must_use]
-    pub fn has_any(&self) -> bool {
+    pub const fn has_any(&self) -> bool {
         self.sha1.is_some()
             || self.sha256.is_some()
             || self.sha512.is_some()
@@ -171,8 +171,7 @@ pub struct PackageDependency {
 #[must_use]
 pub fn normalize_package_name(name: &str) -> String {
     name.to_lowercase()
-        .replace('_', "-")
-        .replace('.', "-")
+        .replace(['_', '.'], "-")
         .trim_start_matches('@')
         .replace('/', "-")
 }

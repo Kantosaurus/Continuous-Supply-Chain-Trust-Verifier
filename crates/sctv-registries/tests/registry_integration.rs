@@ -39,7 +39,7 @@ mod npm_client {
 
         let result = client.get_package("lodash").await;
 
-        assert!(result.is_ok(), "Expected successful response: {:?}", result);
+        assert!(result.is_ok(), "Expected successful response: {result:?}");
         let metadata = result.unwrap();
 
         assert_eq!(metadata.package.name, "lodash");
@@ -61,7 +61,7 @@ mod npm_client {
 
         let result = client.get_package("@babel/core").await;
 
-        assert!(result.is_ok(), "Expected successful response: {:?}", result);
+        assert!(result.is_ok(), "Expected successful response: {result:?}");
         let metadata = result.unwrap();
 
         assert_eq!(metadata.package.name, "@babel/core");
@@ -126,7 +126,7 @@ mod npm_client {
 
         let result = client.get_version("express", "4.18.2").await;
 
-        assert!(result.is_ok(), "Expected successful response: {:?}", result);
+        assert!(result.is_ok(), "Expected successful response: {result:?}");
         let version_meta = result.unwrap();
 
         assert_eq!(version_meta.version.version.to_string(), "4.18.2");
@@ -179,7 +179,9 @@ mod npm_client {
         let cache = Arc::new(RegistryCache::new());
         let client = NpmClient::with_config(&server.uri(), cache);
 
-        let result = client.package_exists("fake-package-that-does-not-exist").await;
+        let result = client
+            .package_exists("fake-package-that-does-not-exist")
+            .await;
 
         assert!(result.is_ok());
         assert!(!result.unwrap());
@@ -222,7 +224,7 @@ mod npm_client {
 
         let result = client.download_package("test-pkg", "1.0.0").await;
 
-        assert!(result.is_ok(), "Expected successful download: {:?}", result);
+        assert!(result.is_ok(), "Expected successful download: {result:?}");
         let bytes = result.unwrap();
         assert_eq!(bytes.as_ref(), tarball_content);
     }
@@ -347,21 +349,21 @@ mod npm_client {
         // Should have both regular and dev dependencies
         assert_eq!(version.version.dependencies.len(), 4);
 
-        let regular_deps: Vec<_> = version
+        let regular_dep_count = version
             .version
             .dependencies
             .iter()
             .filter(|d| !d.is_dev)
-            .collect();
-        let dev_deps: Vec<_> = version
+            .count();
+        let dev_dep_count = version
             .version
             .dependencies
             .iter()
             .filter(|d| d.is_dev)
-            .collect();
+            .count();
 
-        assert_eq!(regular_deps.len(), 2);
-        assert_eq!(dev_deps.len(), 2);
+        assert_eq!(regular_dep_count, 2);
+        assert_eq!(dev_dep_count, 2);
     }
 
     /// Test malformed JSON response handling.
@@ -371,9 +373,7 @@ mod npm_client {
 
         Mock::given(method("GET"))
             .and(path("/malformed-pkg"))
-            .respond_with(
-                ResponseTemplate::new(200).set_body_string("this is not valid json {{{"),
-            )
+            .respond_with(ResponseTemplate::new(200).set_body_string("this is not valid json {{{"))
             .mount(&server)
             .await;
 
@@ -448,7 +448,7 @@ mod cache_tests {
             latest_version: Some("2.0.0".to_string()),
         };
 
-        cache.set_package(PackageEcosystem::Npm, "test-pkg", metadata.clone());
+        cache.set_package(PackageEcosystem::Npm, "test-pkg", metadata);
 
         let cached = cache.get_package(PackageEcosystem::Npm, "test-pkg");
         assert!(cached.is_some());
@@ -581,7 +581,7 @@ mod integrity_tests {
             &base64::engine::general_purpose::STANDARD,
             hasher.finalize(),
         );
-        let integrity = format!("sha512-{}", hash_base64);
+        let integrity = format!("sha512-{hash_base64}");
 
         let checksums = PackageChecksums {
             sha1: None,
@@ -682,7 +682,10 @@ mod concurrent_tests {
         // Due to caching, we might have fewer actual HTTP requests
         // (first request caches, subsequent ones use cache)
         let actual_requests = request_count.load(Ordering::SeqCst);
-        assert!(actual_requests >= 1, "At least one HTTP request should be made");
+        assert!(
+            actual_requests >= 1,
+            "At least one HTTP request should be made"
+        );
     }
 
     /// Test concurrent requests to different packages.
@@ -692,7 +695,7 @@ mod concurrent_tests {
 
         // Mount responses for multiple packages
         for i in 0..5 {
-            let name = format!("pkg-{}", i);
+            let name = format!("pkg-{i}");
             mount_npm_package(&server, &name, &["1.0.0"]).await;
         }
 
@@ -703,7 +706,7 @@ mod concurrent_tests {
         let mut handles = vec![];
         for i in 0..5 {
             let client_clone = client.clone();
-            let name = format!("pkg-{}", i);
+            let name = format!("pkg-{i}");
             handles.push(tokio::spawn(async move {
                 client_clone.get_package(&name).await
             }));

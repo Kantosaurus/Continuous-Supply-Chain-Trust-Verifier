@@ -12,7 +12,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use url::Url;
 
-use super::models::*;
+use super::models::{GoMod, VersionInfo};
 use crate::{
     retry_http, PackageMetadata, RegistryCache, RegistryClient, RegistryError, RegistryResult,
     RetryConfig, VersionMetadata,
@@ -36,6 +36,10 @@ impl GoModulesClient {
     }
 
     /// Creates a client with custom URL and cache.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the HTTP client cannot be built or if `proxy_url` is not a valid URL.
     #[must_use]
     pub fn with_config(proxy_url: &str, cache: Arc<RegistryCache>) -> Self {
         let http = Client::builder()
@@ -72,12 +76,15 @@ impl GoModulesClient {
         let encoded = Self::encode_module_path(module);
         let url = self
             .base_url
-            .join(&format!("/{}/@v/list", encoded))
+            .join(&format!("/{encoded}/@v/list"))
             .map_err(|e| RegistryError::Parse(e.to_string()))?;
 
         tracing::debug!("Fetching version list for {} from {}", module, url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND
             || response.status() == reqwest::StatusCode::GONE
@@ -113,12 +120,20 @@ impl GoModulesClient {
         let encoded = Self::encode_module_path(module);
         let url = self
             .base_url
-            .join(&format!("/{}/@v/{}.info", encoded, version))
+            .join(&format!("/{encoded}/@v/{version}.info"))
             .map_err(|e| RegistryError::Parse(e.to_string()))?;
 
-        tracing::debug!("Fetching version info for {}@{} from {}", module, version, url);
+        tracing::debug!(
+            "Fetching version info for {}@{} from {}",
+            module,
+            version,
+            url
+        );
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND
             || response.status() == reqwest::StatusCode::GONE
@@ -147,12 +162,15 @@ impl GoModulesClient {
         let encoded = Self::encode_module_path(module);
         let url = self
             .base_url
-            .join(&format!("/{}/@v/{}.mod", encoded, version))
+            .join(&format!("/{encoded}/@v/{version}.mod"))
             .map_err(|e| RegistryError::Parse(e.to_string()))?;
 
         tracing::debug!("Fetching go.mod for {}@{} from {}", module, version, url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND
             || response.status() == reqwest::StatusCode::GONE
@@ -178,7 +196,7 @@ impl GoModulesClient {
     fn build_download_url(&self, module: &str, version: &str) -> RegistryResult<Url> {
         let encoded = Self::encode_module_path(module);
         self.base_url
-            .join(&format!("/{}/@v/{}.zip", encoded, version))
+            .join(&format!("/{encoded}/@v/{version}.zip"))
             .map_err(|e| RegistryError::Parse(e.to_string()))
     }
 
@@ -192,7 +210,7 @@ impl GoModulesClient {
         let version_str = version_str.split('+').next().unwrap_or(version_str);
 
         Version::parse(version_str)
-            .map_err(|e| RegistryError::Parse(format!("Invalid version '{}': {}", version, e)))
+            .map_err(|e| RegistryError::Parse(format!("Invalid version '{version}': {e}")))
     }
 
     /// Parses a timestamp from Go proxy format (RFC3339).
@@ -206,13 +224,13 @@ impl GoModulesClient {
     fn infer_repository_url(module: &str) -> Option<Url> {
         // Common hosting patterns
         if module.starts_with("github.com/") {
-            return Url::parse(&format!("https://{}", module)).ok();
+            return Url::parse(&format!("https://{module}")).ok();
         }
         if module.starts_with("gitlab.com/") {
-            return Url::parse(&format!("https://{}", module)).ok();
+            return Url::parse(&format!("https://{module}")).ok();
         }
         if module.starts_with("bitbucket.org/") {
-            return Url::parse(&format!("https://{}", module)).ok();
+            return Url::parse(&format!("https://{module}")).ok();
         }
 
         // For other modules, try to construct a URL
@@ -330,7 +348,10 @@ impl RegistryClient for GoModulesClient {
 
     async fn get_version(&self, name: &str, version: &str) -> RegistryResult<VersionMetadata> {
         // Check cache first
-        if let Some(cached) = self.cache.get_version(PackageEcosystem::GoModules, name, version) {
+        if let Some(cached) = self
+            .cache
+            .get_version(PackageEcosystem::GoModules, name, version)
+        {
             tracing::debug!("Cache hit for {}@{}", name, version);
             return Ok(cached);
         }
@@ -362,31 +383,27 @@ impl RegistryClient for GoModulesClient {
             .unwrap_or_default();
 
         // Check if version is retracted
-        let (yanked, deprecation_message) = go_mod
-            .as_ref()
-            .map(|gm| {
-                let retracted = gm.retract.iter().any(|r| {
-                    if let Some(high) = &r.high {
-                        // Range retraction
-                        version >= r.low.as_str() && version <= high.as_str()
-                    } else {
-                        // Single version retraction
-                        version == r.low
-                    }
-                });
+        let (yanked, deprecation_message) = go_mod.as_ref().map_or((false, None), |gm| {
+            let retracted = gm.retract.iter().any(|r| {
+                r.high.as_ref().map_or_else(
+                    // Single version retraction
+                    || version == r.low,
+                    // Range retraction
+                    |high| version >= r.low.as_str() && version <= high.as_str(),
+                )
+            });
 
-                if retracted {
-                    let msg = gm
-                        .retract
-                        .iter()
-                        .find_map(|r| r.rationale.clone())
-                        .unwrap_or_else(|| "This version has been retracted".to_string());
-                    (true, Some(msg))
-                } else {
-                    (false, None)
-                }
-            })
-            .unwrap_or((false, None));
+            if retracted {
+                let msg = gm
+                    .retract
+                    .iter()
+                    .find_map(|r| r.rationale.clone())
+                    .unwrap_or_else(|| "This version has been retracted".to_string());
+                (true, Some(msg))
+            } else {
+                (false, None)
+            }
+        });
 
         let published_at = Self::parse_timestamp(&info.time);
 
@@ -424,7 +441,10 @@ impl RegistryClient for GoModulesClient {
 
         tracing::debug!("Downloading {}@{} from {}", name, version, url);
 
-        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http.get(url.clone()).send()
+        })
+        .await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND
             || response.status() == reqwest::StatusCode::GONE
@@ -551,8 +571,7 @@ mod tests {
         assert_eq!(url.as_str(), "https://github.com/gin-gonic/gin");
 
         // For versioned paths like /v2, we still get the full module path
-        let url =
-            GoModulesClient::infer_repository_url("github.com/gin-gonic/gin/v2").unwrap();
+        let url = GoModulesClient::infer_repository_url("github.com/gin-gonic/gin/v2").unwrap();
         assert_eq!(url.as_str(), "https://github.com/gin-gonic/gin/v2");
     }
 

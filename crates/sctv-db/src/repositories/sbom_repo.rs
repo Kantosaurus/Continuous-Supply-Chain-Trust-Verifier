@@ -6,7 +6,7 @@ use sctv_core::traits::{RepositoryError, RepositoryResult, SbomRepository};
 use sctv_core::{ProjectId, Sbom, SbomFormat, SbomId, TenantId};
 use sqlx::{PgPool, Row};
 
-/// PostgreSQL implementation of the SBOM repository.
+/// `PostgreSQL` implementation of the SBOM repository.
 pub struct PgSbomRepository {
     pool: PgPool,
 }
@@ -28,9 +28,9 @@ impl PgSbomRepository {
         let generated_at: DateTime<Utc> = row.get("generated_at");
         let scan_id: Option<uuid::Uuid> = row.get("scan_id");
 
-        let format = format_str
-            .parse::<SbomFormat>()
-            .map_err(|_| RepositoryError::InvalidData(format!("Unknown SBOM format: {format_str}")))?;
+        let format = format_str.parse::<SbomFormat>().map_err(|_| {
+            RepositoryError::InvalidData(format!("Unknown SBOM format: {format_str}"))
+        })?;
 
         Ok(Sbom {
             id: SbomId(id),
@@ -44,7 +44,7 @@ impl PgSbomRepository {
         })
     }
 
-    fn format_to_str(format: SbomFormat) -> &'static str {
+    const fn format_to_str(format: SbomFormat) -> &'static str {
         match format {
             SbomFormat::CycloneDx => "cyclonedx",
             SbomFormat::Spdx => "spdx",
@@ -56,11 +56,11 @@ impl PgSbomRepository {
 impl SbomRepository for PgSbomRepository {
     async fn find_by_id(&self, id: SbomId) -> RepositoryResult<Option<Sbom>> {
         let record = sqlx::query(
-            r#"
+            r"
             SELECT id, project_id, tenant_id, format, format_version,
                    content, generated_at, scan_id
             FROM sboms WHERE id = $1
-            "#,
+            ",
         )
         .bind(id.0)
         .fetch_optional(&self.pool)
@@ -75,13 +75,13 @@ impl SbomRepository for PgSbomRepository {
 
     async fn find_by_project(&self, project_id: ProjectId) -> RepositoryResult<Vec<Sbom>> {
         let records = sqlx::query(
-            r#"
+            r"
             SELECT id, project_id, tenant_id, format, format_version,
                    content, generated_at, scan_id
             FROM sboms
             WHERE project_id = $1
             ORDER BY generated_at DESC
-            "#,
+            ",
         )
         .bind(project_id.0)
         .fetch_all(&self.pool)
@@ -93,14 +93,14 @@ impl SbomRepository for PgSbomRepository {
 
     async fn find_latest(&self, project_id: ProjectId) -> RepositoryResult<Option<Sbom>> {
         let record = sqlx::query(
-            r#"
+            r"
             SELECT id, project_id, tenant_id, format, format_version,
                    content, generated_at, scan_id
             FROM sboms
             WHERE project_id = $1
             ORDER BY generated_at DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(project_id.0)
         .fetch_optional(&self.pool)
@@ -119,14 +119,14 @@ impl SbomRepository for PgSbomRepository {
         format: SbomFormat,
     ) -> RepositoryResult<Option<Sbom>> {
         let record = sqlx::query(
-            r#"
+            r"
             SELECT id, project_id, tenant_id, format, format_version,
                    content, generated_at, scan_id
             FROM sboms
             WHERE project_id = $1 AND format = $2
             ORDER BY generated_at DESC
             LIMIT 1
-            "#,
+            ",
         )
         .bind(project_id.0)
         .bind(Self::format_to_str(format))
@@ -142,12 +142,12 @@ impl SbomRepository for PgSbomRepository {
 
     async fn create(&self, sbom: &Sbom) -> RepositoryResult<()> {
         sqlx::query(
-            r#"
+            r"
             INSERT INTO sboms (
                 id, project_id, tenant_id, format, format_version,
                 content, generated_at, scan_id
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-            "#,
+            ",
         )
         .bind(sbom.id.0)
         .bind(sbom.project_id.0)
@@ -185,7 +185,7 @@ impl SbomRepository for PgSbomRepository {
     ) -> RepositoryResult<u32> {
         // Delete SBOMs older than the most recent `keep_count` for this project
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM sboms
             WHERE project_id = $1
               AND id NOT IN (
@@ -194,14 +194,15 @@ impl SbomRepository for PgSbomRepository {
                   ORDER BY generated_at DESC
                   LIMIT $2
               )
-            "#,
+            ",
         )
         .bind(project_id.0)
-        .bind(keep_count as i64)
+        .bind(i64::from(keep_count))
         .execute(&self.pool)
         .await
         .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
-        Ok(result.rows_affected() as u32)
+        // rows_affected() fits in u32 for any realistic number of deleted rows.
+        Ok(u32::try_from(result.rows_affected()).unwrap_or(u32::MAX))
     }
 }

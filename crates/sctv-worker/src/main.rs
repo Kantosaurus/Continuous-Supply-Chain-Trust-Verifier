@@ -32,7 +32,12 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("Connecting to database...");
     let db_pool = sqlx::postgres::PgPoolOptions::new()
-        .max_connections(worker_count as u32 + 5)
+        // worker_count is small enough in practice; saturate to u32::MAX if somehow huge.
+        .max_connections(
+            u32::try_from(worker_count)
+                .unwrap_or(u32::MAX)
+                .saturating_add(5),
+        )
         .connect(&database_url)
         .await?;
 
@@ -44,10 +49,7 @@ async fn main() -> anyhow::Result<()> {
         .with_config(config)
         .build()?;
 
-    tracing::info!(
-        "Worker service initialized with {} workers",
-        worker_count
-    );
+    tracing::info!("Worker service initialized with {} workers", worker_count);
 
     // Register signal handlers for graceful shutdown
     let shutdown_signal = shutdown_signal();

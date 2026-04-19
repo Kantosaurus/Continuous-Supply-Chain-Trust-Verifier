@@ -23,7 +23,10 @@ async fn test_create_and_find_job_by_id() {
     let job_repo = PgJobRepository::new(db.pool.clone());
 
     let tenant = create_test_tenant();
-    tenant_repo.create(&tenant).await.expect("Failed to create tenant");
+    tenant_repo
+        .create(&tenant)
+        .await
+        .expect("Failed to create tenant");
 
     let job = create_test_job(Some(tenant.id));
     job_repo.create(&job).await.expect("Failed to create job");
@@ -44,7 +47,12 @@ async fn test_create_global_job() {
     let job_repo = PgJobRepository::new(db.pool.clone());
 
     // Create a job without tenant (global job)
-    let job = Job::new(None, JobType::Cleanup { older_than_days: 30 });
+    let job = Job::new(
+        None,
+        JobType::Cleanup {
+            older_than_days: 30,
+        },
+    );
     job_repo.create(&job).await.expect("Failed to create job");
 
     let found = job_repo
@@ -64,7 +72,10 @@ async fn test_update_job() {
     let job_repo = PgJobRepository::new(db.pool.clone());
 
     let tenant = create_test_tenant();
-    tenant_repo.create(&tenant).await.expect("Failed to create tenant");
+    tenant_repo
+        .create(&tenant)
+        .await
+        .expect("Failed to create tenant");
 
     let mut job = create_test_job(Some(tenant.id));
     job_repo.create(&job).await.expect("Failed to create job");
@@ -91,7 +102,10 @@ async fn test_job_completion() {
     let job_repo = PgJobRepository::new(db.pool.clone());
 
     let tenant = create_test_tenant();
-    tenant_repo.create(&tenant).await.expect("Failed to create tenant");
+    tenant_repo
+        .create(&tenant)
+        .await
+        .expect("Failed to create tenant");
 
     let mut job = create_test_job(Some(tenant.id));
     job_repo.create(&job).await.expect("Failed to create job");
@@ -119,7 +133,10 @@ async fn test_job_failure() {
     let job_repo = PgJobRepository::new(db.pool.clone());
 
     let tenant = create_test_tenant();
-    tenant_repo.create(&tenant).await.expect("Failed to create tenant");
+    tenant_repo
+        .create(&tenant)
+        .await
+        .expect("Failed to create tenant");
 
     let mut job = create_test_job(Some(tenant.id));
     job_repo.create(&job).await.expect("Failed to create job");
@@ -136,7 +153,10 @@ async fn test_job_failure() {
         .expect("Job not found");
 
     assert_eq!(found.status, JobStatus::Failed);
-    assert_eq!(found.error_message, Some("Something went wrong".to_string()));
+    assert_eq!(
+        found.error_message,
+        Some("Something went wrong".to_string())
+    );
 }
 
 #[tokio::test]
@@ -146,14 +166,23 @@ async fn test_claim_next_job() {
     let job_repo = PgJobRepository::new(db.pool.clone());
 
     let tenant = create_test_tenant();
-    tenant_repo.create(&tenant).await.expect("Failed to create tenant");
+    tenant_repo
+        .create(&tenant)
+        .await
+        .expect("Failed to create tenant");
 
     // Create multiple jobs with different priorities
     let low_job = create_test_job(Some(tenant.id)).with_priority(JobPriority::Low);
     let high_job = create_test_job(Some(tenant.id)).with_priority(JobPriority::High);
 
-    job_repo.create(&low_job).await.expect("Failed to create low job");
-    job_repo.create(&high_job).await.expect("Failed to create high job");
+    job_repo
+        .create(&low_job)
+        .await
+        .expect("Failed to create low job");
+    job_repo
+        .create(&high_job)
+        .await
+        .expect("Failed to create high job");
 
     // Claim next should get high priority job first
     let claimed = job_repo
@@ -173,11 +202,20 @@ async fn test_find_due_jobs() {
     let job_repo = PgJobRepository::new(db.pool.clone());
 
     let tenant = create_test_tenant();
-    tenant_repo.create(&tenant).await.expect("Failed to create tenant");
+    tenant_repo
+        .create(&tenant)
+        .await
+        .expect("Failed to create tenant");
 
     // Create some pending jobs
-    job_repo.create(&create_test_job(Some(tenant.id))).await.unwrap();
-    job_repo.create(&create_test_job(Some(tenant.id))).await.unwrap();
+    job_repo
+        .create(&create_test_job(Some(tenant.id)))
+        .await
+        .unwrap();
+    job_repo
+        .create(&create_test_job(Some(tenant.id)))
+        .await
+        .unwrap();
 
     let due_jobs = job_repo
         .find_due_jobs(10)
@@ -194,7 +232,10 @@ async fn test_find_by_tenant_with_filter() {
     let job_repo = PgJobRepository::new(db.pool.clone());
 
     let tenant = create_test_tenant();
-    tenant_repo.create(&tenant).await.expect("Failed to create tenant");
+    tenant_repo
+        .create(&tenant)
+        .await
+        .expect("Failed to create tenant");
 
     // Create jobs with different statuses
     let pending_job = create_test_job(Some(tenant.id));
@@ -227,16 +268,22 @@ async fn test_count_by_status() {
     let job_repo = PgJobRepository::new(db.pool.clone());
 
     let tenant = create_test_tenant();
-    tenant_repo.create(&tenant).await.expect("Failed to create tenant");
+    tenant_repo
+        .create(&tenant)
+        .await
+        .expect("Failed to create tenant");
 
     // Create jobs
-    job_repo.create(&create_test_job(Some(tenant.id))).await.unwrap();
-    job_repo.create(&create_test_job(Some(tenant.id))).await.unwrap();
-
-    let counts = job_repo
-        .count_by_status()
+    job_repo
+        .create(&create_test_job(Some(tenant.id)))
         .await
-        .expect("Failed to count");
+        .unwrap();
+    job_repo
+        .create(&create_test_job(Some(tenant.id)))
+        .await
+        .unwrap();
+
+    let counts = job_repo.count_by_status().await.expect("Failed to count");
 
     assert_eq!(*counts.get(&JobStatus::Pending).unwrap_or(&0), 2);
 }

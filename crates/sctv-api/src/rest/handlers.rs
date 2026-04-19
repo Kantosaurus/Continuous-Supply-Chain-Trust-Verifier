@@ -8,14 +8,22 @@ use axum::{
 use chrono::Utc;
 use sctv_core::traits::AlertFilter;
 use sctv_core::{
-    Alert, AlertId, Dependency, DependencyId, Policy, PolicyId, PolicyRule,
-    Project, ProjectId, Severity,
+    Alert, AlertId, Dependency, DependencyId, Policy, PolicyId, PolicyRule, Project, ProjectId,
+    Severity,
 };
 use std::sync::Arc;
 use url::Url;
 use uuid::Uuid;
 
-use super::models::*;
+use super::models::{
+    AcknowledgeAlertRequest, AlertFilters, AlertResponse, CreatePolicyRequest,
+    CreateProjectRequest, DependencyResponse, GitHubWebhookPayload, GitLabWebhookPayload,
+    PaginatedResponse, PaginationInfo, PaginationParams, PolicyResponse, PolicyRuleRequest,
+    PolicyRuleResponse, ProjectFilters, ProjectResponse, ResolveAlertRequest, ScanResponse,
+    SuppressAlertRequest, TriggerScanRequest, TriggerScanResponse, UpdatePolicyRequest,
+    UpdateProjectRequest, VerificationCheck, VerificationResponse, VerifyDependencyRequest,
+    WebhookResponse,
+};
 use crate::{
     auth::AuthUser,
     error::{ApiError, ApiResult},
@@ -29,7 +37,10 @@ fn project_to_response(project: &Project, dep_count: u32, alert_count: u32) -> P
         id: project.id.0,
         name: project.name.clone(),
         description: project.description.clone(),
-        repository_url: project.repository_url.as_ref().map(|u| u.to_string()),
+        repository_url: project
+            .repository_url
+            .as_ref()
+            .map(std::string::ToString::to_string),
         default_branch: project.default_branch.clone(),
         status: project.status,
         is_active: true, // Projects in DB are considered active
@@ -65,8 +76,13 @@ fn alert_to_response(alert: &Alert, project_name: Option<String>) -> AlertRespon
 fn extract_dependency_info(alert_type: &sctv_core::AlertType) -> (Option<String>, Option<String>) {
     use sctv_core::AlertType;
     match alert_type {
-        AlertType::DependencyTampering(d) => (Some(d.package_name.clone()), Some(d.version.clone())),
-        AlertType::DowngradeAttack(d) => (Some(d.package_name.clone()), Some(d.current_version.to_string())),
+        AlertType::DependencyTampering(d) => {
+            (Some(d.package_name.clone()), Some(d.version.clone()))
+        }
+        AlertType::DowngradeAttack(d) => (
+            Some(d.package_name.clone()),
+            Some(d.current_version.to_string()),
+        ),
         AlertType::Typosquatting(d) => (Some(d.suspicious_package.clone()), None),
         AlertType::ProvenanceFailure(d) => (Some(d.package_name.clone()), Some(d.version.clone())),
         AlertType::PolicyViolation(_) => (None, None),
@@ -117,7 +133,7 @@ fn policy_to_response(policy: &Policy) -> PolicyResponse {
                 // Serialize the rule to JSON to extract type and config
                 let json = serde_json::to_value(r).ok()?;
                 let rule_type = json.get("type")?.as_str()?.to_string();
-                let mut config = json.clone();
+                let mut config = json;
                 if let Some(obj) = config.as_object_mut() {
                     obj.remove("type");
                 }
@@ -131,25 +147,35 @@ fn policy_to_response(policy: &Policy) -> PolicyResponse {
     }
 }
 
-/// Helper to convert REST PolicyRuleRequest to domain PolicyRule
+/// Helper to convert REST `PolicyRuleRequest` to domain `PolicyRule`
 fn rule_request_to_policy_rule(request: &PolicyRuleRequest) -> Result<PolicyRule, ApiError> {
     // Merge type and config into a single JSON object for deserialization
     let mut json = request.config.clone();
     if let Some(obj) = json.as_object_mut() {
-        obj.insert("type".to_string(), serde_json::Value::String(request.rule_type.clone()));
+        obj.insert(
+            "type".to_string(),
+            serde_json::Value::String(request.rule_type.clone()),
+        );
     } else {
         let mut obj = serde_json::Map::new();
-        obj.insert("type".to_string(), serde_json::Value::String(request.rule_type.clone()));
+        obj.insert(
+            "type".to_string(),
+            serde_json::Value::String(request.rule_type.clone()),
+        );
         json = serde_json::Value::Object(obj);
     }
 
     serde_json::from_value(json)
-        .map_err(|e| ApiError::Validation(format!("Invalid policy rule: {}", e)))
+        .map_err(|e| ApiError::Validation(format!("Invalid policy rule: {e}")))
 }
 
 // ==================== Projects ====================
 
 /// List all projects for the authenticated user's tenant.
+///
+/// # Errors
+///
+/// Returns an error if the database query fails or the user is not authenticated.
 pub async fn list_projects(
     user: AuthUser,
     Query(pagination): Query<PaginationParams>,
@@ -165,23 +191,24 @@ pub async fn list_projects(
 
     // Calculate pagination
     let total_items = projects.len() as u64;
-    let total_pages = ((total_items as f64) / (pagination.per_page as f64)).ceil() as u32;
-    let offset = pagination.offset() as usize;
-    let limit = pagination.per_page as usize;
+    let per_page_u64 = u64::from(pagination.per_page.max(1));
+    let total_pages = u32::try_from(total_items.div_ceil(per_page_u64).max(1)).unwrap_or(u32::MAX);
+    let offset = usize::try_from(pagination.offset()).unwrap_or(0);
+    let limit = usize::try_from(pagination.per_page).unwrap_or(usize::MAX);
 
     // Paginate results
-    let paginated: Vec<_> = projects
-        .into_iter()
-        .skip(offset)
-        .take(limit)
-        .collect();
+    let paginated: Vec<_> = projects.into_iter().skip(offset).take(limit).collect();
 
     // Build responses with dependency and alert counts
     let mut responses = Vec::with_capacity(paginated.len());
     for project in paginated {
         let deps = dep_repo.find_by_project(project.id).await?;
         let alert_count = alert_repo.count_open_by_project(project.id).await?;
-        responses.push(project_to_response(&project, deps.len() as u32, alert_count));
+        responses.push(project_to_response(
+            &project,
+            u32::try_from(deps.len()).unwrap_or(u32::MAX),
+            alert_count,
+        ));
     }
 
     Ok(Json(PaginatedResponse {
@@ -196,6 +223,10 @@ pub async fn list_projects(
 }
 
 /// Create a new project.
+///
+/// # Errors
+///
+/// Returns an error if the database query fails or the request is invalid.
 pub async fn create_project(
     user: AuthUser,
     State(state): State<Arc<AppState>>,
@@ -220,6 +251,10 @@ pub async fn create_project(
 }
 
 /// Get a specific project.
+///
+/// # Errors
+///
+/// Returns an error if the project is not found or the user lacks access.
 pub async fn get_project(
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -232,7 +267,7 @@ pub async fn get_project(
     let project = project_repo
         .find_by_id(ProjectId(id))
         .await?
-        .ok_or_else(|| ApiError::NotFound(format!("Project {} not found", id)))?;
+        .ok_or_else(|| ApiError::NotFound(format!("Project {id} not found")))?;
 
     // Verify tenant access
     if project.tenant_id != user.tenant_id {
@@ -242,10 +277,18 @@ pub async fn get_project(
     let deps = dep_repo.find_by_project(project.id).await?;
     let alert_count = alert_repo.count_open_by_project(project.id).await?;
 
-    Ok(Json(project_to_response(&project, deps.len() as u32, alert_count)))
+    Ok(Json(project_to_response(
+        &project,
+        u32::try_from(deps.len()).unwrap_or(u32::MAX),
+        alert_count,
+    )))
 }
 
 /// Update a project.
+///
+/// # Errors
+///
+/// Returns an error if the project is not found, the user lacks access, or the update fails.
 pub async fn update_project(
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -259,7 +302,7 @@ pub async fn update_project(
     let mut project = project_repo
         .find_by_id(ProjectId(id))
         .await?
-        .ok_or_else(|| ApiError::NotFound(format!("Project {} not found", id)))?;
+        .ok_or_else(|| ApiError::NotFound(format!("Project {id} not found")))?;
 
     // Verify tenant access
     if project.tenant_id != user.tenant_id {
@@ -287,10 +330,18 @@ pub async fn update_project(
     let deps = dep_repo.find_by_project(project.id).await?;
     let alert_count = alert_repo.count_open_by_project(project.id).await?;
 
-    Ok(Json(project_to_response(&project, deps.len() as u32, alert_count)))
+    Ok(Json(project_to_response(
+        &project,
+        u32::try_from(deps.len()).unwrap_or(u32::MAX),
+        alert_count,
+    )))
 }
 
 /// Delete a project.
+///
+/// # Errors
+///
+/// Returns an error if the project is not found, the user lacks access, or the deletion fails.
 pub async fn delete_project(
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -302,7 +353,7 @@ pub async fn delete_project(
     let project = project_repo
         .find_by_id(ProjectId(id))
         .await?
-        .ok_or_else(|| ApiError::NotFound(format!("Project {} not found", id)))?;
+        .ok_or_else(|| ApiError::NotFound(format!("Project {id} not found")))?;
 
     if project.tenant_id != user.tenant_id {
         return Err(ApiError::Forbidden);
@@ -314,6 +365,10 @@ pub async fn delete_project(
 }
 
 /// Trigger a scan for a project.
+///
+/// # Errors
+///
+/// Returns an error if the project is not found, the user lacks access, or enqueueing fails.
 pub async fn trigger_scan(
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -328,7 +383,7 @@ pub async fn trigger_scan(
     let project = project_repo
         .find_by_id(ProjectId(id))
         .await?
-        .ok_or_else(|| ApiError::NotFound(format!("Project {} not found", id)))?;
+        .ok_or_else(|| ApiError::NotFound(format!("Project {id} not found")))?;
 
     if project.tenant_id != user.tenant_id {
         return Err(ApiError::Forbidden);
@@ -353,6 +408,10 @@ pub async fn trigger_scan(
 }
 
 /// List dependencies for a project.
+///
+/// # Errors
+///
+/// Returns an error if the project is not found, the user lacks access, or the query fails.
 pub async fn list_project_dependencies(
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -366,7 +425,7 @@ pub async fn list_project_dependencies(
     let project = project_repo
         .find_by_id(ProjectId(id))
         .await?
-        .ok_or_else(|| ApiError::NotFound(format!("Project {} not found", id)))?;
+        .ok_or_else(|| ApiError::NotFound(format!("Project {id} not found")))?;
 
     if project.tenant_id != user.tenant_id {
         return Err(ApiError::Forbidden);
@@ -376,9 +435,10 @@ pub async fn list_project_dependencies(
 
     // Calculate pagination
     let total_items = dependencies.len() as u64;
-    let total_pages = ((total_items as f64) / (pagination.per_page as f64)).ceil() as u32;
-    let offset = pagination.offset() as usize;
-    let limit = pagination.per_page as usize;
+    let per_page_u64 = u64::from(pagination.per_page.max(1));
+    let total_pages = u32::try_from(total_items.div_ceil(per_page_u64).max(1)).unwrap_or(u32::MAX);
+    let offset = usize::try_from(pagination.offset()).unwrap_or(0);
+    let limit = usize::try_from(pagination.per_page).unwrap_or(usize::MAX);
 
     // Paginate and convert
     let responses: Vec<_> = dependencies
@@ -402,6 +462,10 @@ pub async fn list_project_dependencies(
 // ==================== Alerts ====================
 
 /// List all alerts.
+///
+/// # Errors
+///
+/// Returns an error if the database query fails or the user is not authenticated.
 pub async fn list_alerts(
     user: AuthUser,
     Query(pagination): Query<PaginationParams>,
@@ -441,8 +505,8 @@ pub async fn list_alerts(
         responses.push(alert_to_response(alert, project_name));
     }
 
-    let per_page = pagination.per_page.max(1) as u64;
-    let total_pages = ((total_items + per_page - 1) / per_page) as u32;
+    let per_page_u64 = u64::from(pagination.per_page.max(1));
+    let total_pages = u32::try_from(total_items.div_ceil(per_page_u64)).unwrap_or(u32::MAX);
 
     Ok(Json(PaginatedResponse {
         data: responses,
@@ -456,6 +520,10 @@ pub async fn list_alerts(
 }
 
 /// Get a specific alert.
+///
+/// # Errors
+///
+/// Returns an error if the alert is not found or the user lacks access.
 pub async fn get_alert(
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -467,7 +535,7 @@ pub async fn get_alert(
     let alert = alert_repo
         .find_by_id(AlertId(id))
         .await?
-        .ok_or_else(|| ApiError::NotFound(format!("Alert {} not found", id)))?;
+        .ok_or_else(|| ApiError::NotFound(format!("Alert {id} not found")))?;
 
     // Verify tenant access
     if alert.tenant_id != user.tenant_id {
@@ -483,6 +551,10 @@ pub async fn get_alert(
 }
 
 /// Acknowledge an alert.
+///
+/// # Errors
+///
+/// Returns an error if the alert is not found, the user lacks access, or the update fails.
 pub async fn acknowledge_alert(
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -495,7 +567,7 @@ pub async fn acknowledge_alert(
     let mut alert = alert_repo
         .find_by_id(AlertId(id))
         .await?
-        .ok_or_else(|| ApiError::NotFound(format!("Alert {} not found", id)))?;
+        .ok_or_else(|| ApiError::NotFound(format!("Alert {id} not found")))?;
 
     // Verify tenant access
     if alert.tenant_id != user.tenant_id {
@@ -515,6 +587,10 @@ pub async fn acknowledge_alert(
 }
 
 /// Resolve an alert.
+///
+/// # Errors
+///
+/// Returns an error if the alert is not found, the user lacks access, or the update fails.
 pub async fn resolve_alert(
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -527,7 +603,7 @@ pub async fn resolve_alert(
     let mut alert = alert_repo
         .find_by_id(AlertId(id))
         .await?
-        .ok_or_else(|| ApiError::NotFound(format!("Alert {} not found", id)))?;
+        .ok_or_else(|| ApiError::NotFound(format!("Alert {id} not found")))?;
 
     // Verify tenant access
     if alert.tenant_id != user.tenant_id {
@@ -537,7 +613,9 @@ pub async fn resolve_alert(
     // Resolve the alert
     let remediation = sctv_core::Remediation {
         action_taken: request.action_taken,
-        new_version: request.new_version.and_then(|v| semver::Version::parse(&v).ok()),
+        new_version: request
+            .new_version
+            .and_then(|v| semver::Version::parse(&v).ok()),
         notes: request.notes,
     };
     alert.resolve(user.user_id, remediation);
@@ -552,6 +630,10 @@ pub async fn resolve_alert(
 }
 
 /// Suppress an alert.
+///
+/// # Errors
+///
+/// Returns an error if the alert is not found, the user lacks access, or the update fails.
 pub async fn suppress_alert(
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -564,7 +646,7 @@ pub async fn suppress_alert(
     let mut alert = alert_repo
         .find_by_id(AlertId(id))
         .await?
-        .ok_or_else(|| ApiError::NotFound(format!("Alert {} not found", id)))?;
+        .ok_or_else(|| ApiError::NotFound(format!("Alert {id} not found")))?;
 
     // Verify tenant access
     if alert.tenant_id != user.tenant_id {
@@ -586,6 +668,10 @@ pub async fn suppress_alert(
 // ==================== Policies ====================
 
 /// List all policies.
+///
+/// # Errors
+///
+/// Returns an error if the database query fails or the user is not authenticated.
 pub async fn list_policies(
     user: AuthUser,
     Query(pagination): Query<PaginationParams>,
@@ -597,9 +683,10 @@ pub async fn list_policies(
 
     // Calculate pagination
     let total_items = policies.len() as u64;
-    let total_pages = ((total_items as f64) / (pagination.per_page as f64)).ceil() as u32;
-    let offset = pagination.offset() as usize;
-    let limit = pagination.per_page as usize;
+    let per_page_u64 = u64::from(pagination.per_page.max(1));
+    let total_pages = u32::try_from(total_items.div_ceil(per_page_u64).max(1)).unwrap_or(u32::MAX);
+    let offset = usize::try_from(pagination.offset()).unwrap_or(0);
+    let limit = usize::try_from(pagination.per_page).unwrap_or(usize::MAX);
 
     // Paginate and convert
     let responses: Vec<_> = policies
@@ -621,6 +708,10 @@ pub async fn list_policies(
 }
 
 /// Create a new policy.
+///
+/// # Errors
+///
+/// Returns an error if the request is invalid or the database operation fails.
 pub async fn create_policy(
     user: AuthUser,
     State(state): State<Arc<AppState>>,
@@ -656,6 +747,10 @@ pub async fn create_policy(
 }
 
 /// Get a specific policy.
+///
+/// # Errors
+///
+/// Returns an error if the policy is not found or the user lacks access.
 pub async fn get_policy(
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -666,7 +761,7 @@ pub async fn get_policy(
     let policy = policy_repo
         .find_by_id(PolicyId(id))
         .await?
-        .ok_or_else(|| ApiError::NotFound(format!("Policy {} not found", id)))?;
+        .ok_or_else(|| ApiError::NotFound(format!("Policy {id} not found")))?;
 
     // Verify tenant access
     if policy.tenant_id != user.tenant_id {
@@ -677,6 +772,10 @@ pub async fn get_policy(
 }
 
 /// Update a policy.
+///
+/// # Errors
+///
+/// Returns an error if the policy is not found, the user lacks access, or the update fails.
 pub async fn update_policy(
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -688,7 +787,7 @@ pub async fn update_policy(
     let mut policy = policy_repo
         .find_by_id(PolicyId(id))
         .await?
-        .ok_or_else(|| ApiError::NotFound(format!("Policy {} not found", id)))?;
+        .ok_or_else(|| ApiError::NotFound(format!("Policy {id} not found")))?;
 
     // Verify tenant access
     if policy.tenant_id != user.tenant_id {
@@ -703,10 +802,8 @@ pub async fn update_policy(
         policy.description = Some(desc);
     }
     if let Some(rules) = request.rules {
-        let converted_rules: Result<Vec<PolicyRule>, _> = rules
-            .iter()
-            .map(rule_request_to_policy_rule)
-            .collect();
+        let converted_rules: Result<Vec<PolicyRule>, _> =
+            rules.iter().map(rule_request_to_policy_rule).collect();
         policy.rules = converted_rules?;
     }
     if let Some(enabled) = request.is_enabled {
@@ -720,6 +817,10 @@ pub async fn update_policy(
 }
 
 /// Delete a policy.
+///
+/// # Errors
+///
+/// Returns an error if the policy is not found, the user lacks access, or the deletion fails.
 pub async fn delete_policy(
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -731,7 +832,7 @@ pub async fn delete_policy(
     let policy = policy_repo
         .find_by_id(PolicyId(id))
         .await?
-        .ok_or_else(|| ApiError::NotFound(format!("Policy {} not found", id)))?;
+        .ok_or_else(|| ApiError::NotFound(format!("Policy {id} not found")))?;
 
     if policy.tenant_id != user.tenant_id {
         return Err(ApiError::Forbidden);
@@ -745,6 +846,10 @@ pub async fn delete_policy(
 // ==================== Dependencies ====================
 
 /// Get a specific dependency.
+///
+/// # Errors
+///
+/// Returns an error if the dependency is not found or the user lacks access.
 pub async fn get_dependency(
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -756,7 +861,7 @@ pub async fn get_dependency(
     let dependency = dep_repo
         .find_by_id(DependencyId(id))
         .await?
-        .ok_or_else(|| ApiError::NotFound(format!("Dependency {} not found", id)))?;
+        .ok_or_else(|| ApiError::NotFound(format!("Dependency {id} not found")))?;
 
     // Verify tenant access via project
     let project = project_repo
@@ -772,19 +877,25 @@ pub async fn get_dependency(
 }
 
 /// Verify a dependency.
+///
+/// # Errors
+///
+/// Returns an error if the dependency is not found or the user lacks access.
 pub async fn verify_dependency(
     user: AuthUser,
     Path(id): Path<Uuid>,
     State(state): State<Arc<AppState>>,
     Json(_request): Json<VerifyDependencyRequest>,
 ) -> ApiResult<Json<VerificationResponse>> {
+    use sctv_core::{ProvenanceStatus, SignatureStatus};
+
     let dep_repo = state.dependency_repo()?;
     let project_repo = state.project_repo()?;
 
     let dependency = dep_repo
         .find_by_id(DependencyId(id))
         .await?
-        .ok_or_else(|| ApiError::NotFound(format!("Dependency {} not found", id)))?;
+        .ok_or_else(|| ApiError::NotFound(format!("Dependency {id} not found")))?;
 
     // Verify tenant access via project
     let project = project_repo
@@ -811,8 +922,10 @@ pub async fn verify_dependency(
     }
 
     // Signature check
-    use sctv_core::SignatureStatus;
-    let sig_passed = matches!(dependency.integrity.signature_status, SignatureStatus::Verified);
+    let sig_passed = matches!(
+        dependency.integrity.signature_status,
+        SignatureStatus::Verified
+    );
     checks.push(VerificationCheck {
         check_type: "signature".to_string(),
         passed: sig_passed,
@@ -821,24 +934,27 @@ pub async fn verify_dependency(
         message: if sig_passed {
             None
         } else {
-            Some(format!("Signature status: {:?}", dependency.integrity.signature_status))
+            Some(format!(
+                "Signature status: {:?}",
+                dependency.integrity.signature_status
+            ))
         },
     });
 
     // Provenance check
-    use sctv_core::ProvenanceStatus;
     let prov_passed = matches!(
         dependency.integrity.provenance_status,
-        ProvenanceStatus::SlsaLevel1
-            | ProvenanceStatus::SlsaLevel2
-            | ProvenanceStatus::SlsaLevel3
+        ProvenanceStatus::SlsaLevel1 | ProvenanceStatus::SlsaLevel2 | ProvenanceStatus::SlsaLevel3
     );
     checks.push(VerificationCheck {
         check_type: "provenance".to_string(),
         passed: prov_passed,
         expected: None,
         actual: None,
-        message: Some(format!("Provenance level: {:?}", dependency.integrity.provenance_status)),
+        message: Some(format!(
+            "Provenance level: {:?}",
+            dependency.integrity.provenance_status
+        )),
     });
 
     let is_valid = checks.iter().filter(|c| c.passed).count() >= 2;
@@ -853,7 +969,11 @@ pub async fn verify_dependency(
 
 // ==================== Scans ====================
 
-/// List scans (backed by the jobs table; each ScanProject job is one scan).
+/// List scans (backed by the jobs table; each `ScanProject` job is one scan).
+///
+/// # Errors
+///
+/// Returns an error if the database is not configured or the query fails.
 pub async fn list_scans(
     user: AuthUser,
     Query(pagination): Query<PaginationParams>,
@@ -886,8 +1006,8 @@ pub async fn list_scans(
     // We cannot cheaply count filtered jobs without an extra trait method;
     // use the returned count as a minimum and infer whether more pages exist.
     let total_items = responses.len() as u64;
-    let per_page = pagination.per_page.max(1) as u64;
-    let total_pages = ((total_items + per_page - 1) / per_page).max(1) as u32;
+    let per_page_u64 = u64::from(pagination.per_page.max(1));
+    let total_pages = u32::try_from(total_items.div_ceil(per_page_u64).max(1)).unwrap_or(u32::MAX);
 
     Ok(Json(PaginatedResponse {
         data: responses,
@@ -901,6 +1021,10 @@ pub async fn list_scans(
 }
 
 /// Get a specific scan by ID (backed by the jobs table).
+///
+/// # Errors
+///
+/// Returns an error if the scan is not found or the user lacks access.
 pub async fn get_scan(
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -918,7 +1042,7 @@ pub async fn get_scan(
     let job = job_repo
         .find_by_id(CoreJobId(id))
         .await?
-        .ok_or_else(|| ApiError::NotFound(format!("Scan {} not found", id)))?;
+        .ok_or_else(|| ApiError::NotFound(format!("Scan {id} not found")))?;
 
     if job.tenant_id != Some(user.tenant_id) {
         return Err(ApiError::Forbidden);
@@ -926,11 +1050,11 @@ pub async fn get_scan(
 
     job_to_scan_response(&job)
         .map(Json)
-        .ok_or_else(|| ApiError::NotFound(format!("Job {} is not a scan", id)))
+        .ok_or_else(|| ApiError::NotFound(format!("Job {id} is not a scan")))
 }
 
-/// Maps a core Job row to the API's ScanResponse. Returns None for jobs
-/// that aren't ScanProject jobs — callers filter them out.
+/// Maps a core Job row to the API's `ScanResponse`. Returns None for jobs
+/// that aren't `ScanProject` jobs — callers filter them out.
 fn job_to_scan_response(job: &sctv_core::Job) -> Option<ScanResponse> {
     let project_id = match &job.job_type {
         sctv_core::JobType::ScanProject { project_id } => *project_id,
@@ -941,8 +1065,16 @@ fn job_to_scan_response(job: &sctv_core::Job) -> Option<ScanResponse> {
         .result
         .as_ref()
         .and_then(|v| {
-            let deps = v.get("dependencies_found").and_then(|d| d.as_u64())? as u32;
-            let alerts = v.get("alerts_created").and_then(|a| a.as_u64())? as u32;
+            let deps = u32::try_from(
+                v.get("dependencies_found")
+                    .and_then(serde_json::Value::as_u64)?,
+            )
+            .unwrap_or(u32::MAX);
+            let alerts = u32::try_from(
+                v.get("alerts_created")
+                    .and_then(serde_json::Value::as_u64)?,
+            )
+            .unwrap_or(u32::MAX);
             Some((deps, alerts))
         })
         .unwrap_or((0, 0));
@@ -962,6 +1094,10 @@ fn job_to_scan_response(job: &sctv_core::Job) -> Option<ScanResponse> {
 // ==================== Webhooks ====================
 
 /// Handle GitHub webhook.
+///
+/// # Errors
+///
+/// Returns an error if the payload is invalid or processing fails.
 pub async fn github_webhook(
     State(_state): State<Arc<AppState>>,
     Json(payload): Json<GitHubWebhookPayload>,
@@ -975,11 +1111,19 @@ pub async fn github_webhook(
         received: true,
         message: "Webhook received successfully".to_string(),
         scan_triggered: should_scan,
-        scan_id: if should_scan { Some(Uuid::new_v4()) } else { None },
+        scan_id: if should_scan {
+            Some(Uuid::new_v4())
+        } else {
+            None
+        },
     }))
 }
 
 /// Handle GitLab webhook.
+///
+/// # Errors
+///
+/// Returns an error if the payload is invalid or processing fails.
 pub async fn gitlab_webhook(
     State(_state): State<Arc<AppState>>,
     Json(payload): Json<GitLabWebhookPayload>,
@@ -992,6 +1136,10 @@ pub async fn gitlab_webhook(
         received: true,
         message: "Webhook received successfully".to_string(),
         scan_triggered: should_scan,
-        scan_id: if should_scan { Some(Uuid::new_v4()) } else { None },
+        scan_id: if should_scan {
+            Some(Uuid::new_v4())
+        } else {
+            None
+        },
     }))
 }

@@ -47,7 +47,7 @@ impl DetectionResult {
 
     /// Creates a negative detection result.
     #[must_use]
-    pub fn not_detected() -> Self {
+    pub const fn not_detected() -> Self {
         Self {
             detected: false,
             confidence: 0.0,
@@ -67,9 +67,5 @@ pub trait Detector: Send + Sync {
     async fn analyze(&self, dependency: &Dependency) -> DetectorResult<Vec<DetectionResult>>;
 
     /// Creates alerts from detection results.
-    fn create_alerts(
-        &self,
-        dependency: &Dependency,
-        results: &[DetectionResult],
-    ) -> Vec<Alert>;
+    fn create_alerts(&self, dependency: &Dependency, results: &[DetectionResult]) -> Vec<Alert>;
 }

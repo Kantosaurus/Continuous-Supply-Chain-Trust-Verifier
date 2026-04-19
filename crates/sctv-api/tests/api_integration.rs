@@ -138,7 +138,7 @@ mod authentication {
         let request = Request::builder()
             .uri("/api/v1/projects")
             .method(Method::GET)
-            .header(header::AUTHORIZATION, format!("Bearer {}", token))
+            .header(header::AUTHORIZATION, format!("Bearer {token}"))
             .body(Body::empty())
             .unwrap();
 
@@ -186,7 +186,7 @@ mod projects_no_db {
         let request = Request::builder()
             .uri("/api/v1/projects")
             .method(Method::GET)
-            .header(header::AUTHORIZATION, format!("Bearer {}", token))
+            .header(header::AUTHORIZATION, format!("Bearer {token}"))
             .body(Body::empty())
             .unwrap();
 
@@ -213,7 +213,7 @@ mod projects_no_db {
         let request = Request::builder()
             .uri("/api/v1/projects")
             .method(Method::POST)
-            .header(header::AUTHORIZATION, format!("Bearer {}", token))
+            .header(header::AUTHORIZATION, format!("Bearer {token}"))
             .header(header::CONTENT_TYPE, "application/json")
             .body(Body::from(body.to_string()))
             .unwrap();
@@ -421,9 +421,9 @@ mod error_responses {
 
         let fake_id = Uuid::new_v4();
         let request = Request::builder()
-            .uri(format!("/api/v1/scans/{}", fake_id))
+            .uri(format!("/api/v1/scans/{fake_id}"))
             .method(Method::GET)
-            .header(header::AUTHORIZATION, format!("Bearer {}", token))
+            .header(header::AUTHORIZATION, format!("Bearer {token}"))
             .body(Body::empty())
             .unwrap();
 
@@ -460,7 +460,7 @@ mod request_validation {
         let request = Request::builder()
             .uri("/api/v1/projects")
             .method(Method::POST)
-            .header(header::AUTHORIZATION, format!("Bearer {}", token))
+            .header(header::AUTHORIZATION, format!("Bearer {token}"))
             .header(header::CONTENT_TYPE, "application/json")
             .body(Body::from("{ invalid json }"))
             .unwrap();
@@ -471,8 +471,7 @@ mod request_validation {
         let status = response.status();
         assert!(
             status == StatusCode::BAD_REQUEST || status == StatusCode::UNPROCESSABLE_ENTITY,
-            "Expected 400 or 422, got {}",
-            status
+            "Expected 400 or 422, got {status}"
         );
     }
 
@@ -491,7 +490,7 @@ mod request_validation {
         let request = Request::builder()
             .uri("/api/v1/projects")
             .method(Method::POST)
-            .header(header::AUTHORIZATION, format!("Bearer {}", token))
+            .header(header::AUTHORIZATION, format!("Bearer {token}"))
             // Missing Content-Type header
             .body(Body::from(body.to_string()))
             .unwrap();
@@ -504,8 +503,7 @@ mod request_validation {
             status == StatusCode::UNSUPPORTED_MEDIA_TYPE
                 || status == StatusCode::SERVICE_UNAVAILABLE
                 || status == StatusCode::BAD_REQUEST,
-            "Expected 415, 503, or 400, got {}",
-            status
+            "Expected 415, 503, or 400, got {status}"
         );
     }
 }
@@ -529,7 +527,7 @@ mod pagination {
         let request = Request::builder()
             .uri("/api/v1/projects?page=2&per_page=10")
             .method(Method::GET)
-            .header(header::AUTHORIZATION, format!("Bearer {}", token))
+            .header(header::AUTHORIZATION, format!("Bearer {token}"))
             .body(Body::empty())
             .unwrap();
 
@@ -551,7 +549,7 @@ mod pagination {
         let request = Request::builder()
             .uri("/api/v1/projects")
             .method(Method::GET)
-            .header(header::AUTHORIZATION, format!("Bearer {}", token))
+            .header(header::AUTHORIZATION, format!("Bearer {token}"))
             .body(Body::empty())
             .unwrap();
 
@@ -585,7 +583,7 @@ mod scans {
         let request = Request::builder()
             .uri("/api/v1/scans")
             .method(Method::GET)
-            .header(header::AUTHORIZATION, format!("Bearer {}", token))
+            .header(header::AUTHORIZATION, format!("Bearer {token}"))
             .body(Body::empty())
             .unwrap();
 
@@ -621,15 +619,13 @@ mod cors {
         let status = response.status();
         assert!(
             status == StatusCode::OK || status == StatusCode::NO_CONTENT,
-            "Expected 200 or 204, got {}",
-            status
+            "Expected 200 or 204, got {status}"
         );
 
         // Should have CORS headers
         let headers = response.headers();
         assert!(
-            headers.contains_key("access-control-allow-origin")
-                || headers.contains_key("vary"),
+            headers.contains_key("access-control-allow-origin") || headers.contains_key("vary"),
             "Expected CORS headers"
         );
     }

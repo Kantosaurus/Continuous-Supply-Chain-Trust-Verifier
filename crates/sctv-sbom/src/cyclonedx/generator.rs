@@ -1,50 +1,50 @@
-//! CycloneDX SBOM generator.
+//! `CycloneDX` SBOM generator.
+
+use std::fmt::Write as _;
 
 use sctv_core::{Dependency, PackageEcosystem, Project};
 use uuid::Uuid;
 
-use super::models::*;
+use super::models::{
+    Bom, Component, ComponentScope, ComponentType, Composition, ExternalReference, Hash, Metadata,
+    OrganizationalEntity, Property, Tool,
+};
 use crate::common::{generate_bom_ref, GeneratorConfig};
 use crate::{SbomError, SbomFormat, SbomGenerator, SbomOutput, SbomResult};
 
-/// CycloneDX 1.5 SBOM generator.
+/// `CycloneDX` 1.5 SBOM generator.
 pub struct CycloneDxGenerator {
     /// Whether to output XML instead of JSON.
     xml_output: bool,
 }
 
 impl CycloneDxGenerator {
-    /// Creates a new CycloneDX generator.
+    /// Creates a new `CycloneDX` generator.
     #[must_use]
-    pub fn new(xml_output: bool) -> Self {
+    pub const fn new(xml_output: bool) -> Self {
         Self { xml_output }
     }
 
     /// Creates a JSON generator.
     #[must_use]
-    pub fn json() -> Self {
+    pub const fn json() -> Self {
         Self::new(false)
     }
 
     /// Creates an XML generator.
     #[must_use]
-    pub fn xml() -> Self {
+    pub const fn xml() -> Self {
         Self::new(true)
     }
 
     /// Builds the BOM document.
-    fn build_bom(
-        &self,
-        project: &Project,
-        dependencies: &[Dependency],
-        config: &GeneratorConfig,
-    ) -> SbomResult<Bom> {
+    fn build_bom(project: &Project, dependencies: &[Dependency], config: &GeneratorConfig) -> Bom {
         let serial = format!("urn:uuid:{}", Uuid::new_v4());
 
         let mut bom = Bom::new().with_serial_number(serial);
 
         // Build metadata
-        let metadata = self.build_metadata(project, config)?;
+        let metadata = Self::build_metadata(project, config);
         bom.metadata = Some(metadata);
 
         // Filter dependencies based on config
@@ -63,31 +63,27 @@ impl CycloneDxGenerator {
 
         // Build components
         for dep in &filtered_deps {
-            let component = self.build_component(dep, config)?;
+            let component = Self::build_component(dep, config);
             bom.add_component(component);
         }
 
         // Build dependency relationships
-        let dep_graph = self.build_dependency_graph(&filtered_deps, project)?;
+        let dep_graph = Self::build_dependency_graph(&filtered_deps, project);
         bom.dependencies = dep_graph;
 
         // Add composition assertion
         bom.compositions.push(Composition::incomplete());
 
-        Ok(bom)
+        bom
     }
 
     /// Builds the metadata section.
-    fn build_metadata(
-        &self,
-        project: &Project,
-        config: &GeneratorConfig,
-    ) -> SbomResult<Metadata> {
+    fn build_metadata(project: &Project, config: &GeneratorConfig) -> Metadata {
         let mut metadata = Metadata::new();
 
         // Add tool information
-        let tool = Tool::new(&config.tool_name, &config.tool_version)
-            .with_vendor(&config.tool_vendor);
+        let tool =
+            Tool::new(&config.tool_name, &config.tool_version).with_vendor(&config.tool_vendor);
         metadata.add_tool(tool);
 
         // Add main component (the project itself)
@@ -105,10 +101,7 @@ impl CycloneDxGenerator {
 
         // Add ecosystems as properties
         for ecosystem in &project.ecosystems {
-            main_component.add_property(Property::new(
-                "sctv:ecosystem",
-                ecosystem.purl_type(),
-            ));
+            main_component.add_property(Property::new("sctv:ecosystem", ecosystem.purl_type()));
         }
 
         metadata.component = Some(main_component);
@@ -122,15 +115,11 @@ impl CycloneDxGenerator {
             metadata.supplier = Some(supplier);
         }
 
-        Ok(metadata)
+        metadata
     }
 
     /// Builds a component from a dependency.
-    fn build_component(
-        &self,
-        dep: &Dependency,
-        config: &GeneratorConfig,
-    ) -> SbomResult<Component> {
+    fn build_component(dep: &Dependency, config: &GeneratorConfig) -> Component {
         let bom_ref = generate_bom_ref(
             dep.ecosystem.purl_type(),
             &dep.package_name,
@@ -167,20 +156,14 @@ impl CycloneDxGenerator {
         }
 
         // Add properties
-        component.add_property(Property::new(
-            "sctv:ecosystem",
-            dep.ecosystem.purl_type(),
-        ));
+        component.add_property(Property::new("sctv:ecosystem", dep.ecosystem.purl_type()));
 
         component.add_property(Property::new(
             "sctv:direct",
             if dep.is_direct { "true" } else { "false" },
         ));
 
-        component.add_property(Property::new(
-            "sctv:depth",
-            dep.depth.to_string(),
-        ));
+        component.add_property(Property::new("sctv:depth", dep.depth.to_string()));
 
         // Add provenance information if available
         if let Some(level) = dep.integrity.provenance_status.level() {
@@ -198,15 +181,14 @@ impl CycloneDxGenerator {
             }
         }
 
-        Ok(component)
+        component
     }
 
     /// Builds the dependency graph.
     fn build_dependency_graph(
-        &self,
         deps: &[&Dependency],
         project: &Project,
-    ) -> SbomResult<Vec<super::models::Dependency>> {
+    ) -> Vec<super::models::Dependency> {
         let mut graph = Vec::new();
 
         // Project depends on all direct dependencies
@@ -253,11 +235,11 @@ impl CycloneDxGenerator {
             graph.push(dep_entry);
         }
 
-        Ok(graph)
+        graph
     }
 
     /// Serializes the BOM to JSON.
-    fn serialize_json(&self, bom: &Bom, pretty: bool) -> SbomResult<String> {
+    fn serialize_json(bom: &Bom, pretty: bool) -> SbomResult<String> {
         if pretty {
             serde_json::to_string_pretty(bom)
         } else {
@@ -267,7 +249,8 @@ impl CycloneDxGenerator {
     }
 
     /// Serializes the BOM to XML.
-    fn serialize_xml(&self, bom: &Bom, _pretty: bool) -> SbomResult<String> {
+    #[allow(clippy::too_many_lines)] // sequential XML element serialisation; splitting would obscure structure
+    fn serialize_xml(bom: &Bom, _pretty: bool) -> String {
         // Note: For full XML support, we'd need a proper XML serializer.
         // This provides a basic XML structure.
         let mut xml = String::new();
@@ -276,7 +259,7 @@ impl CycloneDxGenerator {
         xml.push_str(r#"<bom xmlns="http://cyclonedx.org/schema/bom/1.5" "#);
         xml.push_str(r#"version="1" "#);
         if let Some(serial) = &bom.serial_number {
-            xml.push_str(&format!(r#"serialNumber="{}" "#, serial));
+            write!(xml, r#"serialNumber="{serial}" "#).unwrap();
         }
         xml.push_str(">\n");
 
@@ -284,31 +267,33 @@ impl CycloneDxGenerator {
         if let Some(metadata) = &bom.metadata {
             xml.push_str("  <metadata>\n");
             if let Some(timestamp) = &metadata.timestamp {
-                xml.push_str(&format!("    <timestamp>{}</timestamp>\n", timestamp));
+                writeln!(xml, "    <timestamp>{timestamp}</timestamp>").unwrap();
             }
             for tool in &metadata.tools {
                 xml.push_str("    <tools>\n");
                 xml.push_str("      <tool>\n");
                 if let Some(vendor) = &tool.vendor {
-                    xml.push_str(&format!("        <vendor>{}</vendor>\n", escape_xml(vendor)));
+                    writeln!(xml, "        <vendor>{}</vendor>", escape_xml(vendor)).unwrap();
                 }
                 if let Some(name) = &tool.name {
-                    xml.push_str(&format!("        <name>{}</name>\n", escape_xml(name)));
+                    writeln!(xml, "        <name>{}</name>", escape_xml(name)).unwrap();
                 }
                 if let Some(version) = &tool.version {
-                    xml.push_str(&format!("        <version>{}</version>\n", escape_xml(version)));
+                    writeln!(xml, "        <version>{}</version>", escape_xml(version)).unwrap();
                 }
                 xml.push_str("      </tool>\n");
                 xml.push_str("    </tools>\n");
             }
             if let Some(component) = &metadata.component {
-                xml.push_str(&format!(
-                    "    <component type=\"{}\">\n",
-                    component_type_xml(&component.component_type)
-                ));
-                xml.push_str(&format!("      <name>{}</name>\n", escape_xml(&component.name)));
+                writeln!(
+                    xml,
+                    "    <component type=\"{}\">",
+                    component_type_xml(component.component_type)
+                )
+                .unwrap();
+                writeln!(xml, "      <name>{}</name>", escape_xml(&component.name)).unwrap();
                 if let Some(version) = &component.version {
-                    xml.push_str(&format!("      <version>{}</version>\n", escape_xml(version)));
+                    writeln!(xml, "      <version>{}</version>", escape_xml(version)).unwrap();
                 }
                 xml.push_str("    </component>\n");
             }
@@ -318,29 +303,33 @@ impl CycloneDxGenerator {
         // Components
         xml.push_str("  <components>\n");
         for component in &bom.components {
-            xml.push_str(&format!(
+            write!(
+                xml,
                 "    <component type=\"{}\"",
-                component_type_xml(&component.component_type)
-            ));
+                component_type_xml(component.component_type)
+            )
+            .unwrap();
             if let Some(bom_ref) = &component.bom_ref {
-                xml.push_str(&format!(" bom-ref=\"{}\"", escape_xml(bom_ref)));
+                write!(xml, " bom-ref=\"{}\"", escape_xml(bom_ref)).unwrap();
             }
             xml.push_str(">\n");
-            xml.push_str(&format!("      <name>{}</name>\n", escape_xml(&component.name)));
+            writeln!(xml, "      <name>{}</name>", escape_xml(&component.name)).unwrap();
             if let Some(version) = &component.version {
-                xml.push_str(&format!("      <version>{}</version>\n", escape_xml(version)));
+                writeln!(xml, "      <version>{}</version>", escape_xml(version)).unwrap();
             }
             if let Some(purl) = &component.purl {
-                xml.push_str(&format!("      <purl>{}</purl>\n", escape_xml(purl)));
+                writeln!(xml, "      <purl>{}</purl>", escape_xml(purl)).unwrap();
             }
             if !component.hashes.is_empty() {
                 xml.push_str("      <hashes>\n");
                 for hash in &component.hashes {
-                    xml.push_str(&format!(
-                        "        <hash alg=\"{}\">{}</hash>\n",
+                    writeln!(
+                        xml,
+                        "        <hash alg=\"{}\">{}</hash>",
                         escape_xml(&hash.algorithm),
                         escape_xml(&hash.content)
-                    ));
+                    )
+                    .unwrap();
                 }
                 xml.push_str("      </hashes>\n");
             }
@@ -352,16 +341,23 @@ impl CycloneDxGenerator {
         if !bom.dependencies.is_empty() {
             xml.push_str("  <dependencies>\n");
             for dep in &bom.dependencies {
-                xml.push_str(&format!("    <dependency ref=\"{}\"", escape_xml(&dep.reference)));
+                write!(
+                    xml,
+                    "    <dependency ref=\"{}\"",
+                    escape_xml(&dep.reference)
+                )
+                .unwrap();
                 if dep.depends_on.is_empty() {
                     xml.push_str(" />\n");
                 } else {
                     xml.push_str(">\n");
                     for child_ref in &dep.depends_on {
-                        xml.push_str(&format!(
-                            "      <dependency ref=\"{}\" />\n",
+                        writeln!(
+                            xml,
+                            "      <dependency ref=\"{}\" />",
                             escape_xml(child_ref)
-                        ));
+                        )
+                        .unwrap();
                     }
                     xml.push_str("    </dependency>\n");
                 }
@@ -371,7 +367,7 @@ impl CycloneDxGenerator {
 
         xml.push_str("</bom>\n");
 
-        Ok(xml)
+        xml
     }
 }
 
@@ -390,12 +386,12 @@ impl SbomGenerator for CycloneDxGenerator {
         dependencies: &[Dependency],
         config: &GeneratorConfig,
     ) -> SbomResult<SbomOutput> {
-        let bom = self.build_bom(project, dependencies, config)?;
+        let bom = Self::build_bom(project, dependencies, config);
 
         let content = if self.xml_output {
-            self.serialize_xml(&bom, config.pretty_print)?
+            Self::serialize_xml(&bom, config.pretty_print)
         } else {
-            self.serialize_json(&bom, config.pretty_print)?
+            Self::serialize_json(&bom, config.pretty_print)?
         };
 
         Ok(SbomOutput {
@@ -418,7 +414,7 @@ fn escape_xml(s: &str) -> String {
 }
 
 /// Returns the XML representation of a component type.
-fn component_type_xml(ct: &ComponentType) -> &'static str {
+const fn component_type_xml(ct: ComponentType) -> &'static str {
     match ct {
         ComponentType::Application => "application",
         ComponentType::Framework => "framework",

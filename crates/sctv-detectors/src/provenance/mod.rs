@@ -50,7 +50,8 @@ impl Default for ProvenanceConfig {
     fn default() -> Self {
         let mut trusted_builders = HashSet::new();
         // GitHub Actions builders
-        trusted_builders.insert("https://github.com/slsa-framework/slsa-github-generator".to_string());
+        trusted_builders
+            .insert("https://github.com/slsa-framework/slsa-github-generator".to_string());
         trusted_builders.insert("https://github.com/actions/runner".to_string());
         // npm provenance builders
         trusted_builders.insert("https://github.com/npm/cli".to_string());
@@ -118,7 +119,7 @@ impl ProvenanceVerificationResult {
 
     /// Creates a result with verification failure.
     #[must_use]
-    pub fn verification_failed(errors: Vec<String>) -> Self {
+    pub const fn verification_failed(errors: Vec<String>) -> Self {
         Self {
             has_provenance: true,
             slsa_level: Some(0),
@@ -140,7 +141,9 @@ impl ProvenanceVerificationResult {
             return config.allow_missing_provenance;
         }
 
-        let level_ok = self.slsa_level.map_or(false, |l| l >= config.minimum_slsa_level);
+        let level_ok = self
+            .slsa_level
+            .is_some_and(|l| l >= config.minimum_slsa_level);
         let sigstore_ok = !config.require_sigstore || self.sigstore_verified;
         let builder_ok = self.builder_trusted || config.trusted_builders.is_empty();
 
@@ -183,12 +186,24 @@ impl ProvenanceDetector {
     }
 
     /// Verifies provenance for a dependency.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying Sigstore verification fails.
+    #[allow(clippy::unused_async)]
+    // Public API: caller-visible async fn must remain async so signature
+    // and .await behavior stay stable; implementation may become async
+    // when provenance acquires real I/O.
     pub async fn verify_provenance(
         &self,
         dependency: &Dependency,
     ) -> DetectorResult<ProvenanceVerificationResult> {
         // Check if ecosystem supports provenance
-        if !self.config.supported_ecosystems.contains(&dependency.ecosystem) {
+        if !self
+            .config
+            .supported_ecosystems
+            .contains(&dependency.ecosystem)
+        {
             return Ok(ProvenanceVerificationResult {
                 has_provenance: false,
                 slsa_level: None,
@@ -231,7 +246,7 @@ impl ProvenanceDetector {
                     builder_id: details.and_then(|d| d.builder_id.clone()),
                     builder_trusted: details
                         .and_then(|d| d.builder_id.as_ref())
-                        .map_or(false, |id| self.config.trusted_builders.contains(id)),
+                        .is_some_and(|id| self.config.trusted_builders.contains(id)),
                     source_uri: details.and_then(|d| d.source_uri.clone()),
                     source_digest: details.and_then(|d| d.source_digest.clone()),
                     sigstore_verified: dependency.integrity.signature_status
@@ -246,7 +261,7 @@ impl ProvenanceDetector {
 
     /// Determines the SLSA level based on attestation contents.
     #[allow(dead_code)]
-    fn determine_slsa_level(&self, result: &ProvenanceVerificationResult) -> u8 {
+    fn determine_slsa_level(result: &ProvenanceVerificationResult) -> u8 {
         // SLSA Level requirements:
         // Level 1: Documentation of build process
         // Level 2: Hosted build platform with authenticated provenance
@@ -256,16 +271,19 @@ impl ProvenanceDetector {
             return 0;
         }
 
-        let mut level = 1; // Has provenance = at least level 1
-
-        // Level 2: Hosted build with authenticated provenance
-        if result.builder_trusted && result.sigstore_verified {
-            level = 2;
-        }
+        // Level 2: Hosted build with authenticated provenance (at least level 1 if provenance exists)
+        let mut level = if result.builder_trusted && result.sigstore_verified {
+            2
+        } else {
+            1
+        };
 
         // Level 3: Rekor transparency log with inclusion proof
         if level >= 2
-            && result.rekor_entry.as_ref().map_or(false, |e| e.inclusion_verified)
+            && result
+                .rekor_entry
+                .as_ref()
+                .is_some_and(|e| e.inclusion_verified)
             && result.source_digest.is_some()
         {
             level = 3;
@@ -356,28 +374,19 @@ impl Detector for ProvenanceDetector {
                         attestation_errors: verification.errors.clone(),
                     };
 
-                    let title = if !verification.has_provenance {
-                        format!(
-                            "Missing provenance for {}@{}",
-                            dependency.package_name, dependency.resolved_version
-                        )
-                    } else {
+                    let title = if verification.has_provenance {
                         format!(
                             "SLSA provenance verification failed for {}@{}",
                             dependency.package_name, dependency.resolved_version
                         )
+                    } else {
+                        format!(
+                            "Missing provenance for {}@{}",
+                            dependency.package_name, dependency.resolved_version
+                        )
                     };
 
-                    let description = if !verification.has_provenance {
-                        format!(
-                            "Package '{}' version {} does not have SLSA provenance attestation. \
-                             Required minimum level: {}. This means the build process cannot be \
-                             verified and the package may not be from a trusted source.",
-                            dependency.package_name,
-                            dependency.resolved_version,
-                            self.config.minimum_slsa_level
-                        )
-                    } else {
+                    let description = if verification.has_provenance {
                         format!(
                             "Package '{}' version {} has SLSA level {} but requires level {}. \
                              Errors: {}",
@@ -386,6 +395,15 @@ impl Detector for ProvenanceDetector {
                             verification.slsa_level.unwrap_or(0),
                             self.config.minimum_slsa_level,
                             verification.errors.join(", ")
+                        )
+                    } else {
+                        format!(
+                            "Package '{}' version {} does not have SLSA provenance attestation. \
+                             Required minimum level: {}. This means the build process cannot be \
+                             verified and the package may not be from a trusted source.",
+                            dependency.package_name,
+                            dependency.resolved_version,
+                            self.config.minimum_slsa_level
                         )
                     };
 
@@ -405,7 +423,9 @@ impl Detector for ProvenanceDetector {
 
                     Some(alert)
                 } else if result.method == "untrusted_builder" {
-                    let builder_id: Option<String> = result.details.get("builder_id")
+                    let builder_id: Option<String> = result
+                        .details
+                        .get("builder_id")
                         .and_then(|v| v.as_str())
                         .map(String::from);
 
@@ -519,7 +539,7 @@ mod tests {
         assert!(valid_result.is_valid(&config));
 
         // Invalid - level too low
-        let mut invalid_level = valid_result.clone();
+        let mut invalid_level = valid_result;
         invalid_level.slsa_level = Some(0);
         assert!(!invalid_level.is_valid(&config));
 
@@ -528,7 +548,7 @@ mod tests {
         assert!(no_provenance.is_valid(&config));
 
         // Missing provenance with allow_missing = false
-        let mut strict_config = config.clone();
+        let mut strict_config = config;
         strict_config.allow_missing_provenance = false;
         assert!(!no_provenance.is_valid(&strict_config));
     }

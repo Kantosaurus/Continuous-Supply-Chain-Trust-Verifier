@@ -73,6 +73,10 @@ pub struct TenantAwarePool {
 
 impl TenantAwarePool {
     /// Creates a new tenant-aware pool with the given configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the database connection cannot be established.
     pub async fn new(config: DbConfig) -> Result<Self, DbError> {
         let pool = PgPoolOptions::new()
             .max_connections(config.max_connections)
@@ -86,6 +90,11 @@ impl TenantAwarePool {
     }
 
     /// Acquires a connection with tenant context set.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a connection cannot be acquired from the pool or the
+    /// tenant context query fails.
     pub async fn acquire(&self, tenant_id: TenantId) -> Result<TenantConnection, DbError> {
         let mut conn = self.pool.acquire().await?;
 
@@ -95,26 +104,37 @@ impl TenantAwarePool {
             .execute(&mut *conn)
             .await?;
 
-        Ok(TenantConnection {
-            conn,
-            tenant_id,
-        })
+        Ok(TenantConnection { conn, tenant_id })
     }
 
     /// Gets a raw connection without tenant context (for admin operations).
-    pub async fn acquire_admin(&self) -> Result<sqlx::pool::PoolConnection<sqlx::Postgres>, DbError> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a connection cannot be acquired from the pool.
+    pub async fn acquire_admin(
+        &self,
+    ) -> Result<sqlx::pool::PoolConnection<sqlx::Postgres>, DbError> {
         Ok(self.pool.acquire().await?)
     }
 
     /// Returns a reference to the underlying pool.
     #[must_use]
-    pub fn inner(&self) -> &PgPool {
+    pub const fn inner(&self) -> &PgPool {
         &self.pool
     }
 
     /// Runs pending database migrations.
     /// Note: This requires sqlx-cli to prepare migrations first.
     /// Run: cargo sqlx prepare --database-url <url>
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if migrations fail to apply.
+    #[allow(clippy::unused_async)]
+    // Public API: caller-visible async fn must remain async so signature
+    // and .await behavior stay stable; implementation may become async
+    // when migration acquires real I/O.
     pub async fn run_migrations(&self) -> Result<(), DbError> {
         // Migration support requires sqlx-cli preparation.
         // Use sqlx::migrate!("../../migrations") when database is available.

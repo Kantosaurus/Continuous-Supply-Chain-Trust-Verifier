@@ -4,7 +4,7 @@
 //!
 //! This crate provides SBOM generation in two industry-standard formats:
 //!
-//! - **CycloneDX 1.5** - OWASP standard with rich component metadata
+//! - **`CycloneDX` 1.5** - OWASP standard with rich component metadata
 //! - **SPDX 2.3** - Linux Foundation standard for license compliance
 //!
 //! ## Features
@@ -38,8 +38,8 @@ use sctv_core::{Dependency, Project};
 use thiserror::Error;
 
 pub use common::{
-    ExternalReference, ExternalReferenceType, GeneratorConfig, Hash, HashAlgorithm,
-    LicenseChoice, LicenseExpression, OrganizationalContact, OrganizationalEntity,
+    ExternalReference, ExternalReferenceType, GeneratorConfig, Hash, HashAlgorithm, LicenseChoice,
+    LicenseExpression, OrganizationalContact, OrganizationalEntity,
 };
 pub use cyclonedx::CycloneDxGenerator;
 pub use spdx::SpdxGenerator;
@@ -70,9 +70,9 @@ pub type SbomResult<T> = Result<T, SbomError>;
 /// SBOM output format.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SbomFormat {
-    /// CycloneDX 1.5 JSON format.
+    /// `CycloneDX` 1.5 JSON format.
     CycloneDx,
-    /// CycloneDX 1.5 XML format.
+    /// `CycloneDX` 1.5 XML format.
     CycloneDxXml,
     /// SPDX 2.3 JSON format.
     Spdx,
@@ -125,6 +125,10 @@ pub trait SbomGenerator {
     fn format(&self) -> SbomFormat;
 
     /// Generates an SBOM from project and dependencies.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SbomError`] if generation or serialization fails.
     fn generate(
         &self,
         project: &Project,
@@ -144,9 +148,9 @@ pub trait SbomGenerator {
 /// * `format` - The output format
 /// * `config` - Generator configuration options
 ///
-/// # Returns
+/// # Errors
 ///
-/// The generated SBOM output or an error.
+/// Returns [`SbomError`] if generation or serialization fails.
 pub fn generate(
     project: &Project,
     dependencies: &[Dependency],
@@ -168,6 +172,10 @@ pub fn generate(
 /// Generate an SBOM with default configuration.
 ///
 /// Convenience function using default settings.
+///
+/// # Errors
+///
+/// Returns [`SbomError`] if generation or serialization fails.
 pub fn generate_default(
     project: &Project,
     dependencies: &[Dependency],

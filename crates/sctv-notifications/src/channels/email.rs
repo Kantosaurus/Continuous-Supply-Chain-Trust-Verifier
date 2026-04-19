@@ -1,5 +1,6 @@
 //! Email notification channel using SMTP.
 
+use std::fmt::Write as _;
 use std::time::Instant;
 
 use async_trait::async_trait;
@@ -39,11 +40,11 @@ pub struct EmailConfig {
     pub enabled: bool,
 }
 
-fn default_tls() -> bool {
+const fn default_tls() -> bool {
     true
 }
 
-fn default_enabled() -> bool {
+const fn default_enabled() -> bool {
     true
 }
 
@@ -87,7 +88,7 @@ impl EmailConfigBuilder {
 
     /// Sets the SMTP server port.
     #[must_use]
-    pub fn smtp_port(mut self, port: u16) -> Self {
+    pub const fn smtp_port(mut self, port: u16) -> Self {
         self.config.smtp_port = port;
         self
     }
@@ -116,6 +117,9 @@ impl EmailConfigBuilder {
     }
 
     /// Adds multiple recipient addresses.
+    // Builder methods consume `self` to enable method chaining; the `to_*` naming
+    // convention for builder setters is idiomatic here even on non-Copy types.
+    #[allow(clippy::wrong_self_convention)]
     #[must_use]
     pub fn to_many(mut self, addresses: impl IntoIterator<Item = impl Into<String>>) -> Self {
         self.config
@@ -126,14 +130,14 @@ impl EmailConfigBuilder {
 
     /// Sets whether to use TLS.
     #[must_use]
-    pub fn use_tls(mut self, use_tls: bool) -> Self {
+    pub const fn use_tls(mut self, use_tls: bool) -> Self {
         self.config.use_tls = use_tls;
         self
     }
 
     /// Sets whether the channel is enabled.
     #[must_use]
-    pub fn enabled(mut self, enabled: bool) -> Self {
+    pub const fn enabled(mut self, enabled: bool) -> Self {
         self.config.enabled = enabled;
         self
     }
@@ -153,14 +157,12 @@ pub struct EmailChannel {
 impl EmailChannel {
     /// Creates a new email channel with the given configuration.
     #[must_use]
-    pub fn new(config: EmailConfig) -> Self {
+    pub const fn new(config: EmailConfig) -> Self {
         Self { config }
     }
 
     /// Creates the SMTP transport.
-    fn create_transport(
-        &self,
-    ) -> NotificationResult<AsyncSmtpTransport<Tokio1Executor>> {
+    fn create_transport(&self) -> NotificationResult<AsyncSmtpTransport<Tokio1Executor>> {
         let creds = Credentials::new(
             self.config.smtp_username.clone(),
             self.config.smtp_password.clone(),
@@ -184,30 +186,31 @@ impl EmailChannel {
 
     /// Builds the email message.
     fn build_message(&self, notification: &Notification) -> NotificationResult<Message> {
-        let from_mailbox: Mailbox = format!(
-            "{} <{}>",
-            self.config.from_name, self.config.from_address
-        )
-        .parse()
-        .map_err(|e: lettre::address::AddressError| {
-            NotificationError::InvalidConfig(format!("Invalid from address: {e}"))
-        })?;
+        let from_mailbox: Mailbox =
+            format!("{} <{}>", self.config.from_name, self.config.from_address)
+                .parse()
+                .map_err(|e: lettre::address::AddressError| {
+                    NotificationError::InvalidConfig(format!("Invalid from address: {e}"))
+                })?;
 
-        let mut builder = Message::builder()
-            .from(from_mailbox)
-            .subject(format!(
-                "[{}] {}",
-                notification.severity, notification.title
-            ));
+        let mut builder = Message::builder().from(from_mailbox).subject(format!(
+            "[{}] {}",
+            notification.severity, notification.title
+        ));
 
         for to_addr in &self.config.to_addresses {
-            let to_mailbox: Mailbox = to_addr.parse().map_err(|e: lettre::address::AddressError| {
-                NotificationError::InvalidConfig(format!("Invalid to address {to_addr}: {e}"))
-            })?;
+            let to_mailbox: Mailbox =
+                to_addr
+                    .parse()
+                    .map_err(|e: lettre::address::AddressError| {
+                        NotificationError::InvalidConfig(format!(
+                            "Invalid to address {to_addr}: {e}"
+                        ))
+                    })?;
             builder = builder.to(to_mailbox);
         }
 
-        let body = self.format_body(notification);
+        let body = Self::format_body(notification);
 
         builder
             .header(ContentType::TEXT_PLAIN)
@@ -216,32 +219,34 @@ impl EmailChannel {
     }
 
     /// Formats the email body.
-    fn format_body(&self, notification: &Notification) -> String {
+    fn format_body(notification: &Notification) -> String {
         let mut body = String::new();
 
-        body.push_str(&format!("Severity: {}\n", notification.severity));
-        body.push_str(&format!("Time: {}\n\n", notification.created_at));
+        writeln!(body, "Severity: {}", notification.severity)
+            .expect("write to String is infallible");
+        write!(body, "Time: {}\n\n", notification.created_at)
+            .expect("write to String is infallible");
         body.push_str(&notification.message);
         body.push_str("\n\n");
 
         if let Some(project) = &notification.context.project_name {
-            body.push_str(&format!("Project: {project}\n"));
+            writeln!(body, "Project: {project}").expect("write to String is infallible");
         }
 
         if let Some(package) = &notification.context.package_name {
-            body.push_str(&format!("Package: {package}"));
+            write!(body, "Package: {package}").expect("write to String is infallible");
             if let Some(version) = &notification.context.package_version {
-                body.push_str(&format!("@{version}"));
+                write!(body, "@{version}").expect("write to String is infallible");
             }
             body.push('\n');
         }
 
         if let Some(url) = &notification.context.dashboard_url {
-            body.push_str(&format!("\nView in dashboard: {url}\n"));
+            write!(body, "\nView in dashboard: {url}\n").expect("write to String is infallible");
         }
 
         if let Some(remediation) = &notification.context.remediation {
-            body.push_str(&format!("\nRemediation:\n{remediation}\n"));
+            write!(body, "\nRemediation:\n{remediation}\n").expect("write to String is infallible");
         }
 
         body.push_str("\n---\nSupply Chain Trust Verifier\n");
@@ -285,7 +290,8 @@ impl NotificationChannel for EmailChannel {
 
         match transport.send(message).await {
             Ok(response) => {
-                let duration_ms = start.elapsed().as_millis() as u64;
+                // as_millis() returns u128; elapsed time in ms will never exceed u64::MAX (~585M years).
+                let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
                 info!(
                     notification_id = %notification.id,
                     duration_ms,
@@ -301,7 +307,8 @@ impl NotificationChannel for EmailChannel {
                 ))
             }
             Err(e) => {
-                let duration_ms = start.elapsed().as_millis() as u64;
+                // as_millis() returns u128; elapsed time in ms will never exceed u64::MAX (~585M years).
+                let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
                 error!(
                     notification_id = %notification.id,
                     error = %e,
@@ -327,14 +334,11 @@ impl NotificationChannel for EmailChannel {
         }
 
         // Validate the from address format
-        let _: Mailbox = format!(
-            "{} <{}>",
-            self.config.from_name, self.config.from_address
-        )
-        .parse()
-        .map_err(|e: lettre::address::AddressError| {
-            NotificationError::InvalidConfig(format!("Invalid from address: {e}"))
-        })?;
+        let _: Mailbox = format!("{} <{}>", self.config.from_name, self.config.from_address)
+            .parse()
+            .map_err(|e: lettre::address::AddressError| {
+                NotificationError::InvalidConfig(format!("Invalid from address: {e}"))
+            })?;
 
         // Validate all to addresses
         for addr in &self.config.to_addresses {
@@ -372,15 +376,6 @@ mod tests {
 
     #[test]
     fn test_format_body() {
-        let config = EmailConfig::builder()
-            .smtp_host("smtp.example.com")
-            .from("alerts@example.com", "SCTV")
-            .to("admin@example.com")
-            .enabled(true)
-            .build();
-
-        let channel = EmailChannel::new(config);
-
         let notification = Notification::new(
             Severity::High,
             "Security Alert",
@@ -392,7 +387,7 @@ mod tests {
                 .with_package("lodash-utils", "1.0.0"),
         );
 
-        let body = channel.format_body(&notification);
+        let body = EmailChannel::format_body(&notification);
 
         assert!(body.contains("Severity: High"));
         assert!(body.contains("Project: my-project"));
