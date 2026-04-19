@@ -93,10 +93,10 @@ wiremock = "0.6"
 testcontainers = "0.27"
 
 # Leptos web framework
-leptos = { version = "0.7" }
-leptos_meta = { version = "0.7" }
-leptos_router = { version = "0.7" }
-leptos_axum = { version = "0.7" }
+leptos = { version = "0.8" }
+leptos_meta = { version = "0.8" }
+leptos_router = { version = "0.8" }
+leptos_axum = { version = "0.8" }
 
 # WASM support
 wasm-bindgen = "0.2"

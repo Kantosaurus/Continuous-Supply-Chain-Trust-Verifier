@@ -41,7 +41,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 #[cfg(feature = "ssr")]
 fn shell(options: leptos::prelude::LeptosOptions) -> impl leptos::IntoView {
     use leptos::prelude::*;
-    use leptos_meta::*;
+    use leptos_meta::MetaTags;
 
     view! {
         <!DOCTYPE html>
