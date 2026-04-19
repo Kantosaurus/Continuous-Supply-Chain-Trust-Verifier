@@ -13,7 +13,7 @@ Complete reference for the SCTV REST API.
 - [Response Format](#response-format)
 - [Error Handling](#error-handling)
 - [Pagination](#pagination)
-- [Rate Limiting](#rate-limiting)
+- [Rate Limiting](#rate-limiting) (planned, not yet implemented)
 - [Projects API](#projects-api)
 - [Dependencies API](#dependencies-api)
 - [Alerts API](#alerts-api)
@@ -153,7 +153,7 @@ All responses are JSON with this structure:
 | 404 | Not Found | Resource doesn't exist |
 | 409 | Conflict | Resource already exists |
 | 422 | Unprocessable Entity | Validation failed |
-| 429 | Too Many Requests | Rate limit exceeded |
+| 429 | Too Many Requests | Rate limit exceeded (planned; not yet emitted by the server) |
 | 500 | Internal Server Error | Server error |
 | 503 | Service Unavailable | Service temporarily down |
 
@@ -167,7 +167,7 @@ All responses are JSON with this structure:
 | `NOT_FOUND` | Resource not found |
 | `VALIDATION_ERROR` | Input validation failed |
 | `CONFLICT` | Resource conflict |
-| `RATE_LIMIT_EXCEEDED` | Too many requests |
+| `RATE_LIMIT_EXCEEDED` | Too many requests (planned; not yet emitted by the server) |
 | `INTERNAL_ERROR` | Server error |
 
 ---
@@ -204,35 +204,17 @@ GET /api/v1/projects?limit=20&cursor=eyJpZCI6IjU1MGU4NDAwIn0
 
 ## Rate Limiting
 
-Rate limits are applied per API key or IP address:
+**Status: Not yet implemented — future work.**
 
-| Tier | Requests/Minute | Requests/Hour |
-|------|-----------------|---------------|
-| Free | 30 | 500 |
-| Pro | 100 | 2000 |
-| Enterprise | 300 | 10000 |
+The SCTV API server does not currently enforce rate limits. The `429 Too
+Many Requests` status code and `RATE_LIMIT_EXCEEDED` error code are
+reserved for a future release. Clients should still implement sensible
+client-side throttling and exponential backoff to avoid overwhelming the
+server and any upstream package registries.
 
-### Rate Limit Headers
-
-```http
-X-RateLimit-Limit: 100
-X-RateLimit-Remaining: 87
-X-RateLimit-Reset: 1642239600
-```
-
-When rate limited, you'll receive a `429` response:
-
-```json
-{
-  "error": {
-    "code": "RATE_LIMIT_EXCEEDED",
-    "message": "Rate limit exceeded",
-    "details": {
-      "retry_after": 42
-    }
-  }
-}
-```
+Rate-limit response headers (`X-RateLimit-Limit`, `X-RateLimit-Remaining`,
+`X-RateLimit-Reset`) and tiered quotas are planned but not currently
+returned.
 
 ---
 

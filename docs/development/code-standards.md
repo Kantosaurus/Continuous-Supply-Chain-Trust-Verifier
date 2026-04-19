@@ -803,25 +803,6 @@ tracing::debug!("User authenticated: {}", user.email);  // OK
 // tracing::debug!("API key: {}", api_key);  // NEVER!
 ```
 
-### Rate Limiting
-
-Implement rate limiting for public endpoints:
-
-```rust
-// Use tower middleware for rate limiting
-use tower_governor::{GovernorLayer, governor::GovernorConfigBuilder};
-
-let governor_conf = GovernorConfigBuilder::default()
-    .per_second(10)
-    .burst_size(20)
-    .finish()
-    .unwrap();
-
-let app = Router::new()
-    .route("/api/v1/public", get(public_handler))
-    .layer(GovernorLayer { config: Arc::new(governor_conf) });
-```
-
 ## Code Review Checklist
 
 Before submitting code for review, ensure:

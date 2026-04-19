@@ -606,15 +606,21 @@ export SCTV_API_KEY=sctv_live_1a2b3c4d5e6f7g8h9i0j
 # secrets.SCTV_API_KEY
 ```
 
-### 5. Rate Limiting
+### 5. Rate Limiting (planned, not yet implemented)
 
-Protect authentication endpoints:
+Rate limiting of authentication endpoints is planned but not currently
+enforced by the SCTV API. When implemented, configuration will look
+roughly like:
 
 ```rust
-// Configuration
+// Planned configuration (not wired up yet)
 SCTV_AUTH_RATE_LIMIT=10/minute
 SCTV_API_RATE_LIMIT=1000/hour
 ```
+
+For now, operators should enforce rate limits at the reverse proxy /
+ingress layer (see the nginx examples in the deployment and security
+guides).
 
 ### 6. Audit Logging
 
