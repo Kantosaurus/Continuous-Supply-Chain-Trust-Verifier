@@ -533,6 +533,7 @@ mod integrity_tests {
         let expected_hash = hex::encode(hasher.finalize());
 
         let checksums = PackageChecksums {
+            sha1: None,
             sha256: Some(expected_hash),
             sha512: None,
             integrity: None,
@@ -553,6 +554,7 @@ mod integrity_tests {
         let bytes = Bytes::from_static(content);
 
         let checksums = PackageChecksums {
+            sha1: None,
             sha256: Some("wrong_hash_value".to_string()),
             sha512: None,
             integrity: None,
@@ -582,6 +584,7 @@ mod integrity_tests {
         let integrity = format!("sha512-{}", hash_base64);
 
         let checksums = PackageChecksums {
+            sha1: None,
             sha256: None,
             sha512: None,
             integrity: Some(integrity),
@@ -614,6 +617,7 @@ mod integrity_tests {
         };
 
         let checksums = PackageChecksums {
+            sha1: None,
             sha256: Some(sha256_hash),
             sha512: Some(sha512_hash),
             integrity: None,

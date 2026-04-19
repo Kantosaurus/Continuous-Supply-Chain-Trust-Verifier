@@ -1,6 +1,7 @@
 //! Domain models for the Supply Chain Trust Verifier.
 
 mod alert;
+mod api_key;
 mod attestation;
 mod audit_log;
 mod dependency;
@@ -13,6 +14,7 @@ mod tenant;
 mod user;
 
 pub use alert::*;
+pub use api_key::*;
 pub use attestation::*;
 pub use audit_log::*;
 pub use dependency::*;

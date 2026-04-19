@@ -14,7 +14,8 @@ use url::Url;
 
 use super::models::*;
 use crate::{
-    PackageMetadata, RegistryCache, RegistryClient, RegistryError, RegistryResult, VersionMetadata,
+    retry_http, PackageMetadata, RegistryCache, RegistryClient, RegistryError, RegistryResult,
+    RetryConfig, VersionMetadata,
 };
 
 /// RubyGems registry client with caching.
@@ -60,7 +61,7 @@ impl RubyGemsClient {
 
         tracing::debug!("Fetching gem {} from {}", name, url);
 
-        let response = self.http.get(url).send().await?;
+        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::PackageNotFound(name.to_string()));
@@ -92,7 +93,7 @@ impl RubyGemsClient {
 
         tracing::debug!("Fetching versions for {} from {}", name, url);
 
-        let response = self.http.get(url).send().await?;
+        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::PackageNotFound(name.to_string()));
@@ -122,7 +123,7 @@ impl RubyGemsClient {
             .join(&format!("/api/v1/gems/{}/owners.json", name))
             .map_err(|e| RegistryError::Parse(e.to_string()))?;
 
-        let response = self.http.get(url).send().await?;
+        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
 
         if !response.status().is_success() {
             // Non-fatal - return empty list
@@ -343,6 +344,7 @@ impl RegistryClient for RubyGemsClient {
             .collect();
 
         let checksums = PackageChecksums {
+            sha1: None,
             sha256: Some(version_data.sha.clone()),
             sha512: None,
             integrity: None,
@@ -385,7 +387,7 @@ impl RegistryClient for RubyGemsClient {
 
         tracing::debug!("Downloading {}@{} from {}", name, version, url);
 
-        let response = self.http.get(url).send().await?;
+        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::VersionNotFound(

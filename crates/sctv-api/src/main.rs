@@ -90,13 +90,12 @@ fn load_config() -> anyhow::Result<ServerConfig> {
 
     let bind_addr: SocketAddr = format!("{host}:{port}").parse()?;
 
-    let jwt_secret = std::env::var(env_vars::JWT_SECRET)
-        .unwrap_or_else(|_| {
-            tracing::warn!(
-                "JWT_SECRET not set, using default. THIS IS INSECURE FOR PRODUCTION!"
-            );
-            "development-secret-change-in-production".to_string()
-        });
+    let jwt_secret = std::env::var(env_vars::JWT_SECRET).map_err(|_| {
+        anyhow::anyhow!(
+            "{} is not set. Generate a strong secret and set it before starting the API server.",
+            env_vars::JWT_SECRET
+        )
+    })?;
 
     let enable_cors = std::env::var(env_vars::ENABLE_CORS)
         .map(|v| v.to_lowercase() == "true" || v == "1")

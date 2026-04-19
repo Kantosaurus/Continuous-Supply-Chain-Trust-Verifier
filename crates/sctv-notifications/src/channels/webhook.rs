@@ -408,13 +408,19 @@ impl WebhookChannel {
             match self.send_request(&payload_bytes).await {
                 Ok(result) => return Ok(result),
                 Err(e) => {
+                    let retryable = e.is_retryable();
                     warn!(
                         notification_id = %notification.id,
                         attempt,
                         error = %e,
+                        retryable,
                         "Webhook request failed"
                     );
-                    last_error = Some((e, start.elapsed().as_millis() as u64));
+                    let duration_ms = start.elapsed().as_millis() as u64;
+                    if !retryable {
+                        return Ok(DeliveryResult::failure(duration_ms, e.to_string()));
+                    }
+                    last_error = Some((e, duration_ms));
                 }
             }
         }
@@ -487,10 +493,26 @@ impl WebhookChannel {
             })
         } else {
             let body = response.text().await.unwrap_or_default();
-            Err(NotificationError::WebhookDelivery(format!(
-                "HTTP {status}: {body}"
-            )))
+            let msg = format!("HTTP {status}: {body}");
+            if status.is_client_error() {
+                Err(NotificationError::WebhookClientError(msg))
+            } else {
+                Err(NotificationError::WebhookDelivery(msg))
+            }
         }
+    }
+
+    /// Redacts query string and userinfo from a URL for safe logging.
+    fn redacted_url(url: &str) -> String {
+        url::Url::parse(url).map_or_else(
+            |_| "<unparseable-url>".to_string(),
+            |mut u| {
+                u.set_query(None);
+                let _ = u.set_password(None);
+                let _ = u.set_username("");
+                u.to_string()
+            },
+        )
     }
 }
 
@@ -512,7 +534,7 @@ impl NotificationChannel for WebhookChannel {
 
         debug!(
             notification_id = %notification.id,
-            url = %self.config.url,
+            url = %Self::redacted_url(&self.config.url),
             "Sending webhook notification"
         );
 

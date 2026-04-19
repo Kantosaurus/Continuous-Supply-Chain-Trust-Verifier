@@ -30,7 +30,7 @@ impl PgSbomRepository {
 
         let format = format_str
             .parse::<SbomFormat>()
-            .unwrap_or(SbomFormat::CycloneDx);
+            .map_err(|_| RepositoryError::InvalidData(format!("Unknown SBOM format: {format_str}")))?;
 
         Ok(Sbom {
             id: SbomId(id),

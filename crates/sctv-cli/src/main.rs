@@ -3,6 +3,7 @@
 //! A command-line tool for detecting supply chain threats in your dependencies.
 
 mod commands;
+mod shared;
 
 use clap::{Parser, Subcommand};
 

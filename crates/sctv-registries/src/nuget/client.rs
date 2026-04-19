@@ -15,7 +15,8 @@ use url::Url;
 
 use super::models::*;
 use crate::{
-    PackageMetadata, RegistryCache, RegistryClient, RegistryError, RegistryResult, VersionMetadata,
+    retry_http, PackageMetadata, RegistryCache, RegistryClient, RegistryError, RegistryResult,
+    RetryConfig, VersionMetadata,
 };
 
 /// NuGet registry client with caching and service discovery.
@@ -381,7 +382,7 @@ impl RegistryClient for NuGetClient {
 
         tracing::debug!("Downloading {}@{} from {}", name, version, url);
 
-        let response = self.http.get(url).send().await?;
+        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::VersionNotFound(

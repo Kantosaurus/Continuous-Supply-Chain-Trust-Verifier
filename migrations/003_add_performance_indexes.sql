@@ -76,15 +76,8 @@ CREATE INDEX IF NOT EXISTS idx_alerts_dependency ON alerts(dependency_id)
 CREATE INDEX IF NOT EXISTS idx_packages_normalized_trgm ON packages
     USING gin(normalized_name gin_trgm_ops);
 
--- ============================================================================
--- UPDATE TRIGGERS - Add missing triggers for updated_at
--- ============================================================================
-
--- Add update trigger for dependencies (was missing)
-DROP TRIGGER IF EXISTS update_dependencies_updated_at ON dependencies;
-
--- Note: dependencies table doesn't have updated_at column, but has last_verified_at
--- which serves a similar purpose for tracking changes
+-- Note: the `dependencies` table has no `updated_at` column (it uses
+-- `last_verified_at` to track changes), so no updated_at trigger is needed.
 
 -- ============================================================================
 -- COMMENTS - Add table and column documentation

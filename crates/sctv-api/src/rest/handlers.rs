@@ -96,6 +96,16 @@ fn dependency_to_response(dep: &Dependency) -> DependencyResponse {
 }
 
 fn policy_to_response(policy: &Policy) -> PolicyResponse {
+    // Pick the highest override severity so the UI reflects the most severe
+    // override the policy enforces; fall back to Medium when no overrides
+    // are configured (rules carry their own severities per-finding).
+    let severity = policy
+        .severity_overrides
+        .iter()
+        .map(|o| o.severity)
+        .max()
+        .unwrap_or(Severity::Medium);
+
     PolicyResponse {
         id: policy.id.0,
         name: policy.name.clone(),
@@ -114,7 +124,7 @@ fn policy_to_response(policy: &Policy) -> PolicyResponse {
                 Some(PolicyRuleResponse { rule_type, config })
             })
             .collect(),
-        severity: Severity::High, // Default severity for policy display
+        severity,
         is_enabled: policy.enabled,
         created_at: policy.created_at,
         updated_at: policy.updated_at,
@@ -169,8 +179,8 @@ pub async fn list_projects(
     // Build responses with dependency and alert counts
     let mut responses = Vec::with_capacity(paginated.len());
     for project in paginated {
-        let deps = dep_repo.find_by_project(project.id).await.unwrap_or_default();
-        let alert_count = alert_repo.count_open_by_project(project.id).await.unwrap_or(0);
+        let deps = dep_repo.find_by_project(project.id).await?;
+        let alert_count = alert_repo.count_open_by_project(project.id).await?;
         responses.push(project_to_response(&project, deps.len() as u32, alert_count));
     }
 
@@ -229,8 +239,8 @@ pub async fn get_project(
         return Err(ApiError::Forbidden);
     }
 
-    let deps = dep_repo.find_by_project(project.id).await.unwrap_or_default();
-    let alert_count = alert_repo.count_open_by_project(project.id).await.unwrap_or(0);
+    let deps = dep_repo.find_by_project(project.id).await?;
+    let alert_count = alert_repo.count_open_by_project(project.id).await?;
 
     Ok(Json(project_to_response(&project, deps.len() as u32, alert_count)))
 }
@@ -274,8 +284,8 @@ pub async fn update_project(
     // Save updates
     project_repo.update(&project).await?;
 
-    let deps = dep_repo.find_by_project(project.id).await.unwrap_or_default();
-    let alert_count = alert_repo.count_open_by_project(project.id).await.unwrap_or(0);
+    let deps = dep_repo.find_by_project(project.id).await?;
+    let alert_count = alert_repo.count_open_by_project(project.id).await?;
 
     Ok(Json(project_to_response(&project, deps.len() as u32, alert_count)))
 }
@@ -310,9 +320,11 @@ pub async fn trigger_scan(
     State(state): State<Arc<AppState>>,
     Json(_request): Json<TriggerScanRequest>,
 ) -> ApiResult<Json<TriggerScanResponse>> {
+    use sctv_worker::jobs::{JobPayload, ScanProjectPayload};
+    use sctv_worker::queue::{EnqueueOptions, JobQueue, PgJobQueue};
+
     let project_repo = state.project_repo()?;
 
-    // Verify project exists and belongs to tenant
     let project = project_repo
         .find_by_id(ProjectId(id))
         .await?
@@ -322,10 +334,19 @@ pub async fn trigger_scan(
         return Err(ApiError::Forbidden);
     }
 
-    // In a full implementation, this would enqueue a scan job
-    // For now, return a queued status
+    let pool = state
+        .pool()
+        .ok_or_else(|| ApiError::ServiceUnavailable("Database not configured".into()))?;
+    let queue = PgJobQueue::new(pool.clone());
+
+    let payload = JobPayload::ScanProject(ScanProjectPayload::new(project.id, user.tenant_id));
+    let job_id = queue
+        .enqueue(payload, EnqueueOptions::default())
+        .await
+        .map_err(|e| ApiError::Internal(format!("Failed to enqueue scan: {e}")))?;
+
     Ok(Json(TriggerScanResponse {
-        scan_id: Uuid::new_v4(),
+        scan_id: job_id.0,
         status: "queued".to_string(),
         message: "Scan has been queued for processing".to_string(),
     }))
@@ -390,7 +411,7 @@ pub async fn list_alerts(
     let alert_repo = state.alert_repo()?;
     let project_repo = state.project_repo()?;
 
-    // Build filter
+    // Build filter (cloned so we can count with the same predicate)
     let filter = AlertFilter {
         project_id: filters.project_id.map(ProjectId),
         status: filters.status.map(|s| vec![s]),
@@ -398,7 +419,10 @@ pub async fn list_alerts(
         alert_type: filters.alert_type.map(|t| vec![t]),
     };
 
-    // Fetch alerts with filter
+    let total_items = alert_repo
+        .count_with_filter(user.tenant_id, filter.clone())
+        .await?;
+
     let alerts = alert_repo
         .find_with_filter(
             user.tenant_id,
@@ -408,22 +432,17 @@ pub async fn list_alerts(
         )
         .await?;
 
-    // Get project names for alerts
     let mut responses = Vec::with_capacity(alerts.len());
     for alert in &alerts {
         let project_name = project_repo
             .find_by_id(alert.project_id)
-            .await
-            .ok()
-            .flatten()
+            .await?
             .map(|p| p.name);
         responses.push(alert_to_response(alert, project_name));
     }
 
-    // Note: For proper pagination, we'd need a count query
-    // For now, estimate based on returned results
-    let total_items = responses.len() as u64;
-    let total_pages = 1; // Would need a count query for accuracy
+    let per_page = pagination.per_page.max(1) as u64;
+    let total_pages = ((total_items + per_page - 1) / per_page) as u32;
 
     Ok(Json(PaginatedResponse {
         data: responses,
@@ -457,9 +476,7 @@ pub async fn get_alert(
 
     let project_name = project_repo
         .find_by_id(alert.project_id)
-        .await
-        .ok()
-        .flatten()
+        .await?
         .map(|p| p.name);
 
     Ok(Json(alert_to_response(&alert, project_name)))
@@ -491,9 +508,7 @@ pub async fn acknowledge_alert(
 
     let project_name = project_repo
         .find_by_id(alert.project_id)
-        .await
-        .ok()
-        .flatten()
+        .await?
         .map(|p| p.name);
 
     Ok(Json(alert_to_response(&alert, project_name)))
@@ -530,9 +545,7 @@ pub async fn resolve_alert(
 
     let project_name = project_repo
         .find_by_id(alert.project_id)
-        .await
-        .ok()
-        .flatten()
+        .await?
         .map(|p| p.name);
 
     Ok(Json(alert_to_response(&alert, project_name)))
@@ -564,9 +577,7 @@ pub async fn suppress_alert(
 
     let project_name = project_repo
         .find_by_id(alert.project_id)
-        .await
-        .ok()
-        .flatten()
+        .await?
         .map(|p| p.name);
 
     Ok(Json(alert_to_response(&alert, project_name)))
@@ -842,35 +853,110 @@ pub async fn verify_dependency(
 
 // ==================== Scans ====================
 
-/// List scans.
+/// List scans (backed by the jobs table; each ScanProject job is one scan).
 pub async fn list_scans(
-    _user: AuthUser,
+    user: AuthUser,
     Query(pagination): Query<PaginationParams>,
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
 ) -> ApiResult<Json<PaginatedResponse<ScanResponse>>> {
-    // Scans are typically stored in a jobs table
-    // For now, return empty list as scan repository isn't implemented
-    // In a full implementation, this would query the jobs table
+    use sctv_core::traits::{JobFilter, JobRepository};
+    use sctv_db::PgJobRepository;
+
+    let pool = state
+        .pool()
+        .ok_or_else(|| ApiError::ServiceUnavailable("Database not configured".into()))?;
+    let job_repo = PgJobRepository::new(pool.clone());
+
+    let filter = JobFilter {
+        status: None,
+        job_type: Some(vec!["scan_project".to_string()]),
+    };
+
+    let jobs = job_repo
+        .find_by_tenant(
+            Some(user.tenant_id),
+            filter,
+            pagination.per_page,
+            pagination.offset(),
+        )
+        .await?;
+
+    let responses: Vec<ScanResponse> = jobs.iter().filter_map(job_to_scan_response).collect();
+
+    // We cannot cheaply count filtered jobs without an extra trait method;
+    // use the returned count as a minimum and infer whether more pages exist.
+    let total_items = responses.len() as u64;
+    let per_page = pagination.per_page.max(1) as u64;
+    let total_pages = ((total_items + per_page - 1) / per_page).max(1) as u32;
+
     Ok(Json(PaginatedResponse {
-        data: vec![],
+        data: responses,
         pagination: PaginationInfo {
             page: pagination.page,
             per_page: pagination.per_page,
-            total_items: 0,
-            total_pages: 0,
+            total_items,
+            total_pages,
         },
     }))
 }
 
-/// Get a specific scan.
+/// Get a specific scan by ID (backed by the jobs table).
 pub async fn get_scan(
-    _user: AuthUser,
+    user: AuthUser,
     Path(id): Path<Uuid>,
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
 ) -> ApiResult<Json<ScanResponse>> {
-    // Scans are typically stored in a jobs table
-    // For now, return not found as scan repository isn't implemented
-    Err(ApiError::NotFound(format!("Scan {} not found", id)))
+    use sctv_core::traits::JobRepository;
+    use sctv_core::JobId as CoreJobId;
+    use sctv_db::PgJobRepository;
+
+    let pool = state
+        .pool()
+        .ok_or_else(|| ApiError::ServiceUnavailable("Database not configured".into()))?;
+    let job_repo = PgJobRepository::new(pool.clone());
+
+    let job = job_repo
+        .find_by_id(CoreJobId(id))
+        .await?
+        .ok_or_else(|| ApiError::NotFound(format!("Scan {} not found", id)))?;
+
+    if job.tenant_id != Some(user.tenant_id) {
+        return Err(ApiError::Forbidden);
+    }
+
+    job_to_scan_response(&job)
+        .map(Json)
+        .ok_or_else(|| ApiError::NotFound(format!("Job {} is not a scan", id)))
+}
+
+/// Maps a core Job row to the API's ScanResponse. Returns None for jobs
+/// that aren't ScanProject jobs — callers filter them out.
+fn job_to_scan_response(job: &sctv_core::Job) -> Option<ScanResponse> {
+    let project_id = match &job.job_type {
+        sctv_core::JobType::ScanProject { project_id } => *project_id,
+        _ => return None,
+    };
+
+    let (dependencies_found, alerts_created) = job
+        .result
+        .as_ref()
+        .and_then(|v| {
+            let deps = v.get("dependencies_found").and_then(|d| d.as_u64())? as u32;
+            let alerts = v.get("alerts_created").and_then(|a| a.as_u64())? as u32;
+            Some((deps, alerts))
+        })
+        .unwrap_or((0, 0));
+
+    Some(ScanResponse {
+        id: job.id.0,
+        project_id,
+        status: format!("{:?}", job.status).to_lowercase(),
+        started_at: job.started_at.unwrap_or(job.created_at),
+        completed_at: job.completed_at,
+        dependencies_found,
+        alerts_created,
+        error_message: job.error_message.clone(),
+    })
 }
 
 // ==================== Webhooks ====================

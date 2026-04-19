@@ -687,12 +687,14 @@ mod tests {
         let mut verifier = IntegrityVerifier::new();
 
         verifier.registry_checksums = Some(PackageChecksums {
+            sha1: None,
             sha256: Some("abc123".to_string()),
             sha512: None,
             integrity: None,
         });
 
         verifier.computed_checksums = Some(PackageChecksums {
+            sha1: None,
             sha256: Some("abc123".to_string()),
             sha512: None,
             integrity: None,
@@ -706,12 +708,14 @@ mod tests {
         let mut verifier = IntegrityVerifier::new();
 
         verifier.registry_checksums = Some(PackageChecksums {
+            sha1: None,
             sha256: Some("abc123".to_string()),
             sha512: None,
             integrity: None,
         });
 
         verifier.computed_checksums = Some(PackageChecksums {
+            sha1: None,
             sha256: Some("def456".to_string()),
             sha512: None,
             integrity: None,

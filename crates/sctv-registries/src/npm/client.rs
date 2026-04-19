@@ -7,6 +7,7 @@ use sctv_core::{
     Package, PackageChecksums, PackageDependency, PackageEcosystem, PackageId, PackageVersion,
 };
 use semver::Version;
+use sha1::Sha1;
 use sha2::{Digest, Sha256, Sha512};
 use std::sync::Arc;
 use std::time::Duration;
@@ -14,7 +15,8 @@ use url::Url;
 
 use super::models::*;
 use crate::{
-    PackageMetadata, RegistryCache, RegistryClient, RegistryError, RegistryResult, VersionMetadata,
+    retry_http, PackageMetadata, RegistryCache, RegistryClient, RegistryError, RegistryResult,
+    RetryConfig, VersionMetadata,
 };
 
 /// npm registry client with caching and hash verification.
@@ -60,12 +62,13 @@ impl NpmClient {
 
         tracing::debug!("Fetching abbreviated metadata for {} from {}", name, url);
 
-        let response = self
-            .http
-            .get(url)
-            .header("Accept", "application/vnd.npm.install-v1+json")
-            .send()
-            .await?;
+        let response = retry_http(&RetryConfig::default(), || {
+            self.http
+                .get(url.clone())
+                .header("Accept", "application/vnd.npm.install-v1+json")
+                .send()
+        })
+        .await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::PackageNotFound(name.to_string()));
@@ -97,7 +100,7 @@ impl NpmClient {
 
         tracing::debug!("Fetching full metadata for {} from {}", name, url);
 
-        let response = self.http.get(url).send().await?;
+        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::PackageNotFound(name.to_string()));
@@ -129,7 +132,7 @@ impl NpmClient {
 
         tracing::debug!("Fetching version {}@{} from {}", name, version, url);
 
-        let response = self.http.get(url).send().await?;
+        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::VersionNotFound(
@@ -151,12 +154,22 @@ impl NpmClient {
     /// Verifies the integrity of downloaded package bytes.
     pub fn verify_integrity(&self, bytes: &Bytes, expected: &PackageChecksums) -> IntegrityResult {
         let mut result = IntegrityResult {
+            sha1_match: None,
             sha256_match: None,
             sha512_match: None,
             integrity_match: None,
+            computed_sha1: None,
             computed_sha256: None,
             computed_sha512: None,
         };
+
+        // Compute SHA-1 (npm's dist.shasum is SHA-1)
+        let sha1_hash = {
+            let mut hasher = Sha1::new();
+            hasher.update(bytes);
+            hex::encode(hasher.finalize())
+        };
+        result.computed_sha1 = Some(sha1_hash.clone());
 
         // Compute SHA-256
         let sha256_hash = {
@@ -175,6 +188,10 @@ impl NpmClient {
         result.computed_sha512 = Some(sha512_hash.clone());
 
         // Check against expected values
+        if let Some(expected_sha1) = &expected.sha1 {
+            result.sha1_match = Some(expected_sha1.to_lowercase() == sha1_hash);
+        }
+
         if let Some(expected_sha256) = &expected.sha256 {
             result.sha256_match = Some(expected_sha256.to_lowercase() == sha256_hash);
         }
@@ -324,8 +341,9 @@ impl RegistryClient for NpmClient {
             .map_err(|e| RegistryError::Parse(format!("Invalid version: {e}")))?;
 
         let checksums = PackageChecksums {
-            sha256: None, // npm doesn't provide SHA256 by default
-            sha512: npm_version.dist.shasum.clone(),
+            sha1: npm_version.dist.shasum.clone(),
+            sha256: None,
+            sha512: None,
             integrity: npm_version.dist.integrity.clone(),
         };
 
@@ -384,7 +402,7 @@ impl RegistryClient for NpmClient {
 
         tracing::debug!("Downloading {}@{} from {}", name, version, url);
 
-        let response = self.http.get(url).send().await?;
+        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
 
         if !response.status().is_success() {
             return Err(RegistryError::Unavailable(format!(
@@ -475,9 +493,11 @@ impl RegistryClient for NpmClient {
 /// Result of integrity verification.
 #[derive(Debug, Clone)]
 pub struct IntegrityResult {
+    pub sha1_match: Option<bool>,
     pub sha256_match: Option<bool>,
     pub sha512_match: Option<bool>,
     pub integrity_match: Option<bool>,
+    pub computed_sha1: Option<String>,
     pub computed_sha256: Option<String>,
     pub computed_sha512: Option<String>,
 }
@@ -486,7 +506,12 @@ impl IntegrityResult {
     /// Returns true if all available checks passed.
     #[must_use]
     pub fn is_valid(&self) -> bool {
-        let checks = [self.sha256_match, self.sha512_match, self.integrity_match];
+        let checks = [
+            self.sha1_match,
+            self.sha256_match,
+            self.sha512_match,
+            self.integrity_match,
+        ];
         checks
             .iter()
             .filter_map(|c| *c)
@@ -496,7 +521,12 @@ impl IntegrityResult {
     /// Returns true if any check failed.
     #[must_use]
     pub fn has_failure(&self) -> bool {
-        let checks = [self.sha256_match, self.sha512_match, self.integrity_match];
+        let checks = [
+            self.sha1_match,
+            self.sha256_match,
+            self.sha512_match,
+            self.integrity_match,
+        ];
         checks.iter().filter_map(|c| *c).any(|matched| !matched)
     }
 }

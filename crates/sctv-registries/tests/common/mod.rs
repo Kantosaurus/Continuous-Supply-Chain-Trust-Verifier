@@ -416,6 +416,7 @@ pub fn create_test_version(version_str: &str) -> PackageVersion {
         deprecated: false,
         deprecation_message: None,
         checksums: PackageChecksums {
+            sha1: None,
             sha256: Some("abc123def456".to_string()),
             sha512: Some("sha512hash".to_string()),
             integrity: Some("sha512-testintegrity==".to_string()),

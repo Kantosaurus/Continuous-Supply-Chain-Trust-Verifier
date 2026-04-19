@@ -4,6 +4,7 @@
 //! Supports npm, PyPI, Maven, NuGet, RubyGems, Cargo, and Go modules.
 
 mod cache;
+mod retry;
 mod traits;
 
 pub mod cargo;
@@ -15,4 +16,5 @@ pub mod pypi;
 pub mod rubygems;
 
 pub use cache::*;
+pub use retry::{retry_http, RetryConfig};
 pub use traits::*;

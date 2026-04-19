@@ -15,7 +15,8 @@ use url::Url;
 
 use super::models::*;
 use crate::{
-    PackageMetadata, RegistryCache, RegistryClient, RegistryError, RegistryResult, VersionMetadata,
+    retry_http, PackageMetadata, RegistryCache, RegistryClient, RegistryError, RegistryResult,
+    RetryConfig, VersionMetadata,
 };
 
 /// Maven Central registry client with caching and hash verification.
@@ -66,7 +67,7 @@ impl MavenClient {
 
         tracing::debug!("Fetching Maven metadata from {}", url);
 
-        let response = self.http.get(url).send().await?;
+        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::PackageNotFound(coord.to_string()));
@@ -98,7 +99,7 @@ impl MavenClient {
 
         tracing::debug!("Fetching POM from {}", url);
 
-        let response = self.http.get(url).send().await?;
+        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
 
         if response.status() == reqwest::StatusCode::NOT_FOUND {
             return Err(RegistryError::VersionNotFound(
@@ -126,7 +127,7 @@ impl MavenClient {
             .join(&format!("{}.sha1", artifact_path))
             .map_err(|e| RegistryError::Parse(e.to_string()))?;
 
-        let response = self.http.get(url).send().await?;
+        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
 
         if !response.status().is_success() {
             return Ok(None);
@@ -145,7 +146,7 @@ impl MavenClient {
             .join(&format!("{}.sha256", artifact_path))
             .map_err(|e| RegistryError::Parse(e.to_string()))?;
 
-        let response = self.http.get(url).send().await?;
+        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
 
         if !response.status().is_success() {
             return Ok(None);
@@ -203,8 +204,8 @@ impl MavenClient {
         };
         result.computed_sha256 = Some(sha256_hash.clone());
 
-        // Check against expected SHA-1 (stored in sha512 field for Maven)
-        if let Some(expected_sha1) = &expected.sha512 {
+        // Check against expected SHA-1
+        if let Some(expected_sha1) = &expected.sha1 {
             result.sha1_match = Some(expected_sha1.to_lowercase() == sha1_hash);
         }
 
@@ -381,8 +382,9 @@ impl RegistryClient for MavenClient {
         );
 
         let checksums = PackageChecksums {
+            sha1: sha1.ok().flatten(),
             sha256: sha256.ok().flatten(),
-            sha512: sha1.ok().flatten(), // Store SHA-1 in sha512 field for Maven
+            sha512: None,
             integrity: None,
         };
 
@@ -425,7 +427,7 @@ impl RegistryClient for MavenClient {
 
         tracing::debug!("Downloading {}:{} from {}", name, version, url);
 
-        let response = self.http.get(url).send().await?;
+        let response = retry_http(&RetryConfig::default(), || self.http.get(url.clone()).send()).await?;
 
         if !response.status().is_success() {
             return Err(RegistryError::Unavailable(format!(
