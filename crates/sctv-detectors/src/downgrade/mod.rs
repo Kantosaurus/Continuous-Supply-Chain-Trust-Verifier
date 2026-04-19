@@ -70,7 +70,7 @@ pub enum DowngradeSeverity {
 impl DowngradeSeverity {
     /// Converts to alert severity.
     #[must_use]
-    pub fn to_alert_severity(self) -> Severity {
+    pub const fn to_alert_severity(self) -> Severity {
         match self {
             Self::Prerelease => Severity::Low,
             Self::Patch => Severity::Medium,
@@ -164,7 +164,10 @@ impl DowngradeDetector {
 
     /// Creates a detector with custom configuration and history store.
     #[must_use]
-    pub fn with_config_and_store(config: DowngradeConfig, store: VersionHistoryStore) -> Self {
+    pub const fn with_config_and_store(
+        config: DowngradeConfig,
+        store: VersionHistoryStore,
+    ) -> Self {
         Self {
             config,
             history_store: store,
@@ -225,7 +228,7 @@ impl DowngradeDetector {
     }
 
     /// Determines the severity of a version downgrade.
-    fn determine_severity(&self, previous: &Version, current: &Version) -> DowngradeSeverity {
+    const fn determine_severity(&self, previous: &Version, current: &Version) -> DowngradeSeverity {
         if previous.major != current.major {
             DowngradeSeverity::Major
         } else if previous.minor != current.minor {
@@ -239,7 +242,7 @@ impl DowngradeDetector {
     }
 
     /// Checks if a downgrade is allowed by configuration.
-    fn is_allowed_downgrade(
+    const fn is_allowed_downgrade(
         &self,
         _previous: &Version,
         _current: &Version,
@@ -279,7 +282,7 @@ impl DowngradeDetector {
                 if version_gap > 5 {
                     result.is_suspicious = true;
                     result.suspicious_reason =
-                        Some(format!("Large version gap of {} versions", version_gap));
+                        Some(format!("Large version gap of {version_gap} versions"));
                 }
 
                 // Suspicious: Downgrade crosses a major security release boundary
@@ -291,7 +294,7 @@ impl DowngradeDetector {
     }
 
     /// Calculates the "gap" between two versions (rough estimate).
-    fn calculate_version_gap(&self, previous: &Version, current: &Version) -> u64 {
+    const fn calculate_version_gap(&self, previous: &Version, current: &Version) -> u64 {
         let prev_score = (previous.major * 10000) + (previous.minor * 100) + previous.patch;
         let curr_score = (current.major * 10000) + (current.minor * 100) + current.patch;
         prev_score.saturating_sub(curr_score)
@@ -299,7 +302,7 @@ impl DowngradeDetector {
 
     /// Gets a reference to the history store.
     #[must_use]
-    pub fn history_store(&self) -> &VersionHistoryStore {
+    pub const fn history_store(&self) -> &VersionHistoryStore {
         &self.history_store
     }
 }
@@ -414,8 +417,7 @@ impl Detector for DowngradeDetector {
                 alert.dependency_id = Some(dependency.id);
                 alert.severity = analysis
                     .severity
-                    .map(|s| s.to_alert_severity())
-                    .unwrap_or(Severity::Medium);
+                    .map_or(Severity::Medium, DowngradeSeverity::to_alert_severity);
 
                 Some(alert)
             })

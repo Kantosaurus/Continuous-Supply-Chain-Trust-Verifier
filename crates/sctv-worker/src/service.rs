@@ -63,7 +63,7 @@ impl WorkerServiceConfig {
 
     /// Sets the job retention period.
     #[must_use]
-    pub fn with_retention(mut self, days: u32) -> Self {
+    pub const fn with_retention(mut self, days: u32) -> Self {
         self.job_retention_days = days;
         self
     }
@@ -281,16 +281,19 @@ impl WorkerService {
     }
 
     /// Gets worker pool statistics.
+    #[must_use]
     pub fn pool_stats(&self) -> Option<WorkerPoolStatsSnapshot> {
-        self.pool_handle.as_ref().map(|h| h.stats())
+        self.pool_handle
+            .as_ref()
+            .map(super::pool::WorkerPoolHandle::stats)
     }
 
     /// Checks if the worker pool is running.
+    #[must_use]
     pub fn is_running(&self) -> bool {
         self.pool_handle
             .as_ref()
-            .map(|h| h.is_running())
-            .unwrap_or(false)
+            .is_some_and(super::pool::WorkerPoolHandle::is_running)
     }
 
     /// Initiates graceful shutdown of the worker pool.
@@ -310,6 +313,7 @@ impl WorkerService {
     }
 
     /// Returns the registered job types.
+    #[must_use]
     pub fn registered_job_types(&self) -> Vec<JobType> {
         self.registry.registered_types()
     }

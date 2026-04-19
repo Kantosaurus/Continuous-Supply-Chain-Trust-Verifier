@@ -6,7 +6,7 @@ use sctv_core::traits::{RepositoryError, RepositoryResult, UserRepository};
 use sctv_core::{TenantId, User, UserId, UserRole};
 use sqlx::{PgPool, Row};
 
-/// PostgreSQL implementation of the user repository.
+/// `PostgreSQL` implementation of the user repository.
 pub struct PgUserRepository {
     pool: PgPool,
 }
@@ -49,11 +49,11 @@ impl PgUserRepository {
 impl UserRepository for PgUserRepository {
     async fn find_by_id(&self, id: UserId) -> RepositoryResult<Option<User>> {
         let record = sqlx::query(
-            r#"
+            r"
             SELECT id, tenant_id, email, name, role, api_key_hash,
                    last_login_at, created_at, updated_at
             FROM users WHERE id = $1
-            "#,
+            ",
         )
         .bind(id.0)
         .fetch_optional(&self.pool)
@@ -72,11 +72,11 @@ impl UserRepository for PgUserRepository {
         email: &str,
     ) -> RepositoryResult<Option<User>> {
         let record = sqlx::query(
-            r#"
+            r"
             SELECT id, tenant_id, email, name, role, api_key_hash,
                    last_login_at, created_at, updated_at
             FROM users WHERE tenant_id = $1 AND email = $2
-            "#,
+            ",
         )
         .bind(tenant_id.0)
         .bind(email)
@@ -92,11 +92,11 @@ impl UserRepository for PgUserRepository {
 
     async fn find_by_api_key(&self, api_key_hash: &str) -> RepositoryResult<Option<User>> {
         let record = sqlx::query(
-            r#"
+            r"
             SELECT id, tenant_id, email, name, role, api_key_hash,
                    last_login_at, created_at, updated_at
             FROM users WHERE api_key_hash = $1
-            "#,
+            ",
         )
         .bind(api_key_hash)
         .fetch_optional(&self.pool)
@@ -111,13 +111,13 @@ impl UserRepository for PgUserRepository {
 
     async fn find_by_tenant(&self, tenant_id: TenantId) -> RepositoryResult<Vec<User>> {
         let records = sqlx::query(
-            r#"
+            r"
             SELECT id, tenant_id, email, name, role, api_key_hash,
                    last_login_at, created_at, updated_at
             FROM users
             WHERE tenant_id = $1
             ORDER BY created_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id.0)
         .fetch_all(&self.pool)
@@ -129,12 +129,12 @@ impl UserRepository for PgUserRepository {
 
     async fn create(&self, user: &User) -> RepositoryResult<()> {
         sqlx::query(
-            r#"
+            r"
             INSERT INTO users (
                 id, tenant_id, email, name, role, api_key_hash,
                 last_login_at, created_at, updated_at
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-            "#,
+            ",
         )
         .bind(user.id.0)
         .bind(user.tenant_id.0)
@@ -160,12 +160,12 @@ impl UserRepository for PgUserRepository {
 
     async fn update(&self, user: &User) -> RepositoryResult<()> {
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE users SET
                 email = $2, name = $3, role = $4, api_key_hash = $5,
                 last_login_at = $6, updated_at = NOW()
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(user.id.0)
         .bind(&user.email)

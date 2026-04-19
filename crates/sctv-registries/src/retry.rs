@@ -3,7 +3,7 @@
 //! Intended for wrapping `reqwest::Client::*().send()` calls in registry
 //! clients. Retries on connect/timeout errors and 5xx / 429 responses;
 //! 4xx responses are returned to the caller untouched so they can decide
-//! whether the error is recoverable (e.g. 404 → PackageNotFound).
+//! whether the error is recoverable (e.g. 404 → `PackageNotFound`).
 
 use reqwest::{Response, StatusCode};
 use std::future::Future;
@@ -12,7 +12,7 @@ use std::time::Duration;
 /// Configuration for HTTP retry behavior.
 #[derive(Debug, Clone)]
 pub struct RetryConfig {
-    /// Number of additional attempts after the first one (total attempts = 1 + max_retries).
+    /// Number of additional attempts after the first one (total attempts = 1 + `max_retries`).
     pub max_retries: u32,
     /// Initial backoff delay.
     pub initial_delay: Duration,

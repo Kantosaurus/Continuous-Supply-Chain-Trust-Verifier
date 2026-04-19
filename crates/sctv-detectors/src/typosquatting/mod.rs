@@ -4,7 +4,6 @@
 //! which may indicate a typosquatting attack.
 
 use async_trait::async_trait;
-use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use sctv_core::{
     normalize_package_name, Alert, AlertType, Dependency, PackageEcosystem, TyposquattingDetails,
@@ -188,7 +187,8 @@ impl PopularPackagesStore {
 }
 
 /// Global popular packages store.
-static POPULAR_PACKAGES: Lazy<PopularPackagesStore> = Lazy::new(PopularPackagesStore::new);
+static POPULAR_PACKAGES: std::sync::LazyLock<PopularPackagesStore> =
+    std::sync::LazyLock::new(PopularPackagesStore::new);
 
 /// A potential typosquatting candidate.
 #[derive(Debug, Clone, Serialize, serde::Deserialize)]
@@ -209,7 +209,7 @@ pub enum Confidence {
 }
 
 impl Confidence {
-    fn to_score(self) -> f64 {
+    const fn to_score(self) -> f64 {
         match self {
             Self::Low => 0.5,
             Self::Medium => 0.75,
@@ -394,8 +394,8 @@ impl TyposquattingDetector {
 
     /// Checks if names are combosquatting variants.
     fn is_combosquat(&self, suspicious: &str, popular: &str) -> bool {
-        let s_parts: Vec<&str> = suspicious.split(|c| c == '-' || c == '_').collect();
-        let p_parts: Vec<&str> = popular.split(|c| c == '-' || c == '_').collect();
+        let s_parts: Vec<&str> = suspicious.split(['-', '_']).collect();
+        let p_parts: Vec<&str> = popular.split(['-', '_']).collect();
 
         if s_parts.len() != p_parts.len() || s_parts.len() < 2 {
             return false;
@@ -404,8 +404,8 @@ impl TyposquattingDetector {
         // Check if parts are the same but in different order
         let mut s_sorted = s_parts.clone();
         let mut p_sorted = p_parts.clone();
-        s_sorted.sort();
-        p_sorted.sort();
+        s_sorted.sort_unstable();
+        p_sorted.sort_unstable();
 
         s_sorted == p_sorted && s_parts != p_parts
     }

@@ -28,11 +28,11 @@ pub struct NotificationServiceConfig {
     pub default_min_severity: Option<Severity>,
 }
 
-fn default_parallel() -> bool {
+const fn default_parallel() -> bool {
     true
 }
 
-fn default_continue_on_failure() -> bool {
+const fn default_continue_on_failure() -> bool {
     true
 }
 
@@ -53,28 +53,28 @@ pub struct NotificationServiceConfigBuilder {
 impl NotificationServiceConfigBuilder {
     /// Sets whether to deliver in parallel.
     #[must_use]
-    pub fn parallel_delivery(mut self, parallel: bool) -> Self {
+    pub const fn parallel_delivery(mut self, parallel: bool) -> Self {
         self.config.parallel_delivery = parallel;
         self
     }
 
     /// Sets whether to continue on failure.
     #[must_use]
-    pub fn continue_on_failure(mut self, continue_on_failure: bool) -> Self {
+    pub const fn continue_on_failure(mut self, continue_on_failure: bool) -> Self {
         self.config.continue_on_failure = continue_on_failure;
         self
     }
 
     /// Sets the default minimum severity.
     #[must_use]
-    pub fn default_min_severity(mut self, severity: Severity) -> Self {
+    pub const fn default_min_severity(mut self, severity: Severity) -> Self {
         self.config.default_min_severity = Some(severity);
         self
     }
 
     /// Builds the configuration.
     #[must_use]
-    pub fn build(self) -> NotificationServiceConfig {
+    pub const fn build(self) -> NotificationServiceConfig {
         self.config
     }
 }
@@ -124,13 +124,13 @@ impl MultiChannelResult {
 
     /// Returns true if all deliveries were successful.
     #[must_use]
-    pub fn all_successful(&self) -> bool {
+    pub const fn all_successful(&self) -> bool {
         self.failed == 0
     }
 
     /// Returns true if at least one delivery was successful.
     #[must_use]
-    pub fn any_successful(&self) -> bool {
+    pub const fn any_successful(&self) -> bool {
         self.successful > 0
     }
 }
@@ -289,10 +289,10 @@ impl NotificationService {
         // Track skipped channels
         for entry in &self.channels {
             if !self.should_send(entry, notification.severity) {
-                let reason = if !entry.enabled {
-                    "channel disabled"
-                } else {
+                let reason = if entry.enabled {
                     "severity below threshold"
+                } else {
+                    "channel disabled"
                 };
                 result.add_skipped(entry.channel.name().to_string(), reason);
             }
@@ -318,10 +318,10 @@ impl NotificationService {
             let channel_name = entry.channel.name().to_string();
 
             if !self.should_send(entry, notification.severity) {
-                let reason = if !entry.enabled {
-                    "channel disabled"
-                } else {
+                let reason = if entry.enabled {
                     "severity below threshold"
+                } else {
+                    "channel disabled"
                 };
                 result.add_skipped(channel_name, reason);
                 continue;
@@ -378,7 +378,7 @@ impl NotificationService {
 
     /// Returns the number of configured channels.
     #[must_use]
-    pub fn channel_count(&self) -> usize {
+    pub const fn channel_count(&self) -> usize {
         self.channels.len()
     }
 
@@ -409,7 +409,7 @@ impl NotificationServiceBuilder {
 
     /// Sets the service configuration.
     #[must_use]
-    pub fn config(mut self, config: NotificationServiceConfig) -> Self {
+    pub const fn config(mut self, config: NotificationServiceConfig) -> Self {
         self.config = config;
         self
     }
@@ -462,7 +462,7 @@ impl NotificationServiceBuilder {
         self
     }
 
-    /// Adds a PagerDuty channel.
+    /// Adds a `PagerDuty` channel.
     #[must_use]
     pub fn pagerduty(mut self, config: PagerDutyConfig, min_severity: Severity) -> Self {
         let enabled = config.enabled;

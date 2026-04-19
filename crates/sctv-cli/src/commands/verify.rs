@@ -17,7 +17,7 @@ pub async fn run(
     format: OutputFormat,
 ) -> anyhow::Result<()> {
     let ecosystem = PackageEcosystem::from_str(ecosystem)
-        .map_err(|_| anyhow::anyhow!("Unknown ecosystem: {}", ecosystem))?;
+        .map_err(|_| anyhow::anyhow!("Unknown ecosystem: {ecosystem}"))?;
 
     match ecosystem {
         PackageEcosystem::Npm => {}
@@ -56,7 +56,7 @@ pub async fn run(
             crate::shared::emit_sarif(&[])?;
         }
         OutputFormat::Text => {
-            println!("{} {}@{}", ecosystem, name, version);
+            println!("{ecosystem} {name}@{version}");
             if let Some(sha1) = &checksums.sha1 {
                 println!("  sha1:     {sha1}");
             }

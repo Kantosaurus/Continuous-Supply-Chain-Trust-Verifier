@@ -14,16 +14,17 @@ pub struct PaginationParams {
     pub per_page: u32,
 }
 
-fn default_page() -> u32 {
+const fn default_page() -> u32 {
     1
 }
 
-fn default_per_page() -> u32 {
+const fn default_per_page() -> u32 {
     20
 }
 
 impl PaginationParams {
-    pub fn offset(&self) -> u32 {
+    #[must_use]
+    pub const fn offset(&self) -> u32 {
         (self.page.saturating_sub(1)) * self.per_page
     }
 }

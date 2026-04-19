@@ -1,11 +1,11 @@
-//! CycloneDX SBOM format support.
+//! `CycloneDX` SBOM format support.
 //!
-//! This module provides CycloneDX 1.5 SBOM generation conforming to the
-//! OWASP CycloneDX specification.
+//! This module provides `CycloneDX` 1.5 SBOM generation conforming to the
+//! OWASP `CycloneDX` specification.
 //!
 //! # Specification
 //!
-//! CycloneDX is a lightweight SBOM standard designed for use in application
+//! `CycloneDX` is a lightweight SBOM standard designed for use in application
 //! security contexts and supply chain component analysis.
 //!
 //! - Specification: <https://cyclonedx.org/docs/1.5/>

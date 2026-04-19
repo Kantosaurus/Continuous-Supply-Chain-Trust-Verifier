@@ -86,6 +86,7 @@ impl DowngradePolicy {
     }
 
     /// Evaluates a downgrade against this policy.
+    #[must_use]
     pub fn evaluate(
         &self,
         package_name: &str,
@@ -142,6 +143,7 @@ pub struct DowngradeRule {
 
 impl DowngradeRule {
     /// Checks if this rule matches the given context.
+    #[must_use]
     pub fn matches(&self, context: &DowngradeContext) -> bool {
         // Check package filter
         if let Some(filter) = &self.package_filter {
@@ -176,15 +178,16 @@ pub enum DowngradeCondition {
     /// Matches if the version gap is at least N.
     VersionGapAtLeast(u64),
     /// Combines multiple conditions with AND.
-    All(Vec<DowngradeCondition>),
+    All(Vec<Self>),
     /// Combines multiple conditions with OR.
-    Any(Vec<DowngradeCondition>),
+    Any(Vec<Self>),
     /// Negates a condition.
-    Not(Box<DowngradeCondition>),
+    Not(Box<Self>),
 }
 
 impl DowngradeCondition {
     /// Checks if this condition matches the given context.
+    #[must_use]
     pub fn matches(&self, context: &DowngradeContext) -> bool {
         match self {
             Self::Always => true,
@@ -205,7 +208,7 @@ impl DowngradeCondition {
     }
 
     /// Calculates the version gap between two versions.
-    fn calculate_version_gap(previous: &Version, current: &Version) -> u64 {
+    const fn calculate_version_gap(previous: &Version, current: &Version) -> u64 {
         let prev_score = (previous.major * 10000) + (previous.minor * 100) + previous.patch;
         let curr_score = (current.major * 10000) + (current.minor * 100) + current.patch;
         prev_score.saturating_sub(curr_score)
@@ -236,6 +239,7 @@ pub struct PackageFilter {
 
 impl PackageFilter {
     /// Checks if a package name matches this filter.
+    #[must_use]
     pub fn matches(&self, package_name: &str) -> bool {
         // Check exclusions first
         for pattern in &self.exclude {
@@ -265,13 +269,11 @@ impl PackageFilter {
             return true;
         }
 
-        if pattern.ends_with('*') {
-            let prefix = &pattern[..pattern.len() - 1];
+        if let Some(prefix) = pattern.strip_suffix('*') {
             return name.starts_with(prefix);
         }
 
-        if pattern.starts_with('*') {
-            let suffix = &pattern[1..];
+        if let Some(suffix) = pattern.strip_prefix('*') {
             return name.ends_with(suffix);
         }
 
@@ -309,13 +311,13 @@ impl PolicyEvaluation {
 
     /// Checks if an alert should be created.
     #[must_use]
-    pub fn should_alert(&self) -> bool {
+    pub const fn should_alert(&self) -> bool {
         matches!(self.action, DowngradeAction::Alert | DowngradeAction::Block)
     }
 
     /// Checks if a warning should be logged.
     #[must_use]
-    pub fn should_warn(&self) -> bool {
+    pub const fn should_warn(&self) -> bool {
         matches!(
             self.action,
             DowngradeAction::Warn | DowngradeAction::Alert | DowngradeAction::Block

@@ -22,7 +22,7 @@ use crate::jobs::{
 /// Executor for sending notifications.
 ///
 /// This executor uses the `sctv-notifications` crate to deliver alerts
-/// through various channels (Email, Slack, Teams, PagerDuty, Webhook).
+/// through various channels (Email, Slack, Teams, `PagerDuty`, Webhook).
 pub struct SendNotificationExecutor;
 
 impl SendNotificationExecutor {
@@ -253,7 +253,7 @@ impl SendNotificationExecutor {
         }
     }
 
-    /// Sends notification via PagerDuty Events API.
+    /// Sends notification via `PagerDuty` Events API.
     async fn send_pagerduty(
         &self,
         payload: &SendNotificationPayload,

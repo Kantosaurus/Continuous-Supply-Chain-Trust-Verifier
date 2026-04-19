@@ -1,6 +1,6 @@
-//! Job queue implementation using PostgreSQL.
+//! Job queue implementation using `PostgreSQL`.
 //!
-//! This module provides a reliable job queue backed by PostgreSQL, using
+//! This module provides a reliable job queue backed by `PostgreSQL`, using
 //! `SELECT FOR UPDATE SKIP LOCKED` for efficient concurrent job claiming.
 
 mod postgres;
@@ -35,28 +35,28 @@ impl EnqueueOptions {
 
     /// Sets the priority.
     #[must_use]
-    pub fn with_priority(mut self, priority: JobPriority) -> Self {
+    pub const fn with_priority(mut self, priority: JobPriority) -> Self {
         self.priority = Some(priority);
         self
     }
 
     /// Sets the maximum attempts.
     #[must_use]
-    pub fn with_max_attempts(mut self, max: u32) -> Self {
+    pub const fn with_max_attempts(mut self, max: u32) -> Self {
         self.max_attempts = Some(max);
         self
     }
 
     /// Schedules the job for a specific time.
     #[must_use]
-    pub fn scheduled_at(mut self, time: DateTime<Utc>) -> Self {
+    pub const fn scheduled_at(mut self, time: DateTime<Utc>) -> Self {
         self.scheduled_at = Some(time);
         self
     }
 
     /// Sets the tenant ID.
     #[must_use]
-    pub fn with_tenant(mut self, tenant_id: sctv_core::TenantId) -> Self {
+    pub const fn with_tenant(mut self, tenant_id: sctv_core::TenantId) -> Self {
         self.tenant_id = Some(tenant_id);
         self
     }

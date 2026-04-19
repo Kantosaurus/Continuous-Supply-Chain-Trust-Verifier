@@ -9,7 +9,7 @@ use sctv_core::{
 use sqlx::{PgPool, Row};
 use std::net::IpAddr;
 
-/// PostgreSQL implementation of the audit log repository.
+/// `PostgreSQL` implementation of the audit log repository.
 pub struct PgAuditLogRepository {
     pool: PgPool,
 }
@@ -38,11 +38,11 @@ impl PgAuditLogRepository {
 
         let action = action_str
             .parse::<AuditAction>()
-            .map_err(|e| RepositoryError::InvalidData(e))?;
+            .map_err(RepositoryError::InvalidData)?;
 
         let resource_type = resource_type_str
             .parse::<ResourceType>()
-            .map_err(|e| RepositoryError::InvalidData(e))?;
+            .map_err(RepositoryError::InvalidData)?;
 
         let ip_address: Option<IpAddr> = ip_address_str.and_then(|s| s.parse().ok());
 
@@ -65,11 +65,11 @@ impl PgAuditLogRepository {
 impl AuditLogRepository for PgAuditLogRepository {
     async fn find_by_id(&self, id: AuditLogId) -> RepositoryResult<Option<AuditLog>> {
         let record = sqlx::query(
-            r#"
+            r"
             SELECT id, tenant_id, user_id, action, resource_type, resource_id,
                    details, ip_address::text, user_agent, created_at
             FROM audit_logs WHERE id = $1
-            "#,
+            ",
         )
         .bind(id.0)
         .fetch_optional(&self.pool)
@@ -90,44 +90,44 @@ impl AuditLogRepository for PgAuditLogRepository {
         offset: u32,
     ) -> RepositoryResult<Vec<AuditLog>> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT id, tenant_id, user_id, action, resource_type, resource_id,
                    details, ip_address::text, user_agent, created_at
             FROM audit_logs
             WHERE tenant_id = $1
-            "#,
+            ",
         );
 
         let mut param_count = 1;
 
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${}", param_count));
+            query.push_str(&format!(" AND user_id = ${param_count}"));
         }
 
         if filter.action.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND action = ANY(${})", param_count));
+            query.push_str(&format!(" AND action = ANY(${param_count})"));
         }
 
         if filter.resource_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND resource_type = ${}", param_count));
+            query.push_str(&format!(" AND resource_type = ${param_count}"));
         }
 
         if filter.resource_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND resource_id = ${}", param_count));
+            query.push_str(&format!(" AND resource_id = ${param_count}"));
         }
 
         if filter.from_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
 
         if filter.to_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at <= ${}", param_count));
+            query.push_str(&format!(" AND created_at <= ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -143,7 +143,10 @@ impl AuditLogRepository for PgAuditLogRepository {
         }
 
         if let Some(ref actions) = filter.action {
-            let action_strs: Vec<String> = actions.iter().map(|a| a.to_string()).collect();
+            let action_strs: Vec<String> = actions
+                .iter()
+                .map(std::string::ToString::to_string)
+                .collect();
             query_builder = query_builder.bind(action_strs);
         }
 
@@ -164,8 +167,8 @@ impl AuditLogRepository for PgAuditLogRepository {
         }
 
         let records = query_builder
-            .bind(limit as i64)
-            .bind(offset as i64)
+            .bind(i64::from(limit))
+            .bind(i64::from(offset))
             .fetch_all(&self.pool)
             .await
             .map_err(|e| RepositoryError::Database(e.to_string()))?;
@@ -175,12 +178,12 @@ impl AuditLogRepository for PgAuditLogRepository {
 
     async fn create(&self, audit_log: &AuditLog) -> RepositoryResult<()> {
         sqlx::query(
-            r#"
+            r"
             INSERT INTO audit_logs (
                 id, tenant_id, user_id, action, resource_type, resource_id,
                 details, ip_address, user_agent, created_at
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::inet, $9, $10)
-            "#,
+            ",
         )
         .bind(audit_log.id.0)
         .bind(audit_log.tenant_id.0)
@@ -208,12 +211,12 @@ impl AuditLogRepository for PgAuditLogRepository {
         }
 
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM audit_logs
             WHERE created_at < NOW() - INTERVAL '1 day' * $1
-            "#,
+            ",
         )
-        .bind(older_than_days as i64)
+        .bind(i64::from(older_than_days))
         .execute(&self.pool)
         .await
         .map_err(|e| RepositoryError::Database(e.to_string()))?;

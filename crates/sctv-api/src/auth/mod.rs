@@ -35,6 +35,7 @@ pub struct Claims {
 
 impl Claims {
     /// Creates new claims for a user.
+    #[must_use]
     pub fn new(
         user_id: Uuid,
         tenant_id: TenantId,
@@ -58,16 +59,19 @@ impl Claims {
     }
 
     /// Returns the tenant ID.
-    pub fn tenant_id(&self) -> TenantId {
+    #[must_use]
+    pub const fn tenant_id(&self) -> TenantId {
         TenantId(self.tenant_id)
     }
 
     /// Checks if the user has a specific role.
+    #[must_use]
     pub fn has_role(&self, role: &str) -> bool {
         self.roles.iter().any(|r| r == role)
     }
 
     /// Checks if the user is an admin.
+    #[must_use]
     pub fn is_admin(&self) -> bool {
         self.has_role("admin")
     }
@@ -115,7 +119,7 @@ impl FromRequestParts<Arc<AppState>> for AuthUser {
         // Decode and validate JWT
         let claims = decode_token(token, &state.jwt_secret)?;
 
-        Ok(AuthUser::from(claims))
+        Ok(Self::from(claims))
     }
 }
 

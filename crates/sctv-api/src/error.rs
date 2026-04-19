@@ -44,7 +44,8 @@ pub enum ApiError {
 
 impl ApiError {
     /// Returns the HTTP status code for this error.
-    pub fn status_code(&self) -> StatusCode {
+    #[must_use]
+    pub const fn status_code(&self) -> StatusCode {
         match self {
             Self::Unauthorized => StatusCode::UNAUTHORIZED,
             Self::Forbidden => StatusCode::FORBIDDEN,
@@ -60,7 +61,8 @@ impl ApiError {
     }
 
     /// Returns the error code for this error.
-    pub fn error_code(&self) -> &'static str {
+    #[must_use]
+    pub const fn error_code(&self) -> &'static str {
         match self {
             Self::Unauthorized => "UNAUTHORIZED",
             Self::Forbidden => "FORBIDDEN",
@@ -117,7 +119,7 @@ impl From<sctv_core::traits::RepositoryError> for ApiError {
             RepositoryError::AlreadyExists => Self::Conflict("Resource already exists".to_string()),
             RepositoryError::Database(msg) => Self::Database(msg),
             RepositoryError::Serialization(msg) => {
-                Self::Internal(format!("Serialization error: {}", msg))
+                Self::Internal(format!("Serialization error: {msg}"))
             }
             RepositoryError::InvalidData(msg) => Self::Validation(msg),
         }

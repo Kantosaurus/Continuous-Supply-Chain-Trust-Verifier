@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use tokio::sync::{broadcast, Semaphore};
+use tokio::sync::broadcast;
 use tokio::task::JoinHandle;
 
 use crate::error::{WorkerError, WorkerResult};
@@ -57,7 +57,7 @@ impl WorkerPoolConfig {
 
     /// Sets the number of workers.
     #[must_use]
-    pub fn with_workers(mut self, count: usize) -> Self {
+    pub const fn with_workers(mut self, count: usize) -> Self {
         self.worker_count = count;
         self
     }
@@ -71,7 +71,7 @@ impl WorkerPoolConfig {
 
     /// Sets the polling interval.
     #[must_use]
-    pub fn with_poll_interval(mut self, ms: u64) -> Self {
+    pub const fn with_poll_interval(mut self, ms: u64) -> Self {
         self.poll_interval_ms = ms;
         self
     }
@@ -143,6 +143,7 @@ impl<Q: JobQueue + 'static> WorkerPool<Q> {
     }
 
     /// Returns the current statistics.
+    #[must_use]
     pub fn stats(&self) -> WorkerPoolStatsSnapshot {
         self.stats.snapshot()
     }
@@ -239,7 +240,7 @@ impl<Q: JobQueue + 'static> WorkerPool<Q> {
                         Ok(None) => {
                             // No jobs available, wait before polling again
                             tokio::select! {
-                                _ = tokio::time::sleep(Duration::from_millis(
+                                () = tokio::time::sleep(Duration::from_millis(
                                     pool.config.poll_interval_ms
                                 )) => {}
                                 _ = shutdown_rx.recv() => {
@@ -271,7 +272,7 @@ impl<Q: JobQueue + 'static> WorkerPool<Q> {
 
         // Spawn stale job checker
         let stale_pool = pool.clone();
-        let stale_job_types = job_types.clone();
+        let _stale_job_types = job_types;
         let stale_handle = tokio::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_secs(
                 stale_pool.config.stale_check_interval_secs,
@@ -323,11 +324,13 @@ pub struct WorkerPoolHandle {
 
 impl WorkerPoolHandle {
     /// Returns the current statistics.
+    #[must_use]
     pub fn stats(&self) -> WorkerPoolStatsSnapshot {
         self.stats.snapshot()
     }
 
     /// Checks if the pool is running.
+    #[must_use]
     pub fn is_running(&self) -> bool {
         !self.shutdown.load(Ordering::Relaxed)
     }
@@ -344,22 +347,20 @@ impl WorkerPoolHandle {
         if self.config.graceful_shutdown {
             let timeout = Duration::from_secs(self.config.shutdown_timeout_secs);
 
-            match tokio::time::timeout(timeout, async {
+            if tokio::time::timeout(timeout, async {
                 for handle in self.worker_handles {
                     let _ = handle.await;
                 }
                 let _ = self.stale_handle.await;
             })
             .await
+                == Ok(())
             {
-                Ok(_) => {
-                    tracing::info!("Worker pool stopped gracefully");
-                    Ok(())
-                }
-                Err(_) => {
-                    tracing::warn!("Worker pool shutdown timed out");
-                    Err(WorkerError::Timeout)
-                }
+                tracing::info!("Worker pool stopped gracefully");
+                Ok(())
+            } else {
+                tracing::warn!("Worker pool shutdown timed out");
+                Err(WorkerError::Timeout)
             }
         } else {
             // Abort all workers immediately

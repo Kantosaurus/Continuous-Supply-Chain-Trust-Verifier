@@ -13,7 +13,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use url::Url;
 
-use super::models::*;
+use super::models::{NpmAbbreviatedPackage, NpmPackageDocument, NpmVersionResponse};
 use crate::{
     retry_http, PackageMetadata, RegistryCache, RegistryClient, RegistryError, RegistryResult,
     RetryConfig, VersionMetadata,

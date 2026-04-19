@@ -119,7 +119,7 @@ impl ProvenanceVerificationResult {
 
     /// Creates a result with verification failure.
     #[must_use]
-    pub fn verification_failed(errors: Vec<String>) -> Self {
+    pub const fn verification_failed(errors: Vec<String>) -> Self {
         Self {
             has_provenance: true,
             slsa_level: Some(0),
@@ -143,7 +143,7 @@ impl ProvenanceVerificationResult {
 
         let level_ok = self
             .slsa_level
-            .map_or(false, |l| l >= config.minimum_slsa_level);
+            .is_some_and(|l| l >= config.minimum_slsa_level);
         let sigstore_ok = !config.require_sigstore || self.sigstore_verified;
         let builder_ok = self.builder_trusted || config.trusted_builders.is_empty();
 
@@ -238,7 +238,7 @@ impl ProvenanceDetector {
                     builder_id: details.and_then(|d| d.builder_id.clone()),
                     builder_trusted: details
                         .and_then(|d| d.builder_id.as_ref())
-                        .map_or(false, |id| self.config.trusted_builders.contains(id)),
+                        .is_some_and(|id| self.config.trusted_builders.contains(id)),
                     source_uri: details.and_then(|d| d.source_uri.clone()),
                     source_digest: details.and_then(|d| d.source_digest.clone()),
                     sigstore_verified: dependency.integrity.signature_status
@@ -275,7 +275,7 @@ impl ProvenanceDetector {
             && result
                 .rekor_entry
                 .as_ref()
-                .map_or(false, |e| e.inclusion_verified)
+                .is_some_and(|e| e.inclusion_verified)
             && result.source_digest.is_some()
         {
             level = 3;
@@ -366,28 +366,19 @@ impl Detector for ProvenanceDetector {
                         attestation_errors: verification.errors.clone(),
                     };
 
-                    let title = if !verification.has_provenance {
-                        format!(
-                            "Missing provenance for {}@{}",
-                            dependency.package_name, dependency.resolved_version
-                        )
-                    } else {
+                    let title = if verification.has_provenance {
                         format!(
                             "SLSA provenance verification failed for {}@{}",
                             dependency.package_name, dependency.resolved_version
                         )
+                    } else {
+                        format!(
+                            "Missing provenance for {}@{}",
+                            dependency.package_name, dependency.resolved_version
+                        )
                     };
 
-                    let description = if !verification.has_provenance {
-                        format!(
-                            "Package '{}' version {} does not have SLSA provenance attestation. \
-                             Required minimum level: {}. This means the build process cannot be \
-                             verified and the package may not be from a trusted source.",
-                            dependency.package_name,
-                            dependency.resolved_version,
-                            self.config.minimum_slsa_level
-                        )
-                    } else {
+                    let description = if verification.has_provenance {
                         format!(
                             "Package '{}' version {} has SLSA level {} but requires level {}. \
                              Errors: {}",
@@ -396,6 +387,15 @@ impl Detector for ProvenanceDetector {
                             verification.slsa_level.unwrap_or(0),
                             self.config.minimum_slsa_level,
                             verification.errors.join(", ")
+                        )
+                    } else {
+                        format!(
+                            "Package '{}' version {} does not have SLSA provenance attestation. \
+                             Required minimum level: {}. This means the build process cannot be \
+                             verified and the package may not be from a trusted source.",
+                            dependency.package_name,
+                            dependency.resolved_version,
+                            self.config.minimum_slsa_level
                         )
                     };
 
@@ -531,7 +531,7 @@ mod tests {
         assert!(valid_result.is_valid(&config));
 
         // Invalid - level too low
-        let mut invalid_level = valid_result.clone();
+        let mut invalid_level = valid_result;
         invalid_level.slsa_level = Some(0);
         assert!(!invalid_level.is_valid(&config));
 
@@ -540,7 +540,7 @@ mod tests {
         assert!(no_provenance.is_valid(&config));
 
         // Missing provenance with allow_missing = false
-        let mut strict_config = config.clone();
+        let mut strict_config = config;
         strict_config.allow_missing_provenance = false;
         assert!(!no_provenance.is_valid(&strict_config));
     }

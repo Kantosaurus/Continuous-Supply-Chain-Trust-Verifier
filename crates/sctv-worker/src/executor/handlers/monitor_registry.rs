@@ -21,7 +21,7 @@ pub struct MonitorRegistryExecutor;
 impl MonitorRegistryExecutor {
     /// Creates a new monitor registry executor.
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self
     }
 
@@ -88,17 +88,17 @@ impl MonitorRegistryExecutor {
                         }
 
                         // Check for maintainer changes
-                        if payload.check_maintainer_changes {
-                            if metadata.package.maintainers != cached_pkg.maintainers {
-                                maintainer_changes_detected += 1;
-                                tracing::warn!(
-                                    package = package_name,
-                                    old_maintainers = ?cached_pkg.maintainers,
-                                    new_maintainers = ?metadata.package.maintainers,
-                                    "Maintainer change detected"
-                                );
-                                // In a real implementation, create an alert here
-                            }
+                        if payload.check_maintainer_changes
+                            && metadata.package.maintainers != cached_pkg.maintainers
+                        {
+                            maintainer_changes_detected += 1;
+                            tracing::warn!(
+                                package = package_name,
+                                old_maintainers = ?cached_pkg.maintainers,
+                                new_maintainers = ?metadata.package.maintainers,
+                                "Maintainer change detected"
+                            );
+                            // In a real implementation, create an alert here
                         }
 
                         // Update cached package

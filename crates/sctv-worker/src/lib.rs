@@ -55,7 +55,7 @@
 //!
 //! # Reliability Features
 //!
-//! - **Atomic job claiming**: Uses PostgreSQL's `SKIP LOCKED` for safe concurrent access
+//! - **Atomic job claiming**: Uses `PostgreSQL`'s `SKIP LOCKED` for safe concurrent access
 //! - **Automatic retries**: Configurable retry count with exponential backoff potential
 //! - **Stale job recovery**: Automatically releases jobs that appear stuck
 //! - **Graceful shutdown**: Waits for running jobs to complete before stopping

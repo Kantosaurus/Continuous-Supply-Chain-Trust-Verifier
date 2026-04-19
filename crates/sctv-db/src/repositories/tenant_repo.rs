@@ -5,7 +5,7 @@ use sctv_core::traits::{RepositoryError, RepositoryResult, TenantRepository};
 use sctv_core::{Tenant, TenantId};
 use sqlx::{PgPool, Row};
 
-/// PostgreSQL implementation of the tenant repository.
+/// `PostgreSQL` implementation of the tenant repository.
 pub struct PgTenantRepository {
     pool: PgPool,
 }

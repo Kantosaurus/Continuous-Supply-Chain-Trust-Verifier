@@ -25,7 +25,7 @@ pub struct ScanProjectPayload {
 impl ScanProjectPayload {
     /// Creates a new scan project payload.
     #[must_use]
-    pub fn new(project_id: ProjectId, tenant_id: TenantId) -> Self {
+    pub const fn new(project_id: ProjectId, tenant_id: TenantId) -> Self {
         Self {
             project_id,
             tenant_id,
@@ -43,7 +43,7 @@ impl ScanProjectPayload {
 
     /// Enables full scan mode (ignores cache).
     #[must_use]
-    pub fn full_scan(mut self) -> Self {
+    pub const fn full_scan(mut self) -> Self {
         self.full_scan = true;
         self
     }
@@ -82,7 +82,7 @@ pub struct MonitorRegistryPayload {
 impl MonitorRegistryPayload {
     /// Creates a new monitor registry payload.
     #[must_use]
-    pub fn new(ecosystem: PackageEcosystem) -> Self {
+    pub const fn new(ecosystem: PackageEcosystem) -> Self {
         Self {
             ecosystem,
             packages: Vec::new(),
@@ -101,7 +101,7 @@ impl MonitorRegistryPayload {
 
     /// Configures what to check.
     #[must_use]
-    pub fn check_only(
+    pub const fn check_only(
         mut self,
         new_versions: bool,
         removals: bool,
@@ -157,7 +157,7 @@ pub struct VerifyProvenancePayload {
 impl VerifyProvenancePayload {
     /// Creates a new verify provenance payload.
     #[must_use]
-    pub fn new(
+    pub const fn new(
         dependency_id: DependencyId,
         tenant_id: TenantId,
         ecosystem: PackageEcosystem,
@@ -178,7 +178,7 @@ impl VerifyProvenancePayload {
 
     /// Configures which verification methods to use.
     #[must_use]
-    pub fn verify_only(mut self, slsa: bool, sigstore: bool, intoto: bool) -> Self {
+    pub const fn verify_only(mut self, slsa: bool, sigstore: bool, intoto: bool) -> Self {
         self.verify_slsa = slsa;
         self.verify_sigstore = sigstore;
         self.verify_intoto = intoto;
@@ -242,7 +242,7 @@ pub enum NotificationChannel {
     Slack,
     /// Microsoft Teams webhook.
     Teams,
-    /// PagerDuty alert.
+    /// `PagerDuty` alert.
     PagerDuty,
     /// Generic webhook.
     Webhook,

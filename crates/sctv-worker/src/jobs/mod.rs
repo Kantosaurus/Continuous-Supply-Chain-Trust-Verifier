@@ -58,7 +58,7 @@ pub enum JobStatus {
 impl JobStatus {
     /// Returns the database string representation.
     #[must_use]
-    pub fn as_str(&self) -> &'static str {
+    pub const fn as_str(&self) -> &'static str {
         match self {
             Self::Pending => "pending",
             Self::Running => "running",
@@ -100,7 +100,7 @@ pub enum JobType {
 impl JobType {
     /// Returns the database string representation.
     #[must_use]
-    pub fn as_str(&self) -> &'static str {
+    pub const fn as_str(&self) -> &'static str {
         match self {
             Self::ScanProject => "scan_project",
             Self::MonitorRegistry => "monitor_registry",
@@ -138,7 +138,7 @@ pub enum JobPayload {
 impl JobPayload {
     /// Returns the job type for this payload.
     #[must_use]
-    pub fn job_type(&self) -> JobType {
+    pub const fn job_type(&self) -> JobType {
         match self {
             Self::ScanProject(_) => JobType::ScanProject,
             Self::MonitorRegistry(_) => JobType::MonitorRegistry,
@@ -163,11 +163,12 @@ pub enum JobResult {
 }
 
 /// Priority levels for jobs.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, Default)]
 pub enum JobPriority {
     /// Low priority - processed when no higher priority jobs exist.
     Low = 0,
     /// Normal priority - default for most jobs.
+    #[default]
     Normal = 5,
     /// High priority - processed before normal priority.
     High = 10,
@@ -175,15 +176,9 @@ pub enum JobPriority {
     Critical = 15,
 }
 
-impl Default for JobPriority {
-    fn default() -> Self {
-        Self::Normal
-    }
-}
-
 impl From<JobPriority> for i32 {
     fn from(priority: JobPriority) -> Self {
-        priority as i32
+        priority as Self
     }
 }
 
@@ -259,28 +254,28 @@ impl Job {
 
     /// Sets the tenant ID for this job.
     #[must_use]
-    pub fn with_tenant(mut self, tenant_id: sctv_core::TenantId) -> Self {
+    pub const fn with_tenant(mut self, tenant_id: sctv_core::TenantId) -> Self {
         self.tenant_id = Some(tenant_id);
         self
     }
 
     /// Sets the priority for this job.
     #[must_use]
-    pub fn with_priority(mut self, priority: JobPriority) -> Self {
+    pub const fn with_priority(mut self, priority: JobPriority) -> Self {
         self.priority = priority;
         self
     }
 
     /// Sets the maximum retry attempts.
     #[must_use]
-    pub fn with_max_attempts(mut self, max: u32) -> Self {
+    pub const fn with_max_attempts(mut self, max: u32) -> Self {
         self.max_attempts = max;
         self
     }
 
     /// Schedules the job for a specific time.
     #[must_use]
-    pub fn scheduled_for(mut self, time: DateTime<Utc>) -> Self {
+    pub const fn scheduled_for(mut self, time: DateTime<Utc>) -> Self {
         self.scheduled_at = time;
         self.status = JobStatus::Scheduled;
         self
@@ -288,7 +283,7 @@ impl Job {
 
     /// Checks if the job can be retried.
     #[must_use]
-    pub fn can_retry(&self) -> bool {
+    pub const fn can_retry(&self) -> bool {
         self.attempts < self.max_attempts
     }
 

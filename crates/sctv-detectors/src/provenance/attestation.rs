@@ -347,6 +347,7 @@ impl AttestationParser {
     }
 
     /// Converts parsed provenance to core domain types.
+    #[must_use]
     pub fn to_attestation(
         envelope: &DsseEnvelope,
         statement: &InTotoStatement,

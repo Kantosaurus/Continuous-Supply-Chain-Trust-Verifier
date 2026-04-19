@@ -33,11 +33,11 @@ pub struct SlackConfig {
     pub enabled: bool,
 }
 
-fn default_timeout() -> u64 {
+const fn default_timeout() -> u64 {
     30
 }
 
-fn default_enabled() -> bool {
+const fn default_enabled() -> bool {
     true
 }
 
@@ -99,14 +99,14 @@ impl SlackConfigBuilder {
 
     /// Sets the request timeout.
     #[must_use]
-    pub fn timeout_secs(mut self, secs: u64) -> Self {
+    pub const fn timeout_secs(mut self, secs: u64) -> Self {
         self.config.timeout_secs = secs;
         self
     }
 
     /// Sets whether the channel is enabled.
     #[must_use]
-    pub fn enabled(mut self, enabled: bool) -> Self {
+    pub const fn enabled(mut self, enabled: bool) -> Self {
         self.config.enabled = enabled;
         self
     }
@@ -168,7 +168,7 @@ impl SlackChannel {
     }
 
     /// Returns the color for the given severity level.
-    fn severity_color(severity: Severity) -> &'static str {
+    const fn severity_color(severity: Severity) -> &'static str {
         match severity {
             Severity::Critical => "#dc3545", // Red
             Severity::High => "#fd7e14",     // Orange
@@ -179,7 +179,7 @@ impl SlackChannel {
     }
 
     /// Returns the emoji for the given severity level.
-    fn severity_emoji(severity: Severity) -> &'static str {
+    const fn severity_emoji(severity: Severity) -> &'static str {
         match severity {
             Severity::Critical => ":rotating_light:",
             Severity::High => ":warning:",

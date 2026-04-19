@@ -7,7 +7,7 @@ use sctv_core::{Package, PackageEcosystem, PackageId};
 use sqlx::{PgPool, Row};
 use url::Url;
 
-/// PostgreSQL implementation of the package repository.
+/// `PostgreSQL` implementation of the package repository.
 pub struct PgPackageRepository {
     pool: PgPool,
 }
@@ -34,9 +34,9 @@ impl PgPackageRepository {
         let last_updated: Option<DateTime<Utc>> = row.get("last_updated");
         let cached_at: DateTime<Utc> = row.get("cached_at");
 
-        let ecosystem: PackageEcosystem = ecosystem.parse().map_err(|_| {
-            RepositoryError::InvalidData(format!("Invalid ecosystem: {}", ecosystem))
-        })?;
+        let ecosystem: PackageEcosystem = ecosystem
+            .parse()
+            .map_err(|_| RepositoryError::InvalidData(format!("Invalid ecosystem: {ecosystem}")))?;
 
         let homepage = homepage.and_then(|u| Url::parse(&u).ok());
         let repository = repository.and_then(|u| Url::parse(&u).ok());
@@ -66,11 +66,11 @@ impl PgPackageRepository {
 impl PackageRepository for PgPackageRepository {
     async fn find_by_id(&self, id: PackageId) -> RepositoryResult<Option<Package>> {
         let record = sqlx::query(
-            r#"
+            r"
             SELECT id, ecosystem, name, normalized_name, description, homepage, repository,
                    popularity_rank, is_popular, maintainers, first_published, last_updated, cached_at
             FROM packages WHERE id = $1
-            "#,
+            ",
         )
         .bind(id.0)
         .fetch_optional(&self.pool)
@@ -89,12 +89,12 @@ impl PackageRepository for PgPackageRepository {
         name: &str,
     ) -> RepositoryResult<Option<Package>> {
         let record = sqlx::query(
-            r#"
+            r"
             SELECT id, ecosystem, name, normalized_name, description, homepage, repository,
                    popularity_rank, is_popular, maintainers, first_published, last_updated, cached_at
             FROM packages
             WHERE ecosystem = $1 AND name = $2
-            "#,
+            ",
         )
         .bind(ecosystem.to_string().to_lowercase())
         .bind(name)
@@ -113,7 +113,7 @@ impl PackageRepository for PgPackageRepository {
             .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
         sqlx::query(
-            r#"
+            r"
             INSERT INTO packages (
                 id, ecosystem, name, normalized_name, description, homepage, repository,
                 popularity_rank, is_popular, maintainers, first_published, last_updated, cached_at
@@ -130,15 +130,15 @@ impl PackageRepository for PgPackageRepository {
                 first_published = COALESCE(packages.first_published, EXCLUDED.first_published),
                 last_updated = EXCLUDED.last_updated,
                 cached_at = EXCLUDED.cached_at
-            "#,
+            ",
         )
         .bind(package.id.0)
         .bind(package.ecosystem.to_string().to_lowercase())
         .bind(&package.name)
         .bind(&package.normalized_name)
         .bind(&package.description)
-        .bind(package.homepage.as_ref().map(|u| u.as_str()))
-        .bind(package.repository.as_ref().map(|u| u.as_str()))
+        .bind(package.homepage.as_ref().map(url::Url::as_str))
+        .bind(package.repository.as_ref().map(url::Url::as_str))
         .bind(package.popularity_rank.map(|r| r as i32))
         .bind(package.is_popular)
         .bind(maintainers)
@@ -158,17 +158,17 @@ impl PackageRepository for PgPackageRepository {
         limit: u32,
     ) -> RepositoryResult<Vec<Package>> {
         let records = sqlx::query(
-            r#"
+            r"
             SELECT id, ecosystem, name, normalized_name, description, homepage, repository,
                    popularity_rank, is_popular, maintainers, first_published, last_updated, cached_at
             FROM packages
             WHERE ecosystem = $1 AND is_popular = true
             ORDER BY popularity_rank ASC NULLS LAST
             LIMIT $2
-            "#,
+            ",
         )
         .bind(ecosystem.to_string().to_lowercase())
-        .bind(limit as i64)
+        .bind(i64::from(limit))
         .fetch_all(&self.pool)
         .await
         .map_err(|e| RepositoryError::Database(e.to_string()))?;
@@ -184,7 +184,7 @@ impl PackageRepository for PgPackageRepository {
     ) -> RepositoryResult<Vec<Package>> {
         // Use the pg_trgm extension for fuzzy matching
         let records = sqlx::query(
-            r#"
+            r"
             SELECT id, ecosystem, name, normalized_name, description, homepage, repository,
                    popularity_rank, is_popular, maintainers, first_published, last_updated, cached_at
             FROM packages
@@ -198,11 +198,11 @@ impl PackageRepository for PgPackageRepository {
                 similarity(name, $2) DESC,
                 popularity_rank ASC NULLS LAST
             LIMIT $3
-            "#,
+            ",
         )
         .bind(ecosystem.to_string().to_lowercase())
         .bind(prefix)
-        .bind(limit as i64)
+        .bind(i64::from(limit))
         .fetch_all(&self.pool)
         .await
         .map_err(|e| RepositoryError::Database(e.to_string()))?;
@@ -230,12 +230,12 @@ impl PgPackageVersionRepository {
         version: &str,
     ) -> RepositoryResult<Option<sctv_core::PackageVersion>> {
         let record = sqlx::query(
-            r#"
+            r"
             SELECT package_id, version, published_at, yanked, deprecated, deprecation_message,
                    checksums, download_url, size_bytes, attestations, dependencies, cached_at
             FROM package_versions
             WHERE package_id = $1 AND version = $2
-            "#,
+            ",
         )
         .bind(package_id.0)
         .bind(version)
@@ -259,7 +259,7 @@ impl PgPackageVersionRepository {
                 let cached_at: DateTime<Utc> = row.get("cached_at");
 
                 let version = semver::Version::parse(&version_str)
-                    .map_err(|e| RepositoryError::InvalidData(format!("Invalid version: {}", e)))?;
+                    .map_err(|e| RepositoryError::InvalidData(format!("Invalid version: {e}")))?;
 
                 let checksums: sctv_core::PackageChecksums = serde_json::from_value(checksums)
                     .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
@@ -305,7 +305,7 @@ impl PgPackageVersionRepository {
             .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
         sqlx::query(
-            r#"
+            r"
             INSERT INTO package_versions (
                 package_id, version, published_at, yanked, deprecated, deprecation_message,
                 checksums, download_url, size_bytes, attestations, dependencies, cached_at
@@ -322,7 +322,7 @@ impl PgPackageVersionRepository {
                 attestations = EXCLUDED.attestations,
                 dependencies = EXCLUDED.dependencies,
                 cached_at = EXCLUDED.cached_at
-            "#,
+            ",
         )
         .bind(version.package_id.0)
         .bind(version.version.to_string())
@@ -331,7 +331,7 @@ impl PgPackageVersionRepository {
         .bind(version.deprecated)
         .bind(&version.deprecation_message)
         .bind(checksums)
-        .bind(version.download_url.as_ref().map(|u| u.as_str()))
+        .bind(version.download_url.as_ref().map(url::Url::as_str))
         .bind(version.size_bytes.map(|s| s as i64))
         .bind(attestations)
         .bind(dependencies)
@@ -349,13 +349,13 @@ impl PgPackageVersionRepository {
         package_id: PackageId,
     ) -> RepositoryResult<Vec<sctv_core::PackageVersion>> {
         let records = sqlx::query(
-            r#"
+            r"
             SELECT package_id, version, published_at, yanked, deprecated, deprecation_message,
                    checksums, download_url, size_bytes, attestations, dependencies, cached_at
             FROM package_versions
             WHERE package_id = $1
             ORDER BY published_at DESC NULLS LAST
-            "#,
+            ",
         )
         .bind(package_id.0)
         .fetch_all(&self.pool)

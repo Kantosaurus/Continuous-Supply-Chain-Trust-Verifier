@@ -1,34 +1,37 @@
-//! CycloneDX SBOM generator.
+//! `CycloneDX` SBOM generator.
 
 use sctv_core::{Dependency, PackageEcosystem, Project};
 use uuid::Uuid;
 
-use super::models::*;
+use super::models::{
+    Bom, Component, ComponentScope, ComponentType, Composition, ExternalReference, Hash, Metadata,
+    OrganizationalEntity, Property, Tool,
+};
 use crate::common::{generate_bom_ref, GeneratorConfig};
 use crate::{SbomError, SbomFormat, SbomGenerator, SbomOutput, SbomResult};
 
-/// CycloneDX 1.5 SBOM generator.
+/// `CycloneDX` 1.5 SBOM generator.
 pub struct CycloneDxGenerator {
     /// Whether to output XML instead of JSON.
     xml_output: bool,
 }
 
 impl CycloneDxGenerator {
-    /// Creates a new CycloneDX generator.
+    /// Creates a new `CycloneDX` generator.
     #[must_use]
-    pub fn new(xml_output: bool) -> Self {
+    pub const fn new(xml_output: bool) -> Self {
         Self { xml_output }
     }
 
     /// Creates a JSON generator.
     #[must_use]
-    pub fn json() -> Self {
+    pub const fn json() -> Self {
         Self::new(false)
     }
 
     /// Creates an XML generator.
     #[must_use]
-    pub fn xml() -> Self {
+    pub const fn xml() -> Self {
         Self::new(true)
     }
 
@@ -259,7 +262,7 @@ impl CycloneDxGenerator {
         xml.push_str(r#"<bom xmlns="http://cyclonedx.org/schema/bom/1.5" "#);
         xml.push_str(r#"version="1" "#);
         if let Some(serial) = &bom.serial_number {
-            xml.push_str(&format!(r#"serialNumber="{}" "#, serial));
+            xml.push_str(&format!(r#"serialNumber="{serial}" "#));
         }
         xml.push_str(">\n");
 
@@ -267,7 +270,7 @@ impl CycloneDxGenerator {
         if let Some(metadata) = &bom.metadata {
             xml.push_str("  <metadata>\n");
             if let Some(timestamp) = &metadata.timestamp {
-                xml.push_str(&format!("    <timestamp>{}</timestamp>\n", timestamp));
+                xml.push_str(&format!("    <timestamp>{timestamp}</timestamp>\n"));
             }
             for tool in &metadata.tools {
                 xml.push_str("    <tools>\n");
@@ -422,7 +425,7 @@ fn escape_xml(s: &str) -> String {
 }
 
 /// Returns the XML representation of a component type.
-fn component_type_xml(ct: &ComponentType) -> &'static str {
+const fn component_type_xml(ct: &ComponentType) -> &'static str {
     match ct {
         ComponentType::Application => "application",
         ComponentType::Framework => "framework",

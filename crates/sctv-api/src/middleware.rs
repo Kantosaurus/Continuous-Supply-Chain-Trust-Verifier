@@ -31,14 +31,16 @@ pub struct RateLimiter {
 }
 
 impl RateLimiter {
-    pub fn new(requests_per_minute: u32) -> Self {
+    #[must_use]
+    pub const fn new(requests_per_minute: u32) -> Self {
         Self {
             requests_per_minute,
         }
     }
 
     /// Checks if a request should be rate limited.
-    pub fn check(&self, _client_id: &str) -> bool {
+    #[must_use]
+    pub const fn check(&self, _client_id: &str) -> bool {
         // In a real implementation, track requests per client
         // and return true if rate limit exceeded
         false

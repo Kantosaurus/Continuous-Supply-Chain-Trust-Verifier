@@ -17,7 +17,7 @@ pub fn init_tracing() {
     });
 }
 
-/// PostgreSQL container image for testing.
+/// `PostgreSQL` container image for testing.
 #[derive(Debug, Clone)]
 pub struct PostgresImage {
     env_vars: Vec<(String, String)>,
@@ -36,11 +36,11 @@ impl Default for PostgresImage {
 }
 
 impl testcontainers::Image for PostgresImage {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "postgres"
     }
 
-    fn tag(&self) -> &str {
+    fn tag(&self) -> &'static str {
         "16-alpine"
     }
 
@@ -98,7 +98,7 @@ impl TestDb {
             .await
             .expect("Failed to get host port");
 
-        let database_url = format!("postgres://test:test@127.0.0.1:{}/sctv_test", host_port);
+        let database_url = format!("postgres://test:test@127.0.0.1:{host_port}/sctv_test");
 
         // Wait a bit for PostgreSQL to be fully ready
         tokio::time::sleep(std::time::Duration::from_secs(2)).await;

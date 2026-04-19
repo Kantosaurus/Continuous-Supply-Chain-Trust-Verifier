@@ -37,16 +37,19 @@ impl ExecutorRegistry {
     }
 
     /// Gets the executor for a job type.
+    #[must_use]
     pub fn get(&self, job_type: &JobType) -> Option<&BoxedExecutor> {
         self.executors.get(job_type)
     }
 
     /// Returns all registered job types.
+    #[must_use]
     pub fn registered_types(&self) -> Vec<JobType> {
         self.executors.keys().cloned().collect()
     }
 
     /// Checks if an executor is registered for a job type.
+    #[must_use]
     pub fn has_executor(&self, job_type: &JobType) -> bool {
         self.executors.contains_key(job_type)
     }
@@ -141,14 +144,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_unregistered_type() {
-        let registry = ExecutorRegistry::new();
+        let _registry = ExecutorRegistry::new();
         let payload = JobPayload::ScanProject(ScanProjectPayload {
             project_id: ProjectId::new(),
             tenant_id: TenantId::new(),
             ecosystems: vec![PackageEcosystem::Npm],
             full_scan: false,
         });
-        let job = Job::new(payload);
+        let _job = Job::new(payload);
 
         // Create a minimal context (won't actually connect to DB in this test)
         // This test will fail on context creation, which is expected

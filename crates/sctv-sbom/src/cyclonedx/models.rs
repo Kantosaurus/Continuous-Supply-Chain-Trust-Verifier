@@ -1,15 +1,15 @@
-//! CycloneDX 1.5 schema models.
+//! `CycloneDX` 1.5 schema models.
 //!
-//! This module defines types that closely follow the CycloneDX 1.5 specification.
-//! See: https://cyclonedx.org/docs/1.5/json/
+//! This module defines types that closely follow the `CycloneDX` 1.5 specification.
+//! See: <https://cyclonedx.org/docs/1.5/json>/
 
 use serde::{Deserialize, Serialize};
 
-/// The root CycloneDX BOM document.
+/// The root `CycloneDX` BOM document.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Bom {
-    /// Must be "CycloneDX".
+    /// Must be "`CycloneDX`".
     pub bom_format: String,
     /// The spec version (1.5).
     pub spec_version: String,
@@ -37,7 +37,7 @@ pub struct Bom {
 }
 
 impl Bom {
-    /// Creates a new CycloneDX 1.5 BOM.
+    /// Creates a new `CycloneDX` 1.5 BOM.
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -238,7 +238,7 @@ pub struct Component {
     pub properties: Vec<Property>,
     /// Nested components.
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub components: Vec<Component>,
+    pub components: Vec<Self>,
     /// Evidence supporting the component's identity.
     pub evidence: Option<ComponentEvidence>,
     /// Release notes.
@@ -312,7 +312,7 @@ impl Component {
 
     /// Sets the scope.
     #[must_use]
-    pub fn with_scope(mut self, scope: ComponentScope) -> Self {
+    pub const fn with_scope(mut self, scope: ComponentScope) -> Self {
         self.scope = Some(scope);
         self
     }

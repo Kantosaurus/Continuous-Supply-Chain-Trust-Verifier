@@ -6,7 +6,7 @@ use sctv_core::traits::{ApiKeyRepository, RepositoryError, RepositoryResult};
 use sctv_core::{ApiKey, ApiKeyId, TenantId};
 use sqlx::{PgPool, Row};
 
-/// PostgreSQL implementation of the API key repository.
+/// `PostgreSQL` implementation of the API key repository.
 pub struct PgApiKeyRepository {
     pool: PgPool,
 }
@@ -46,14 +46,14 @@ impl PgApiKeyRepository {
 impl ApiKeyRepository for PgApiKeyRepository {
     async fn find_active_by_hash(&self, key_hash: &str) -> RepositoryResult<Option<ApiKey>> {
         let record = sqlx::query(
-            r#"
+            r"
             SELECT id, tenant_id, name, key_hash, scopes, created_at,
                    last_used_at, expires_at, revoked_at
             FROM api_keys
             WHERE key_hash = $1
               AND revoked_at IS NULL
               AND (expires_at IS NULL OR expires_at > NOW())
-            "#,
+            ",
         )
         .bind(key_hash)
         .fetch_optional(&self.pool)
@@ -65,12 +65,12 @@ impl ApiKeyRepository for PgApiKeyRepository {
 
     async fn find_by_id(&self, id: ApiKeyId) -> RepositoryResult<Option<ApiKey>> {
         let record = sqlx::query(
-            r#"
+            r"
             SELECT id, tenant_id, name, key_hash, scopes, created_at,
                    last_used_at, expires_at, revoked_at
             FROM api_keys
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(id.0)
         .fetch_optional(&self.pool)
@@ -82,13 +82,13 @@ impl ApiKeyRepository for PgApiKeyRepository {
 
     async fn list_active_by_tenant(&self, tenant_id: TenantId) -> RepositoryResult<Vec<ApiKey>> {
         let records = sqlx::query(
-            r#"
+            r"
             SELECT id, tenant_id, name, key_hash, scopes, created_at,
                    last_used_at, expires_at, revoked_at
             FROM api_keys
             WHERE tenant_id = $1 AND revoked_at IS NULL
             ORDER BY created_at DESC
-            "#,
+            ",
         )
         .bind(tenant_id.0)
         .fetch_all(&self.pool)
@@ -100,12 +100,12 @@ impl ApiKeyRepository for PgApiKeyRepository {
 
     async fn create(&self, key: &ApiKey) -> RepositoryResult<()> {
         sqlx::query(
-            r#"
+            r"
             INSERT INTO api_keys (
                 id, tenant_id, name, key_hash, scopes,
                 created_at, last_used_at, expires_at, revoked_at
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-            "#,
+            ",
         )
         .bind(key.id.0)
         .bind(key.tenant_id.0)

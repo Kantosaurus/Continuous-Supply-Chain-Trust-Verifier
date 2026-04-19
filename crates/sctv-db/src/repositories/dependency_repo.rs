@@ -10,7 +10,7 @@ use sctv_core::{
 use semver::Version;
 use sqlx::{PgPool, Row};
 
-/// PostgreSQL implementation of the dependency repository.
+/// `PostgreSQL` implementation of the dependency repository.
 pub struct PgDependencyRepository {
     pool: PgPool,
 }
@@ -42,12 +42,12 @@ impl PgDependencyRepository {
         let first_seen_at: DateTime<Utc> = row.get("first_seen_at");
         let last_verified_at: DateTime<Utc> = row.get("last_verified_at");
 
-        let ecosystem: PackageEcosystem = ecosystem.parse().map_err(|_| {
-            RepositoryError::InvalidData(format!("Invalid ecosystem: {}", ecosystem))
-        })?;
+        let ecosystem: PackageEcosystem = ecosystem
+            .parse()
+            .map_err(|_| RepositoryError::InvalidData(format!("Invalid ecosystem: {ecosystem}")))?;
 
         let resolved_version = Version::parse(&resolved_version)
-            .map_err(|e| RepositoryError::InvalidData(format!("Invalid version: {}", e)))?;
+            .map_err(|e| RepositoryError::InvalidData(format!("Invalid version: {e}")))?;
 
         let signature_status = match signature_status.as_str() {
             "verified" => SignatureStatus::Verified,
@@ -94,7 +94,7 @@ impl PgDependencyRepository {
         })
     }
 
-    fn signature_status_to_str(status: SignatureStatus) -> &'static str {
+    const fn signature_status_to_str(status: SignatureStatus) -> &'static str {
         match status {
             SignatureStatus::Verified => "verified",
             SignatureStatus::Invalid => "invalid",
@@ -103,7 +103,7 @@ impl PgDependencyRepository {
         }
     }
 
-    fn provenance_status_to_str(status: ProvenanceStatus) -> &'static str {
+    const fn provenance_status_to_str(status: ProvenanceStatus) -> &'static str {
         match status {
             ProvenanceStatus::SlsaLevel0 => "slsa_level0",
             ProvenanceStatus::SlsaLevel1 => "slsa_level1",
@@ -119,13 +119,13 @@ impl PgDependencyRepository {
 impl DependencyRepository for PgDependencyRepository {
     async fn find_by_id(&self, id: DependencyId) -> RepositoryResult<Option<Dependency>> {
         let record = sqlx::query(
-            r#"
+            r"
             SELECT id, project_id, tenant_id, package_name, ecosystem, version_constraint,
                    resolved_version, is_direct, is_dev_dependency, depth, parent_id,
                    hash_sha256, hash_sha512, signature_status, provenance_status,
                    provenance_details, first_seen_at, last_verified_at
             FROM dependencies WHERE id = $1
-            "#,
+            ",
         )
         .bind(id.0)
         .fetch_optional(&self.pool)
@@ -140,7 +140,7 @@ impl DependencyRepository for PgDependencyRepository {
 
     async fn find_by_project(&self, project_id: ProjectId) -> RepositoryResult<Vec<Dependency>> {
         let records = sqlx::query(
-            r#"
+            r"
             SELECT id, project_id, tenant_id, package_name, ecosystem, version_constraint,
                    resolved_version, is_direct, is_dev_dependency, depth, parent_id,
                    hash_sha256, hash_sha512, signature_status, provenance_status,
@@ -148,7 +148,7 @@ impl DependencyRepository for PgDependencyRepository {
             FROM dependencies
             WHERE project_id = $1
             ORDER BY is_direct DESC, depth ASC, package_name ASC
-            "#,
+            ",
         )
         .bind(project_id.0)
         .fetch_all(&self.pool)
@@ -163,7 +163,7 @@ impl DependencyRepository for PgDependencyRepository {
         project_id: ProjectId,
     ) -> RepositoryResult<Vec<Dependency>> {
         let records = sqlx::query(
-            r#"
+            r"
             SELECT id, project_id, tenant_id, package_name, ecosystem, version_constraint,
                    resolved_version, is_direct, is_dev_dependency, depth, parent_id,
                    hash_sha256, hash_sha512, signature_status, provenance_status,
@@ -171,7 +171,7 @@ impl DependencyRepository for PgDependencyRepository {
             FROM dependencies
             WHERE project_id = $1 AND is_direct = true
             ORDER BY package_name ASC
-            "#,
+            ",
         )
         .bind(project_id.0)
         .fetch_all(&self.pool)
@@ -186,19 +186,19 @@ impl DependencyRepository for PgDependencyRepository {
             .integrity
             .provenance_details
             .as_ref()
-            .map(|d| serde_json::to_value(d))
+            .map(serde_json::to_value)
             .transpose()
             .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
         sqlx::query(
-            r#"
+            r"
             INSERT INTO dependencies (
                 id, project_id, tenant_id, package_name, ecosystem, version_constraint,
                 resolved_version, is_direct, is_dev_dependency, depth, parent_id,
                 hash_sha256, hash_sha512, signature_status, provenance_status,
                 provenance_details, first_seen_at, last_verified_at
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
-            "#,
+            ",
         )
         .bind(dependency.id.0)
         .bind(dependency.project_id.0)
@@ -252,12 +252,12 @@ impl DependencyRepository for PgDependencyRepository {
                 .integrity
                 .provenance_details
                 .as_ref()
-                .map(|d| serde_json::to_value(d))
+                .map(serde_json::to_value)
                 .transpose()
                 .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
             sqlx::query(
-                r#"
+                r"
                 INSERT INTO dependencies (
                     id, project_id, tenant_id, package_name, ecosystem, version_constraint,
                     resolved_version, is_direct, is_dev_dependency, depth, parent_id,
@@ -272,7 +272,7 @@ impl DependencyRepository for PgDependencyRepository {
                     provenance_status = EXCLUDED.provenance_status,
                     provenance_details = EXCLUDED.provenance_details,
                     last_verified_at = EXCLUDED.last_verified_at
-                "#,
+                ",
             )
             .bind(dependency.id.0)
             .bind(dependency.project_id.0)
@@ -313,12 +313,12 @@ impl DependencyRepository for PgDependencyRepository {
             .integrity
             .provenance_details
             .as_ref()
-            .map(|d| serde_json::to_value(d))
+            .map(serde_json::to_value)
             .transpose()
             .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE dependencies SET
                 package_name = $2, ecosystem = $3, version_constraint = $4,
                 resolved_version = $5, is_direct = $6, is_dev_dependency = $7,
@@ -326,7 +326,7 @@ impl DependencyRepository for PgDependencyRepository {
                 signature_status = $12, provenance_status = $13, provenance_details = $14,
                 last_verified_at = $15
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(dependency.id.0)
         .bind(&dependency.package_name)
@@ -394,14 +394,14 @@ impl DependencyRepository for PgDependencyRepository {
         version: &str,
     ) -> RepositoryResult<Option<Dependency>> {
         let record = sqlx::query(
-            r#"
+            r"
             SELECT id, project_id, tenant_id, package_name, ecosystem, version_constraint,
                    resolved_version, is_direct, is_dev_dependency, depth, parent_id,
                    hash_sha256, hash_sha512, signature_status, provenance_status,
                    provenance_details, first_seen_at, last_verified_at
             FROM dependencies
             WHERE project_id = $1 AND ecosystem = $2 AND package_name = $3 AND resolved_version = $4
-            "#,
+            ",
         )
         .bind(project_id.0)
         .bind(ecosystem.to_string().to_lowercase())

@@ -59,7 +59,7 @@ impl NotificationError {
     /// Returns false for hard client errors (4xx, auth failures, invalid config) where
     /// further attempts are wasted.
     #[must_use]
-    pub fn is_retryable(&self) -> bool {
+    pub const fn is_retryable(&self) -> bool {
         !matches!(
             self,
             Self::WebhookClientError(_)

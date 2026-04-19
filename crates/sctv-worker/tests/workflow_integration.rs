@@ -720,7 +720,7 @@ mod job_id {
     #[test]
     fn test_job_id_display() {
         let id = JobId::new();
-        let display = format!("{}", id);
+        let display = format!("{id}");
 
         // Should be a valid UUID string
         assert_eq!(display.len(), 36); // UUID format: 8-4-4-4-12

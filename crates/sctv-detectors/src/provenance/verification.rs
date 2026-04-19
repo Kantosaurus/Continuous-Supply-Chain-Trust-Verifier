@@ -28,7 +28,7 @@ impl ProvenanceVerifier {
 
     /// Creates a verifier with custom configuration.
     #[must_use]
-    pub fn with_config(config: ProvenanceConfig) -> Self {
+    pub const fn with_config(config: ProvenanceConfig) -> Self {
         Self {
             sigstore: SigstoreVerifier::with_settings(config.verify_rekor, None),
             config,
@@ -78,7 +78,7 @@ impl ProvenanceVerifier {
         let builder_id = details.and_then(|d| d.builder_id.clone());
         let builder_trusted = builder_id
             .as_ref()
-            .map_or(false, |id| self.config.trusted_builders.contains(id));
+            .is_some_and(|id| self.config.trusted_builders.contains(id));
 
         ProvenanceVerificationResult {
             has_provenance: true,
@@ -116,7 +116,7 @@ impl ProvenanceVerifier {
         Ok(ProvenanceVerificationResult::no_provenance())
     }
 
-    /// Verifies provenance for a PyPI package.
+    /// Verifies provenance for a `PyPI` package.
     async fn verify_pypi_provenance(
         &self,
         dependency: &Dependency,
@@ -338,7 +338,7 @@ impl MockAttestationFetcher {
     pub fn add_attestation(&self, attestation: FetchedAttestation) {
         self.attestations
             .write()
-            .unwrap_or_else(|e| e.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .push(attestation);
     }
 }
@@ -354,7 +354,7 @@ impl AttestationFetcher for MockAttestationFetcher {
         Ok(self
             .attestations
             .read()
-            .unwrap_or_else(|e| e.into_inner())
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .clone())
     }
 }

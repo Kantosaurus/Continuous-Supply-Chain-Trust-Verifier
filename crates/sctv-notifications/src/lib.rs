@@ -5,7 +5,7 @@
 //! - **Email** - SMTP-based email notifications via [`channels::EmailChannel`]
 //! - **Slack** - Slack webhook integration via [`channels::SlackChannel`]
 //! - **Teams** - Microsoft Teams webhook integration via [`channels::TeamsChannel`]
-//! - **PagerDuty** - PagerDuty Events API v2 via [`channels::PagerDutyChannel`]
+//! - **`PagerDuty`** - `PagerDuty` Events API v2 via [`channels::PagerDutyChannel`]
 //! - **Webhook** - Generic HTTP webhook support via [`channels::WebhookChannel`]
 //!
 //! # Architecture

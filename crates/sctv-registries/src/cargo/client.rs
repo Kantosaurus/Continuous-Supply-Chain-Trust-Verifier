@@ -12,7 +12,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use url::Url;
 
-use super::models::*;
+use super::models::{CrateResponse, DependenciesResponse, OwnersResponse};
 use crate::{
     retry_http, PackageMetadata, RegistryCache, RegistryClient, RegistryError, RegistryResult,
     RetryConfig, VersionMetadata,
@@ -66,7 +66,7 @@ impl CargoClient {
     async fn fetch_crate(&self, name: &str) -> RegistryResult<CrateResponse> {
         let url = self
             .base_url
-            .join(&format!("/api/v1/crates/{}", name))
+            .join(&format!("/api/v1/crates/{name}"))
             .map_err(|e| RegistryError::Parse(e.to_string()))?;
 
         tracing::debug!("Fetching crate {} from {}", name, url);
@@ -105,7 +105,7 @@ impl CargoClient {
     ) -> RegistryResult<DependenciesResponse> {
         let url = self
             .base_url
-            .join(&format!("/api/v1/crates/{}/{}/dependencies", name, version))
+            .join(&format!("/api/v1/crates/{name}/{version}/dependencies"))
             .map_err(|e| RegistryError::Parse(e.to_string()))?;
 
         tracing::debug!(
@@ -144,7 +144,7 @@ impl CargoClient {
     async fn fetch_owners(&self, name: &str) -> RegistryResult<Vec<String>> {
         let url = self
             .base_url
-            .join(&format!("/api/v1/crates/{}/owners", name))
+            .join(&format!("/api/v1/crates/{name}/owners"))
             .map_err(|e| RegistryError::Parse(e.to_string()))?;
 
         let response = retry_http(&RetryConfig::default(), || {
@@ -169,7 +169,7 @@ impl CargoClient {
     fn build_download_url(&self, name: &str, version: &str) -> RegistryResult<Url> {
         // Format: https://static.crates.io/crates/{name}/{name}-{version}.crate
         self.static_url
-            .join(&format!("/crates/{}/{}-{}.crate", name, name, version))
+            .join(&format!("/crates/{name}/{name}-{version}.crate"))
             .map_err(|e| RegistryError::Parse(e.to_string()))
     }
 }

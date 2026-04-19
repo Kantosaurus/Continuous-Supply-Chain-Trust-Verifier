@@ -1,4 +1,4 @@
-//! PostgreSQL implementation of the job queue.
+//! `PostgreSQL` implementation of the job queue.
 //!
 //! This implementation uses `SELECT FOR UPDATE SKIP LOCKED` for efficient
 //! concurrent job claiming without blocking.
@@ -18,9 +18,9 @@ pub struct PgJobQueue {
 }
 
 impl PgJobQueue {
-    /// Creates a new PostgreSQL job queue.
+    /// Creates a new `PostgreSQL` job queue.
     #[must_use]
-    pub fn new(pool: PgPool) -> Self {
+    pub const fn new(pool: PgPool) -> Self {
         Self { pool }
     }
 
@@ -86,12 +86,12 @@ impl JobQueue for PgJobQueue {
         let payload_json = serde_json::to_value(&payload)?;
 
         sqlx::query(
-            r#"
+            r"
             INSERT INTO jobs (
                 id, tenant_id, job_type, status, priority, payload,
                 attempts, max_attempts, scheduled_at, created_at
             ) VALUES ($1, $2, $3, $4, $5, $6, 0, $7, $8, $9)
-            "#,
+            ",
         )
         .bind(job_id.0)
         .bind(options.tenant_id.map(|t| t.0))
@@ -138,12 +138,12 @@ impl JobQueue for PgJobQueue {
             let payload_json = serde_json::to_value(&payload)?;
 
             sqlx::query(
-                r#"
+                r"
                 INSERT INTO jobs (
                     id, tenant_id, job_type, status, priority, payload,
                     attempts, max_attempts, scheduled_at, created_at
                 ) VALUES ($1, $2, $3, $4, $5, $6, 0, $7, $8, $9)
-                "#,
+                ",
             )
             .bind(job_id.0)
             .bind(options.tenant_id.map(|t| t.0))
@@ -173,7 +173,7 @@ impl JobQueue for PgJobQueue {
 
         // Use SELECT FOR UPDATE SKIP LOCKED to claim a job without blocking
         let row = sqlx::query(
-            r#"
+            r"
             WITH next_job AS (
                 SELECT id FROM jobs
                 WHERE status IN ('pending', 'scheduled')
@@ -191,7 +191,7 @@ impl JobQueue for PgJobQueue {
                       jobs.priority, jobs.payload, jobs.result, jobs.error_message,
                       jobs.attempts, jobs.max_attempts, jobs.scheduled_at,
                       jobs.started_at, jobs.completed_at, jobs.created_at
-            "#,
+            ",
         )
         .bind(&job_type_strs)
         .bind(now)
@@ -214,7 +214,7 @@ impl JobQueue for PgJobQueue {
         let now = Utc::now();
 
         let rows = sqlx::query(
-            r#"
+            r"
             WITH next_jobs AS (
                 SELECT id FROM jobs
                 WHERE status IN ('pending', 'scheduled')
@@ -232,11 +232,11 @@ impl JobQueue for PgJobQueue {
                       jobs.priority, jobs.payload, jobs.result, jobs.error_message,
                       jobs.attempts, jobs.max_attempts, jobs.scheduled_at,
                       jobs.started_at, jobs.completed_at, jobs.created_at
-            "#,
+            ",
         )
         .bind(&job_type_strs)
         .bind(now)
-        .bind(limit as i64)
+        .bind(i64::from(limit))
         .bind(now)
         .fetch_all(&self.pool)
         .await?;
@@ -256,11 +256,11 @@ impl JobQueue for PgJobQueue {
         let now = Utc::now();
 
         let rows_affected = sqlx::query(
-            r#"
+            r"
             UPDATE jobs
             SET status = 'completed', result = $2, completed_at = $3
             WHERE id = $1 AND status = 'running'
-            "#,
+            ",
         )
         .bind(job_id.0)
         .bind(result_json)
@@ -301,11 +301,11 @@ impl JobQueue for PgJobQueue {
         };
 
         sqlx::query(
-            r#"
+            r"
             UPDATE jobs
             SET status = $2, error_message = $3, completed_at = $4
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(job_id.0)
         .bind(new_status)
@@ -327,11 +327,11 @@ impl JobQueue for PgJobQueue {
 
     async fn retry(&self, job_id: JobId) -> WorkerResult<()> {
         let rows_affected = sqlx::query(
-            r#"
+            r"
             UPDATE jobs
             SET status = 'pending', started_at = NULL, completed_at = NULL, error_message = NULL
             WHERE id = $1 AND status IN ('failed', 'cancelled')
-            "#,
+            ",
         )
         .bind(job_id.0)
         .execute(&self.pool)
@@ -351,11 +351,11 @@ impl JobQueue for PgJobQueue {
         let now = Utc::now();
 
         let rows_affected = sqlx::query(
-            r#"
+            r"
             UPDATE jobs
             SET status = 'cancelled', completed_at = $2
             WHERE id = $1 AND status IN ('pending', 'scheduled')
-            "#,
+            ",
         )
         .bind(job_id.0)
         .bind(now)
@@ -374,12 +374,12 @@ impl JobQueue for PgJobQueue {
 
     async fn get(&self, job_id: JobId) -> WorkerResult<Option<Job>> {
         let row = sqlx::query(
-            r#"
+            r"
             SELECT id, tenant_id, job_type, status, priority, payload, result,
                    error_message, attempts, max_attempts, scheduled_at,
                    started_at, completed_at, created_at
             FROM jobs WHERE id = $1
-            "#,
+            ",
         )
         .bind(job_id.0)
         .fetch_optional(&self.pool)
@@ -394,44 +394,44 @@ impl JobQueue for PgJobQueue {
     async fn list(&self, filter: JobFilter, limit: u32, offset: u32) -> WorkerResult<Vec<Job>> {
         // Build dynamic query based on filters
         let mut query = String::from(
-            r#"
+            r"
             SELECT id, tenant_id, job_type, status, priority, payload, result,
                    error_message, attempts, max_attempts, scheduled_at,
                    started_at, completed_at, created_at
             FROM jobs WHERE 1=1
-            "#,
+            ",
         );
 
         let mut param_count = 0;
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ANY(${})", param_count));
+            query.push_str(&format!(" AND status = ANY(${param_count})"));
         }
 
         if filter.job_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND job_type = ANY(${})", param_count));
+            query.push_str(&format!(" AND job_type = ANY(${param_count})"));
         }
 
         if filter.tenant_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND tenant_id = ${}", param_count));
+            query.push_str(&format!(" AND tenant_id = ${param_count}"));
         }
 
         if filter.min_priority.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND priority >= ${}", param_count));
+            query.push_str(&format!(" AND priority >= ${param_count}"));
         }
 
         if filter.scheduled_before.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND scheduled_at <= ${}", param_count));
+            query.push_str(&format!(" AND scheduled_at <= ${param_count}"));
         }
 
         if filter.created_after.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${}", param_count));
+            query.push_str(&format!(" AND created_at >= ${param_count}"));
         }
 
         query.push_str(&format!(
@@ -470,8 +470,8 @@ impl JobQueue for PgJobQueue {
         }
 
         let rows = query_builder
-            .bind(limit as i64)
-            .bind(offset as i64)
+            .bind(i64::from(limit))
+            .bind(i64::from(offset))
             .fetch_all(&self.pool)
             .await?;
 
@@ -481,11 +481,11 @@ impl JobQueue for PgJobQueue {
     async fn stats(&self) -> WorkerResult<QueueStats> {
         // Get counts by status
         let status_counts = sqlx::query(
-            r#"
+            r"
             SELECT status, COUNT(*) as count
             FROM jobs
             GROUP BY status
-            "#,
+            ",
         )
         .fetch_all(&self.pool)
         .await?;
@@ -508,12 +508,12 @@ impl JobQueue for PgJobQueue {
 
         // Get counts by job type (for pending/running only)
         let type_counts = sqlx::query(
-            r#"
+            r"
             SELECT job_type, COUNT(*) as count
             FROM jobs
             WHERE status IN ('pending', 'running', 'scheduled')
             GROUP BY job_type
-            "#,
+            ",
         )
         .fetch_all(&self.pool)
         .await?;
@@ -530,14 +530,14 @@ impl JobQueue for PgJobQueue {
     }
 
     async fn release_stale_jobs(&self, timeout_minutes: u32) -> WorkerResult<u32> {
-        let cutoff = Utc::now() - chrono::Duration::minutes(timeout_minutes as i64);
+        let cutoff = Utc::now() - chrono::Duration::minutes(i64::from(timeout_minutes));
 
         let rows_affected = sqlx::query(
-            r#"
+            r"
             UPDATE jobs
             SET status = 'pending', started_at = NULL
             WHERE status = 'running' AND started_at < $1
-            "#,
+            ",
         )
         .bind(cutoff)
         .execute(&self.pool)
@@ -556,14 +556,14 @@ impl JobQueue for PgJobQueue {
     }
 
     async fn cleanup_old_jobs(&self, retention_days: u32) -> WorkerResult<u32> {
-        let cutoff = Utc::now() - chrono::Duration::days(retention_days as i64);
+        let cutoff = Utc::now() - chrono::Duration::days(i64::from(retention_days));
 
         let rows_affected = sqlx::query(
-            r#"
+            r"
             DELETE FROM jobs
             WHERE status IN ('completed', 'failed', 'cancelled')
               AND completed_at < $1
-            "#,
+            ",
         )
         .bind(cutoff)
         .execute(&self.pool)
@@ -586,14 +586,14 @@ impl JobQueue for PgJobQueue {
         let now = Utc::now();
 
         let row = sqlx::query(
-            r#"
+            r"
             SELECT EXISTS(
                 SELECT 1 FROM jobs
                 WHERE status IN ('pending', 'scheduled')
                   AND job_type = ANY($1)
                   AND scheduled_at <= $2
             ) as has_pending
-            "#,
+            ",
         )
         .bind(&job_type_strs)
         .bind(now)

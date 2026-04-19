@@ -205,7 +205,7 @@ pub struct SigstoreVerifier {
 impl SigstoreVerifier {
     /// Creates a new verifier with default settings.
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             verify_inclusion: true,
             rekor_public_key: None,
@@ -214,7 +214,7 @@ impl SigstoreVerifier {
 
     /// Creates a verifier with custom settings.
     #[must_use]
-    pub fn with_settings(verify_inclusion: bool, rekor_public_key: Option<Vec<u8>>) -> Self {
+    pub const fn with_settings(verify_inclusion: bool, rekor_public_key: Option<Vec<u8>>) -> Self {
         Self {
             verify_inclusion,
             rekor_public_key,
@@ -373,13 +373,13 @@ pub struct BundleVerificationResult {
 impl BundleVerificationResult {
     /// Checks if verification was successful.
     #[must_use]
-    pub fn is_verified(&self) -> bool {
+    pub const fn is_verified(&self) -> bool {
         self.certificate_verified && self.signature_verified
     }
 
     /// Checks if the bundle has all required components.
     #[must_use]
-    pub fn is_complete(&self) -> bool {
+    pub const fn is_complete(&self) -> bool {
         self.has_certificate && self.has_signature && self.has_tlog_entry
     }
 }

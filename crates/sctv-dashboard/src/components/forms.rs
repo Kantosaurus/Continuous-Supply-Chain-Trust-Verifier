@@ -70,8 +70,8 @@ mod select {
     #![allow(clippy::needless_pass_by_value)]
 
     use super::{
-        ChevronDownIcon, ClassAttribute, CollectView, ElementChild, GlobalAttributes, IntoView,
-        component, view,
+        component, view, ChevronDownIcon, ClassAttribute, CollectView, ElementChild,
+        GlobalAttributes, IntoView,
     };
 
     /// Select dropdown with custom styling.

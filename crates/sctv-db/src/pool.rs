@@ -107,7 +107,7 @@ impl TenantAwarePool {
 
     /// Returns a reference to the underlying pool.
     #[must_use]
-    pub fn inner(&self) -> &PgPool {
+    pub const fn inner(&self) -> &PgPool {
         &self.pool
     }
 

@@ -1,4 +1,4 @@
-//! NuGet registry client implementation.
+//! `NuGet` registry client implementation.
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -13,13 +13,13 @@ use std::time::Duration;
 use tokio::sync::OnceCell;
 use url::Url;
 
-use super::models::*;
+use super::models::{RegistrationIndex, RegistrationLeaf, RegistrationPage, ServiceIndex};
 use crate::{
     retry_http, PackageMetadata, RegistryCache, RegistryClient, RegistryError, RegistryResult,
     RetryConfig, VersionMetadata,
 };
 
-/// NuGet registry client with caching and service discovery.
+/// `NuGet` registry client with caching and service discovery.
 pub struct NuGetClient {
     http: Client,
     base_url: Url,
@@ -28,10 +28,10 @@ pub struct NuGetClient {
 }
 
 impl NuGetClient {
-    /// Default NuGet API URL.
+    /// Default `NuGet` API URL.
     pub const DEFAULT_REGISTRY: &'static str = "https://api.nuget.org/v3/index.json";
 
-    /// Creates a new NuGet client with default settings.
+    /// Creates a new `NuGet` client with default settings.
     #[must_use]
     pub fn new() -> Self {
         Self::with_config(Self::DEFAULT_REGISTRY, Arc::new(RegistryCache::new()))
@@ -88,7 +88,7 @@ impl NuGetClient {
 
         // NuGet uses lowercase package IDs in URLs
         let package_id = name.to_lowercase();
-        let url = format!("{}{}/index.json", base_url, package_id);
+        let url = format!("{base_url}{package_id}/index.json");
 
         tracing::debug!("Fetching registration for {} from {}", name, url);
 
@@ -165,15 +165,13 @@ impl NuGetClient {
         // Format: {base}/{id-lower}/{version}/{id-lower}.{version}.nupkg
         let package_id = name.to_lowercase();
         let version_lower = version.to_lowercase();
-        let url_str = format!(
-            "{}{}/{}/{}.{}.nupkg",
-            base_url, package_id, version_lower, package_id, version_lower
-        );
+        let url_str =
+            format!("{base_url}{package_id}/{version_lower}/{package_id}.{version_lower}.nupkg");
 
         Url::parse(&url_str).map_err(|e| RegistryError::Parse(e.to_string()))
     }
 
-    /// Parses a NuGet timestamp.
+    /// Parses a `NuGet` timestamp.
     fn parse_timestamp(s: &str) -> Option<chrono::DateTime<chrono::Utc>> {
         chrono::DateTime::parse_from_rfc3339(s)
             .ok()
@@ -243,7 +241,7 @@ impl RegistryClient for NuGetClient {
         let maintainers = latest_entry
             .authors
             .as_ref()
-            .map(|a| a.to_vec())
+            .map(super::models::AuthorsField::to_vec)
             .unwrap_or_default();
 
         // Parse timestamps

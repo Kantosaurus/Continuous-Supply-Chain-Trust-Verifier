@@ -1,4 +1,4 @@
-//! RubyGems API response models.
+//! `RubyGems` API response models.
 
 use serde::Deserialize;
 
@@ -31,7 +31,7 @@ pub struct GemInfo {
     pub dependencies: GemDependencies,
 }
 
-/// Gem metadata from rubygems_metadata.
+/// Gem metadata from `rubygems_metadata`.
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct GemMetadata {
     pub bug_tracker_uri: Option<String>,
@@ -108,7 +108,7 @@ pub struct Owner {
     pub email: Option<String>,
 }
 
-/// Response from /api/v1/gems/{name}/reverse_dependencies.json
+/// Response from /`api/v1/gems/{name}/reverse_dependencies.json`
 #[derive(Debug, Clone, Deserialize)]
 pub struct ReverseDependency {
     pub name: String,

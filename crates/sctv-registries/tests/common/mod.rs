@@ -6,9 +6,8 @@
 use sctv_core::{Package, PackageChecksums, PackageEcosystem, PackageId, PackageVersion};
 use semver::Version;
 use serde_json::json;
-use std::sync::Arc;
 use wiremock::{
-    matchers::{header, method, path, path_regex},
+    matchers::{header, method, path},
     Mock, MockServer, ResponseTemplate,
 };
 
@@ -118,7 +117,7 @@ pub fn npm_version_metadata(name: &str, version: &str) -> serde_json::Value {
     })
 }
 
-/// Test fixture for PyPI package metadata.
+/// Test fixture for `PyPI` package metadata.
 pub fn pypi_package_metadata(name: &str, version: &str) -> serde_json::Value {
     json!({
         "info": {
@@ -161,13 +160,13 @@ pub fn maven_pom_metadata(group_id: &str, artifact_id: &str, version: &str) -> S
         r#"<?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0">
     <modelVersion>4.0.0</modelVersion>
-    <groupId>{}</groupId>
-    <artifactId>{}</artifactId>
-    <version>{}</version>
+    <groupId>{group_id}</groupId>
+    <artifactId>{artifact_id}</artifactId>
+    <version>{version}</version>
     <packaging>jar</packaging>
-    <name>{}</name>
+    <name>{artifact_id}</name>
     <description>Test Maven artifact</description>
-    <url>https://github.com/test/{}</url>
+    <url>https://github.com/test/{artifact_id}</url>
     <dependencies>
         <dependency>
             <groupId>org.example</groupId>
@@ -175,8 +174,7 @@ pub fn maven_pom_metadata(group_id: &str, artifact_id: &str, version: &str) -> S
             <version>1.0.0</version>
         </dependency>
     </dependencies>
-</project>"#,
-        group_id, artifact_id, version, artifact_id, artifact_id
+</project>"#
     )
 }
 
@@ -184,7 +182,7 @@ pub fn maven_pom_metadata(group_id: &str, artifact_id: &str, version: &str) -> S
 pub fn maven_metadata(group_id: &str, artifact_id: &str, versions: &[&str]) -> String {
     let versions_xml: String = versions
         .iter()
-        .map(|v| format!("        <version>{}</version>", v))
+        .map(|v| format!("        <version>{v}</version>"))
         .collect::<Vec<_>>()
         .join("\n");
 
@@ -226,7 +224,7 @@ pub async fn mount_npm_package(server: &MockServer, name: &str, versions: &[&str
 
     // Full package metadata
     Mock::given(method("GET"))
-        .and(path(format!("/{}", encoded_name)))
+        .and(path(format!("/{encoded_name}")))
         .respond_with(
             ResponseTemplate::new(200).set_body_json(npm_package_metadata(name, versions)),
         )
@@ -243,7 +241,7 @@ pub async fn mount_npm_abbreviated(server: &MockServer, name: &str, versions: &[
     };
 
     Mock::given(method("GET"))
-        .and(path(format!("/{}", encoded_name)))
+        .and(path(format!("/{encoded_name}")))
         .and(header("Accept", "application/vnd.npm.install-v1+json"))
         .respond_with(
             ResponseTemplate::new(200).set_body_json(npm_abbreviated_metadata(name, versions)),
@@ -261,7 +259,7 @@ pub async fn mount_npm_version(server: &MockServer, name: &str, version: &str) {
     };
 
     Mock::given(method("GET"))
-        .and(path(format!("/{}/{}", encoded_name, version)))
+        .and(path(format!("/{encoded_name}/{version}")))
         .respond_with(ResponseTemplate::new(200).set_body_json(npm_version_metadata(name, version)))
         .mount(server)
         .await;
@@ -276,7 +274,7 @@ pub async fn mount_npm_not_found(server: &MockServer, name: &str) {
     };
 
     Mock::given(method("GET"))
-        .and(path(format!("/{}", encoded_name)))
+        .and(path(format!("/{encoded_name}")))
         .respond_with(ResponseTemplate::new(404).set_body_json(json!({ "error": "Not found" })))
         .mount(server)
         .await;
@@ -291,7 +289,7 @@ pub async fn mount_npm_rate_limit(server: &MockServer, name: &str, retry_after: 
     };
 
     Mock::given(method("GET"))
-        .and(path(format!("/{}", encoded_name)))
+        .and(path(format!("/{encoded_name}")))
         .respond_with(
             ResponseTemplate::new(429)
                 .insert_header("Retry-After", retry_after.to_string())
@@ -304,7 +302,7 @@ pub async fn mount_npm_rate_limit(server: &MockServer, name: &str, retry_after: 
 /// Mounts a tarball download response.
 pub async fn mount_npm_tarball(server: &MockServer, name: &str, version: &str, content: &[u8]) {
     Mock::given(method("GET"))
-        .and(path(format!("/{}/-/{}-{}.tgz", name, name, version)))
+        .and(path(format!("/{name}/-/{name}-{version}.tgz")))
         .respond_with(
             ResponseTemplate::new(200)
                 .insert_header("Content-Type", "application/gzip")
@@ -314,15 +312,15 @@ pub async fn mount_npm_tarball(server: &MockServer, name: &str, version: &str, c
         .await;
 }
 
-/// Sets up a mock PyPI server.
+/// Sets up a mock `PyPI` server.
 pub async fn setup_pypi_mock_server() -> MockServer {
     MockServer::start().await
 }
 
-/// Mounts PyPI package metadata.
+/// Mounts `PyPI` package metadata.
 pub async fn mount_pypi_package(server: &MockServer, name: &str, version: &str) {
     Mock::given(method("GET"))
-        .and(path(format!("/pypi/{}/json", name)))
+        .and(path(format!("/pypi/{name}/json")))
         .respond_with(
             ResponseTemplate::new(200).set_body_json(pypi_package_metadata(name, version)),
         )
@@ -346,8 +344,7 @@ pub async fn mount_maven_metadata(
 
     Mock::given(method("GET"))
         .and(path(format!(
-            "/{}/{}/maven-metadata.xml",
-            group_path, artifact_id
+            "/{group_path}/{artifact_id}/maven-metadata.xml"
         )))
         .respond_with(
             ResponseTemplate::new(200)
@@ -369,8 +366,7 @@ pub async fn mount_maven_pom(
 
     Mock::given(method("GET"))
         .and(path(format!(
-            "/{}/{}/{}/{}-{}.pom",
-            group_path, artifact_id, version, artifact_id, version
+            "/{group_path}/{artifact_id}/{version}/{artifact_id}-{version}.pom"
         )))
         .respond_with(
             ResponseTemplate::new(200)
@@ -388,7 +384,7 @@ pub fn create_test_package(name: &str, ecosystem: PackageEcosystem) -> Package {
         ecosystem,
         name: name.to_string(),
         normalized_name: name.to_lowercase().replace('-', "_"),
-        description: Some(format!("Test package: {}", name)),
+        description: Some(format!("Test package: {name}")),
         homepage: None,
         repository: None,
         popularity_rank: None,

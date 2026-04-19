@@ -10,7 +10,7 @@ use sctv_core::{
 use sqlx::{PgPool, Row};
 use url::Url;
 
-/// PostgreSQL implementation of the project repository.
+/// `PostgreSQL` implementation of the project repository.
 pub struct PgProjectRepository {
     pool: PgPool,
 }
@@ -81,12 +81,12 @@ impl PgProjectRepository {
 impl ProjectRepository for PgProjectRepository {
     async fn find_by_id(&self, id: ProjectId) -> RepositoryResult<Option<Project>> {
         let record = sqlx::query(
-            r#"
+            r"
             SELECT id, tenant_id, name, description, repository_url, default_branch,
                    ecosystems, scan_schedule, policy_id, last_scan_at, status,
                    metadata, created_at, updated_at
             FROM projects WHERE id = $1
-            "#,
+            ",
         )
         .bind(id.0)
         .fetch_optional(&self.pool)
@@ -101,13 +101,13 @@ impl ProjectRepository for PgProjectRepository {
 
     async fn find_by_tenant(&self, tenant_id: TenantId) -> RepositoryResult<Vec<Project>> {
         let records = sqlx::query(
-            r#"
+            r"
             SELECT id, tenant_id, name, description, repository_url, default_branch,
                    ecosystems, scan_schedule, policy_id, last_scan_at, status,
                    metadata, created_at, updated_at
             FROM projects WHERE tenant_id = $1
             ORDER BY name ASC
-            "#,
+            ",
         )
         .bind(tenant_id.0)
         .fetch_all(&self.pool)
@@ -138,19 +138,19 @@ impl ProjectRepository for PgProjectRepository {
         };
 
         sqlx::query(
-            r#"
+            r"
             INSERT INTO projects (
                 id, tenant_id, name, description, repository_url, default_branch,
                 ecosystems, scan_schedule, policy_id, last_scan_at, status,
                 metadata, created_at, updated_at
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-            "#,
+            ",
         )
         .bind(project.id.0)
         .bind(project.tenant_id.0)
         .bind(&project.name)
         .bind(&project.description)
-        .bind(project.repository_url.as_ref().map(|u| u.as_str()))
+        .bind(project.repository_url.as_ref().map(url::Url::as_str))
         .bind(&project.default_branch)
         .bind(&ecosystems)
         .bind(scan_schedule)
@@ -194,18 +194,18 @@ impl ProjectRepository for PgProjectRepository {
         };
 
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE projects SET
                 name = $2, description = $3, repository_url = $4, default_branch = $5,
                 ecosystems = $6, scan_schedule = $7, policy_id = $8, last_scan_at = $9,
                 status = $10, metadata = $11, updated_at = NOW()
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(project.id.0)
         .bind(&project.name)
         .bind(&project.description)
-        .bind(project.repository_url.as_ref().map(|u| u.as_str()))
+        .bind(project.repository_url.as_ref().map(url::Url::as_str))
         .bind(&project.default_branch)
         .bind(&ecosystems)
         .bind(scan_schedule)
@@ -242,7 +242,7 @@ impl ProjectRepository for PgProjectRepository {
         // Find projects that haven't been scanned in the last hour
         // or have never been scanned
         let records = sqlx::query(
-            r#"
+            r"
             SELECT id, tenant_id, name, description, repository_url, default_branch,
                    ecosystems, scan_schedule, policy_id, last_scan_at, status,
                    metadata, created_at, updated_at
@@ -251,7 +251,7 @@ impl ProjectRepository for PgProjectRepository {
                OR last_scan_at < NOW() - INTERVAL '1 hour'
             ORDER BY last_scan_at ASC NULLS FIRST
             LIMIT 100
-            "#,
+            ",
         )
         .fetch_all(&self.pool)
         .await

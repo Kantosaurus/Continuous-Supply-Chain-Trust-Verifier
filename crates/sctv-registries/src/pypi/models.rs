@@ -1,9 +1,9 @@
-//! PyPI API response models.
+//! `PyPI` API response models.
 
 use serde::Deserialize;
 use std::collections::HashMap;
 
-/// Full package response from PyPI JSON API.
+/// Full package response from `PyPI` JSON API.
 #[derive(Debug, Deserialize)]
 pub struct PyPiPackageResponse {
     pub info: PyPiPackageInfo,
@@ -13,7 +13,7 @@ pub struct PyPiPackageResponse {
     pub urls: Vec<PyPiReleaseFile>,
 }
 
-/// Package metadata from PyPI.
+/// Package metadata from `PyPI`.
 #[derive(Debug, Deserialize)]
 pub struct PyPiPackageInfo {
     pub name: String,
@@ -43,7 +43,7 @@ pub struct PyPiPackageInfo {
     pub yanked_reason: Option<String>,
 }
 
-/// A release file (wheel, sdist, etc.) from PyPI.
+/// A release file (wheel, sdist, etc.) from `PyPI`.
 #[derive(Debug, Clone, Deserialize)]
 pub struct PyPiReleaseFile {
     /// Comment text (usually empty).
@@ -58,7 +58,7 @@ pub struct PyPiReleaseFile {
     pub has_sig: Option<bool>,
     /// MD5 digest (deprecated).
     pub md5_digest: Option<String>,
-    /// Package type (e.g., "bdist_wheel", "sdist").
+    /// Package type (e.g., "`bdist_wheel`", "sdist").
     pub packagetype: Option<String>,
     /// Python version (e.g., "py3", "source").
     pub python_version: Option<String>,
@@ -78,7 +78,7 @@ pub struct PyPiReleaseFile {
     pub yanked_reason: Option<String>,
 }
 
-/// File digests from PyPI.
+/// File digests from `PyPI`.
 #[derive(Debug, Clone, Deserialize)]
 pub struct PyPiDigests {
     pub md5: Option<String>,
@@ -87,7 +87,7 @@ pub struct PyPiDigests {
     pub blake2b_256: Option<String>,
 }
 
-/// Version-specific response from PyPI.
+/// Version-specific response from `PyPI`.
 #[derive(Debug, Deserialize)]
 pub struct PyPiVersionResponse {
     pub info: PyPiPackageInfo,
@@ -95,7 +95,7 @@ pub struct PyPiVersionResponse {
     pub urls: Vec<PyPiReleaseFile>,
 }
 
-/// Provenance attestation from PyPI (PEP 740).
+/// Provenance attestation from `PyPI` (PEP 740).
 #[derive(Debug, Clone, Deserialize)]
 pub struct PyPiAttestation {
     pub version: u32,
@@ -129,7 +129,7 @@ pub struct PyPiSimpleProject {
     pub name: String,
 }
 
-/// Parsed dependency from requires_dist.
+/// Parsed dependency from `requires_dist`.
 #[derive(Debug, Clone)]
 pub struct PyPiDependency {
     pub name: String,
@@ -140,7 +140,8 @@ pub struct PyPiDependency {
 }
 
 impl PyPiDependency {
-    /// Parses a requires_dist entry into a dependency.
+    /// Parses a `requires_dist` entry into a dependency.
+    #[must_use]
     pub fn parse(spec: &str) -> Option<Self> {
         let spec = spec.trim();
         if spec.is_empty() {
@@ -160,9 +161,7 @@ impl PyPiDependency {
                 &rest[..idx],
                 Some(rest[idx + 1..end_idx].trim().to_string()),
             )
-        } else if let Some(idx) =
-            rest.find(|c: char| c == '<' || c == '>' || c == '=' || c == '~' || c == '!')
-        {
+        } else if let Some(idx) = rest.find(['<', '>', '=', '~', '!']) {
             (&rest[..idx], Some(rest[idx..].trim().to_string()))
         } else {
             (rest, None)
@@ -188,8 +187,7 @@ impl PyPiDependency {
         // Check if this is an optional dependency (has environment marker)
         let is_optional = markers
             .as_ref()
-            .map(|m| m.contains("extra ==") || m.contains("extra=="))
-            .unwrap_or(false);
+            .is_some_and(|m| m.contains("extra ==") || m.contains("extra=="));
 
         Some(Self {
             name,

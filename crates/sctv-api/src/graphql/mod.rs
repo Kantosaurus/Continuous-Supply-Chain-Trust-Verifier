@@ -314,8 +314,8 @@ impl QueryRoot {
 
         let filtered: Vec<_> = dependencies
             .into_iter()
-            .filter(|d| ecosystem.map_or(true, |e| d.ecosystem == e))
-            .filter(|d| is_direct.map_or(true, |direct| d.is_direct == direct))
+            .filter(|d| ecosystem.is_none_or(|e| d.ecosystem == e))
+            .filter(|d| is_direct.is_none_or(|direct| d.is_direct == direct))
             .skip(offset)
             .take(limit)
             .map(|d| Dependency {
@@ -900,6 +900,7 @@ pub struct CreatePolicyInput {
 pub type ApiSchema = Schema<QueryRoot, MutationRoot, EmptySubscription>;
 
 /// Creates the GraphQL schema.
+#[must_use]
 pub fn create_schema(_state: Arc<AppState>) -> ApiSchema {
     Schema::build(QueryRoot, MutationRoot, EmptySubscription).finish()
 }
@@ -943,7 +944,7 @@ async fn graphql_handler(
 
 /// Creates the GraphQL router.
 pub fn routes(state: Arc<AppState>) -> Router<Arc<AppState>> {
-    let schema = create_schema(state.clone());
+    let schema = create_schema(state);
 
     Router::new()
         .route("/", post(graphql_handler))

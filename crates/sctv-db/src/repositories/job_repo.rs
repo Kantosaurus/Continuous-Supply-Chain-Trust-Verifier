@@ -7,7 +7,7 @@ use sctv_core::{Job, JobId, JobPriority, JobStatus, JobType, TenantId};
 use sqlx::{PgPool, Row};
 use std::collections::HashMap;
 
-/// PostgreSQL implementation of the job repository.
+/// `PostgreSQL` implementation of the job repository.
 pub struct PgJobRepository {
     pool: PgPool,
 }
@@ -41,8 +41,7 @@ impl PgJobRepository {
 
         let job_type: JobType = serde_json::from_value(payload.clone()).map_err(|e| {
             RepositoryError::Serialization(format!(
-                "Failed to deserialize job type '{}': {}",
-                job_type_str, e
+                "Failed to deserialize job type '{job_type_str}': {e}"
             ))
         })?;
 
@@ -64,7 +63,7 @@ impl PgJobRepository {
         })
     }
 
-    fn status_to_str(status: JobStatus) -> &'static str {
+    const fn status_to_str(status: JobStatus) -> &'static str {
         match status {
             JobStatus::Pending => "pending",
             JobStatus::Running => "running",
@@ -80,12 +79,12 @@ impl PgJobRepository {
 impl JobRepository for PgJobRepository {
     async fn find_by_id(&self, id: JobId) -> RepositoryResult<Option<Job>> {
         let record = sqlx::query(
-            r#"
+            r"
             SELECT id, tenant_id, job_type, status, priority, payload, result,
                    error_message, attempts, max_attempts, scheduled_at,
                    started_at, completed_at, created_at
             FROM jobs WHERE id = $1
-            "#,
+            ",
         )
         .bind(id.0)
         .fetch_optional(&self.pool)
@@ -106,30 +105,30 @@ impl JobRepository for PgJobRepository {
         offset: u32,
     ) -> RepositoryResult<Vec<Job>> {
         let mut query = String::from(
-            r#"
+            r"
             SELECT id, tenant_id, job_type, status, priority, payload, result,
                    error_message, attempts, max_attempts, scheduled_at,
                    started_at, completed_at, created_at
             FROM jobs
             WHERE 1=1
-            "#,
+            ",
         );
 
         let mut param_count = 0;
 
         if tenant_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND tenant_id = ${}", param_count));
+            query.push_str(&format!(" AND tenant_id = ${param_count}"));
         }
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ANY(${})", param_count));
+            query.push_str(&format!(" AND status = ANY(${param_count})"));
         }
 
         if filter.job_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND job_type = ANY(${})", param_count));
+            query.push_str(&format!(" AND job_type = ANY(${param_count})"));
         }
 
         query.push_str(&format!(
@@ -154,8 +153,8 @@ impl JobRepository for PgJobRepository {
         }
 
         let records = query_builder
-            .bind(limit as i64)
-            .bind(offset as i64)
+            .bind(i64::from(limit))
+            .bind(i64::from(offset))
             .fetch_all(&self.pool)
             .await
             .map_err(|e| RepositoryError::Database(e.to_string()))?;
@@ -168,13 +167,13 @@ impl JobRepository for PgJobRepository {
             .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
         sqlx::query(
-            r#"
+            r"
             INSERT INTO jobs (
                 id, tenant_id, job_type, status, priority, payload, result,
                 error_message, attempts, max_attempts, scheduled_at,
                 started_at, completed_at, created_at
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
-            "#,
+            ",
         )
         .bind(job.id.0)
         .bind(job.tenant_id.map(|t| t.0))
@@ -202,13 +201,13 @@ impl JobRepository for PgJobRepository {
             .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
 
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE jobs SET
                 status = $2, priority = $3, payload = $4, result = $5,
                 error_message = $6, attempts = $7, scheduled_at = $8,
                 started_at = $9, completed_at = $10
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(job.id.0)
         .bind(Self::status_to_str(job.status))
@@ -234,7 +233,7 @@ impl JobRepository for PgJobRepository {
     async fn claim_next(&self) -> RepositoryResult<Option<Job>> {
         // Use a transaction with row locking to atomically claim a job
         let record = sqlx::query(
-            r#"
+            r"
             UPDATE jobs SET
                 status = 'running',
                 started_at = NOW(),
@@ -250,7 +249,7 @@ impl JobRepository for PgJobRepository {
             RETURNING id, tenant_id, job_type, status, priority, payload, result,
                       error_message, attempts, max_attempts, scheduled_at,
                       started_at, completed_at, created_at
-            "#,
+            ",
         )
         .fetch_optional(&self.pool)
         .await
@@ -264,7 +263,7 @@ impl JobRepository for PgJobRepository {
 
     async fn find_due_jobs(&self, limit: u32) -> RepositoryResult<Vec<Job>> {
         let records = sqlx::query(
-            r#"
+            r"
             SELECT id, tenant_id, job_type, status, priority, payload, result,
                    error_message, attempts, max_attempts, scheduled_at,
                    started_at, completed_at, created_at
@@ -273,9 +272,9 @@ impl JobRepository for PgJobRepository {
               AND scheduled_at <= NOW()
             ORDER BY priority DESC, scheduled_at ASC
             LIMIT $1
-            "#,
+            ",
         )
-        .bind(limit as i64)
+        .bind(i64::from(limit))
         .fetch_all(&self.pool)
         .await
         .map_err(|e| RepositoryError::Database(e.to_string()))?;
@@ -285,16 +284,16 @@ impl JobRepository for PgJobRepository {
 
     async fn find_stale_jobs(&self, older_than_seconds: u32) -> RepositoryResult<Vec<Job>> {
         let records = sqlx::query(
-            r#"
+            r"
             SELECT id, tenant_id, job_type, status, priority, payload, result,
                    error_message, attempts, max_attempts, scheduled_at,
                    started_at, completed_at, created_at
             FROM jobs
             WHERE status = 'running'
               AND started_at < NOW() - INTERVAL '1 second' * $1
-            "#,
+            ",
         )
-        .bind(older_than_seconds as i64)
+        .bind(i64::from(older_than_seconds))
         .fetch_all(&self.pool)
         .await
         .map_err(|e| RepositoryError::Database(e.to_string()))?;
@@ -311,13 +310,13 @@ impl JobRepository for PgJobRepository {
         }
 
         let result = sqlx::query(
-            r#"
+            r"
             DELETE FROM jobs
             WHERE status IN ('completed', 'failed', 'cancelled')
               AND completed_at < NOW() - INTERVAL '1 day' * $1
-            "#,
+            ",
         )
-        .bind(older_than_days as i64)
+        .bind(i64::from(older_than_days))
         .execute(&self.pool)
         .await
         .map_err(|e| RepositoryError::Database(e.to_string()))?;
@@ -327,11 +326,11 @@ impl JobRepository for PgJobRepository {
 
     async fn count_by_status(&self) -> RepositoryResult<HashMap<JobStatus, u32>> {
         let records = sqlx::query(
-            r#"
+            r"
             SELECT status, COUNT(*) as count
             FROM jobs
             GROUP BY status
-            "#,
+            ",
         )
         .fetch_all(&self.pool)
         .await

@@ -1,4 +1,4 @@
-//! RubyGems registry client implementation.
+//! `RubyGems` registry client implementation.
 
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -12,13 +12,13 @@ use std::sync::Arc;
 use std::time::Duration;
 use url::Url;
 
-use super::models::*;
+use super::models::{GemInfo, Owner, VersionInfo};
 use crate::{
     retry_http, PackageMetadata, RegistryCache, RegistryClient, RegistryError, RegistryResult,
     RetryConfig, VersionMetadata,
 };
 
-/// RubyGems registry client with caching.
+/// `RubyGems` registry client with caching.
 pub struct RubyGemsClient {
     http: Client,
     base_url: Url,
@@ -26,10 +26,10 @@ pub struct RubyGemsClient {
 }
 
 impl RubyGemsClient {
-    /// Default RubyGems registry URL.
+    /// Default `RubyGems` registry URL.
     pub const DEFAULT_REGISTRY: &'static str = "https://rubygems.org";
 
-    /// Creates a new RubyGems client with default settings.
+    /// Creates a new `RubyGems` client with default settings.
     #[must_use]
     pub fn new() -> Self {
         Self::with_config(Self::DEFAULT_REGISTRY, Arc::new(RegistryCache::new()))
@@ -56,7 +56,7 @@ impl RubyGemsClient {
     async fn fetch_gem(&self, name: &str) -> RegistryResult<GemInfo> {
         let url = self
             .base_url
-            .join(&format!("/api/v1/gems/{}.json", name))
+            .join(&format!("/api/v1/gems/{name}.json"))
             .map_err(|e| RegistryError::Parse(e.to_string()))?;
 
         tracing::debug!("Fetching gem {} from {}", name, url);
@@ -91,7 +91,7 @@ impl RubyGemsClient {
     async fn fetch_versions(&self, name: &str) -> RegistryResult<Vec<VersionInfo>> {
         let url = self
             .base_url
-            .join(&format!("/api/v1/versions/{}.json", name))
+            .join(&format!("/api/v1/versions/{name}.json"))
             .map_err(|e| RegistryError::Parse(e.to_string()))?;
 
         tracing::debug!("Fetching versions for {} from {}", name, url);
@@ -126,7 +126,7 @@ impl RubyGemsClient {
     async fn fetch_owners(&self, name: &str) -> RegistryResult<Vec<String>> {
         let url = self
             .base_url
-            .join(&format!("/api/v1/gems/{}/owners.json", name))
+            .join(&format!("/api/v1/gems/{name}/owners.json"))
             .map_err(|e| RegistryError::Parse(e.to_string()))?;
 
         let response = retry_http(&RetryConfig::default(), || {
@@ -151,7 +151,7 @@ impl RubyGemsClient {
     fn build_download_url(&self, name: &str, version: &str) -> RegistryResult<Url> {
         // Format: https://rubygems.org/gems/{name}-{version}.gem
         self.base_url
-            .join(&format!("/gems/{}-{}.gem", name, version))
+            .join(&format!("/gems/{name}-{version}.gem"))
             .map_err(|e| RegistryError::Parse(e.to_string()))
     }
 
@@ -182,24 +182,23 @@ impl RubyGemsClient {
             };
 
             Version::parse(&normalized)
-                .map_err(|e| RegistryError::Parse(format!("Invalid version '{}': {}", version, e)))
+                .map_err(|e| RegistryError::Parse(format!("Invalid version '{version}': {e}")))
         } else if parts.len() == 2 {
             // Handle "1.2" -> "1.2.0"
             Version::parse(&format!("{}.{}.0", parts[0], parts[1]))
-                .map_err(|e| RegistryError::Parse(format!("Invalid version '{}': {}", version, e)))
+                .map_err(|e| RegistryError::Parse(format!("Invalid version '{version}': {e}")))
         } else if parts.len() == 1 {
             // Handle "1" -> "1.0.0"
             Version::parse(&format!("{}.0.0", parts[0]))
-                .map_err(|e| RegistryError::Parse(format!("Invalid version '{}': {}", version, e)))
+                .map_err(|e| RegistryError::Parse(format!("Invalid version '{version}': {e}")))
         } else {
             Err(RegistryError::Parse(format!(
-                "Invalid version format: {}",
-                version
+                "Invalid version format: {version}"
             )))
         }
     }
 
-    /// Parses a timestamp from RubyGems format.
+    /// Parses a timestamp from `RubyGems` format.
     fn parse_timestamp(s: &str) -> Option<chrono::DateTime<chrono::Utc>> {
         // RubyGems uses ISO 8601 format
         chrono::DateTime::parse_from_rfc3339(s)

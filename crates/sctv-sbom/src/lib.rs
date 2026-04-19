@@ -4,7 +4,7 @@
 //!
 //! This crate provides SBOM generation in two industry-standard formats:
 //!
-//! - **CycloneDX 1.5** - OWASP standard with rich component metadata
+//! - **`CycloneDX` 1.5** - OWASP standard with rich component metadata
 //! - **SPDX 2.3** - Linux Foundation standard for license compliance
 //!
 //! ## Features
@@ -70,9 +70,9 @@ pub type SbomResult<T> = Result<T, SbomError>;
 /// SBOM output format.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SbomFormat {
-    /// CycloneDX 1.5 JSON format.
+    /// `CycloneDX` 1.5 JSON format.
     CycloneDx,
-    /// CycloneDX 1.5 XML format.
+    /// `CycloneDX` 1.5 XML format.
     CycloneDxXml,
     /// SPDX 2.3 JSON format.
     Spdx,

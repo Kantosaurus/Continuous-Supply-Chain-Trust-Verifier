@@ -67,7 +67,7 @@ pub async fn run(
 }
 
 /// Loads dependency names from a project manifest.
-/// Returns (names, resolved_ecosystem) or an error.
+/// Returns (names, `resolved_ecosystem`) or an error.
 fn load_dependency_names(
     project_path: &Path,
     requested_ecosystem: Option<&str>,

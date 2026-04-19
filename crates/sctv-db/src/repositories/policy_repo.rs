@@ -6,7 +6,7 @@ use sctv_core::traits::{PolicyRepository, RepositoryError, RepositoryResult};
 use sctv_core::{Policy, PolicyId, PolicyRule, SeverityOverride, TenantId};
 use sqlx::{PgPool, Row};
 
-/// PostgreSQL implementation of the policy repository.
+/// `PostgreSQL` implementation of the policy repository.
 pub struct PgPolicyRepository {
     pool: PgPool,
 }
@@ -58,11 +58,11 @@ impl PgPolicyRepository {
 impl PolicyRepository for PgPolicyRepository {
     async fn find_by_id(&self, id: PolicyId) -> RepositoryResult<Option<Policy>> {
         let record = sqlx::query(
-            r#"
+            r"
             SELECT id, tenant_id, name, description, rules, severity_overrides,
                    is_default, enabled, created_at, updated_at
             FROM policies WHERE id = $1
-            "#,
+            ",
         )
         .bind(id.0)
         .fetch_optional(&self.pool)
@@ -77,13 +77,13 @@ impl PolicyRepository for PgPolicyRepository {
 
     async fn find_by_tenant(&self, tenant_id: TenantId) -> RepositoryResult<Vec<Policy>> {
         let records = sqlx::query(
-            r#"
+            r"
             SELECT id, tenant_id, name, description, rules, severity_overrides,
                    is_default, enabled, created_at, updated_at
             FROM policies
             WHERE tenant_id = $1
             ORDER BY is_default DESC, name ASC
-            "#,
+            ",
         )
         .bind(tenant_id.0)
         .fetch_all(&self.pool)
@@ -95,13 +95,13 @@ impl PolicyRepository for PgPolicyRepository {
 
     async fn find_default(&self, tenant_id: TenantId) -> RepositoryResult<Option<Policy>> {
         let record = sqlx::query(
-            r#"
+            r"
             SELECT id, tenant_id, name, description, rules, severity_overrides,
                    is_default, enabled, created_at, updated_at
             FROM policies
             WHERE tenant_id = $1 AND is_default = true
             LIMIT 1
-            "#,
+            ",
         )
         .bind(tenant_id.0)
         .fetch_optional(&self.pool)
@@ -138,12 +138,12 @@ impl PolicyRepository for PgPolicyRepository {
         }
 
         sqlx::query(
-            r#"
+            r"
             INSERT INTO policies (
                 id, tenant_id, name, description, rules, severity_overrides,
                 is_default, enabled, created_at, updated_at
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-            "#,
+            ",
         )
         .bind(policy.id.0)
         .bind(policy.tenant_id.0)
@@ -197,12 +197,12 @@ impl PolicyRepository for PgPolicyRepository {
         }
 
         let result = sqlx::query(
-            r#"
+            r"
             UPDATE policies SET
                 name = $2, description = $3, rules = $4, severity_overrides = $5,
                 is_default = $6, enabled = $7, updated_at = NOW()
             WHERE id = $1
-            "#,
+            ",
         )
         .bind(policy.id.0)
         .bind(&policy.name)

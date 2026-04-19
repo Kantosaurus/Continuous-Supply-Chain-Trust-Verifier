@@ -13,7 +13,9 @@ use std::sync::Arc;
 use std::time::Duration;
 use url::Url;
 
-use super::models::*;
+use super::models::{
+    MavenCoordinate, MavenMetadata, MavenPom, MavenSearchDoc, MavenSearchResponse,
+};
 use crate::{
     retry_http, PackageMetadata, RegistryCache, RegistryClient, RegistryError, RegistryResult,
     RetryConfig, VersionMetadata,
@@ -89,7 +91,7 @@ impl MavenClient {
 
         let xml_text = response.text().await?;
         quick_xml::de::from_str(&xml_text)
-            .map_err(|e| RegistryError::Parse(format!("Failed to parse metadata: {}", e)))
+            .map_err(|e| RegistryError::Parse(format!("Failed to parse metadata: {e}")))
     }
 
     /// Fetches POM file for a specific version.
@@ -123,14 +125,14 @@ impl MavenClient {
 
         let xml_text = response.text().await?;
         quick_xml::de::from_str(&xml_text)
-            .map_err(|e| RegistryError::Parse(format!("Failed to parse POM: {}", e)))
+            .map_err(|e| RegistryError::Parse(format!("Failed to parse POM: {e}")))
     }
 
     /// Fetches the SHA-1 checksum for an artifact.
     async fn fetch_sha1(&self, artifact_path: &str) -> RegistryResult<Option<String>> {
         let url = self
             .base_url
-            .join(&format!("{}.sha1", artifact_path))
+            .join(&format!("{artifact_path}.sha1"))
             .map_err(|e| RegistryError::Parse(e.to_string()))?;
 
         let response = retry_http(&RetryConfig::default(), || {
@@ -152,7 +154,7 @@ impl MavenClient {
     async fn fetch_sha256(&self, artifact_path: &str) -> RegistryResult<Option<String>> {
         let url = self
             .base_url
-            .join(&format!("{}.sha256", artifact_path))
+            .join(&format!("{artifact_path}.sha256"))
             .map_err(|e| RegistryError::Parse(e.to_string()))?;
 
         let response = retry_http(&RetryConfig::default(), || {
@@ -286,7 +288,7 @@ impl RegistryClient for MavenClient {
         }
 
         let coord = MavenCoordinate::parse(name)
-            .ok_or_else(|| RegistryError::Parse(format!("Invalid Maven coordinate: {}", name)))?;
+            .ok_or_else(|| RegistryError::Parse(format!("Invalid Maven coordinate: {name}")))?;
 
         let metadata = self.fetch_metadata(&coord).await?;
 
@@ -377,7 +379,7 @@ impl RegistryClient for MavenClient {
         }
 
         let coord = MavenCoordinate::parse(name)
-            .ok_or_else(|| RegistryError::Parse(format!("Invalid Maven coordinate: {}", name)))?;
+            .ok_or_else(|| RegistryError::Parse(format!("Invalid Maven coordinate: {name}")))?;
 
         let pom = self.fetch_pom(&coord, version).await?;
 
@@ -508,7 +510,7 @@ impl RegistryClient for MavenClient {
         let version_meta = self.get_version(name, version).await?;
 
         version_meta.download_url.ok_or_else(|| {
-            RegistryError::Unavailable(format!("No download URL for {}:{}", name, version))
+            RegistryError::Unavailable(format!("No download URL for {name}:{version}"))
         })
     }
 }
@@ -539,7 +541,7 @@ impl MavenIntegrityResult {
     }
 }
 
-/// Parses a Maven timestamp (YYYYMMDDHHmmss format).
+/// Parses a Maven timestamp (`YYYYMMDDHHmmss` format).
 fn parse_maven_timestamp(s: &str) -> Option<chrono::DateTime<chrono::Utc>> {
     if s.len() < 14 {
         return None;
@@ -584,7 +586,7 @@ fn parse_maven_version(version: &str) -> Result<Version, String> {
             let major = extract_numeric_prefix(parts[0]);
             let minor = extract_numeric_prefix(parts[1]);
             let patch = extract_numeric_prefix(parts[2]);
-            format!("{}.{}.{}", major, minor, patch)
+            format!("{major}.{minor}.{patch}")
         }
     };
 
@@ -593,7 +595,7 @@ fn parse_maven_version(version: &str) -> Result<Version, String> {
 
 /// Extracts the leading numeric portion of a version segment.
 fn extract_numeric_prefix(s: &str) -> u64 {
-    let numeric: String = s.chars().take_while(|c| c.is_ascii_digit()).collect();
+    let numeric: String = s.chars().take_while(char::is_ascii_digit).collect();
     numeric.parse().unwrap_or(0)
 }
 

@@ -132,7 +132,7 @@ pub enum TamperingSource {
 impl TamperingSource {
     fn as_str(&self) -> String {
         match self {
-            Self::Registry(url) => format!("registry:{}", url),
+            Self::Registry(url) => format!("registry:{url}"),
             Self::LockFile => "lock_file".to_string(),
             Self::PreviousVerification => "previous_verification".to_string(),
             Self::Sbom => "sbom".to_string(),
@@ -207,6 +207,7 @@ impl TamperingDetector {
     }
 
     /// Verifies a hash matches the expected value.
+    #[must_use]
     pub fn verify_hash(
         computed: &str,
         expected: &str,
@@ -216,7 +217,9 @@ impl TamperingDetector {
         let computed_lower = computed.to_lowercase();
         let expected_lower = expected.to_lowercase();
 
-        if computed_lower != expected_lower {
+        if computed_lower == expected_lower {
+            None
+        } else {
             Some(TamperingFinding {
                 finding_type: TamperingType::HashMismatch,
                 algorithm: Some(algorithm),
@@ -225,8 +228,6 @@ impl TamperingDetector {
                 source,
                 confidence: 1.0,
             })
-        } else {
-            None
         }
     }
 
@@ -504,7 +505,7 @@ impl Detector for TamperingDetector {
                     This may indicate the package has been tampered with.",
                     dependency.package_name,
                     dependency.resolved_version,
-                    format!("{:?}", algorithm).to_lowercase(),
+                    format!("{algorithm:?}").to_lowercase(),
                     tampering_details.expected_hash,
                     tampering_details.actual_hash,
                 );
@@ -546,6 +547,7 @@ impl IntegrityVerifier {
     }
 
     /// Verifies all sources match and returns any mismatches.
+    #[must_use]
     pub fn verify_all(&self) -> Vec<IntegrityMismatch> {
         let mut mismatches = Vec::new();
 

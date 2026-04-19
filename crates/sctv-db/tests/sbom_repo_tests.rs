@@ -264,7 +264,7 @@ async fn test_cleanup_old_sboms() {
         sbom_repo
             .create(&sbom)
             .await
-            .expect(&format!("Failed to create SBOM {}", i));
+            .unwrap_or_else(|_| panic!("Failed to create SBOM {i}"));
         tokio::time::sleep(std::time::Duration::from_millis(10)).await;
     }
 

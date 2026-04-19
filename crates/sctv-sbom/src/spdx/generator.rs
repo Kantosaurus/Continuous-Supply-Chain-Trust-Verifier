@@ -3,7 +3,9 @@
 use sctv_core::{Dependency, PackageEcosystem, Project};
 use uuid::Uuid;
 
-use super::models::*;
+use super::models::{
+    Checksum, CreationInfo, Document, ExternalRef, Package, PackagePurpose, Relationship,
+};
 use crate::common::{generate_bom_ref, GeneratorConfig};
 use crate::{SbomError, SbomFormat, SbomGenerator, SbomOutput, SbomResult};
 
@@ -16,19 +18,19 @@ pub struct SpdxGenerator {
 impl SpdxGenerator {
     /// Creates a new SPDX generator.
     #[must_use]
-    pub fn new(tag_value_output: bool) -> Self {
+    pub const fn new(tag_value_output: bool) -> Self {
         Self { tag_value_output }
     }
 
     /// Creates a JSON generator.
     #[must_use]
-    pub fn json() -> Self {
+    pub const fn json() -> Self {
         Self::new(false)
     }
 
     /// Creates a tag-value generator.
     #[must_use]
-    pub fn tag_value() -> Self {
+    pub const fn tag_value() -> Self {
         Self::new(true)
     }
 
@@ -46,7 +48,7 @@ impl SpdxGenerator {
             doc_uuid
         );
 
-        let mut doc = Document::new(format!("{} SBOM", project.name), namespace.clone());
+        let mut doc = Document::new(format!("{} SBOM", project.name), namespace);
 
         // Build creation info
         let creation_info = self.build_creation_info(config)?;
@@ -298,17 +300,16 @@ impl SpdxGenerator {
                 .creators
                 .iter()
                 .find(|c| c.starts_with("Tool:"))
-                .map(|s| s.trim_start_matches("Tool: "))
-                .unwrap_or("unknown")
+                .map_or("unknown", |s| s.trim_start_matches("Tool: "))
         ));
         for creator in &doc.creation_info.creators {
             if !creator.starts_with("Tool:") {
-                output.push_str(&format!("Creator: {}\n", creator));
+                output.push_str(&format!("Creator: {creator}\n"));
             }
         }
         output.push_str(&format!("Created: {}\n", doc.creation_info.created));
         if let Some(license_version) = &doc.creation_info.license_list_version {
-            output.push_str(&format!("LicenseListVersion: {}\n", license_version));
+            output.push_str(&format!("LicenseListVersion: {license_version}\n"));
         }
 
         output.push('\n');
@@ -320,11 +321,11 @@ impl SpdxGenerator {
             output.push_str(&format!("SPDXID: {}\n", pkg.spdx_id));
 
             if let Some(version) = &pkg.version_info {
-                output.push_str(&format!("PackageVersion: {}\n", version));
+                output.push_str(&format!("PackageVersion: {version}\n"));
             }
 
             if let Some(supplier) = &pkg.supplier {
-                output.push_str(&format!("PackageSupplier: {}\n", supplier));
+                output.push_str(&format!("PackageSupplier: {supplier}\n"));
             }
 
             output.push_str(&format!(
@@ -333,7 +334,7 @@ impl SpdxGenerator {
             ));
 
             if let Some(files_analyzed) = pkg.files_analyzed {
-                output.push_str(&format!("FilesAnalyzed: {}\n", files_analyzed));
+                output.push_str(&format!("FilesAnalyzed: {files_analyzed}\n"));
             }
 
             for checksum in &pkg.checksums {
@@ -344,23 +345,23 @@ impl SpdxGenerator {
             }
 
             if let Some(homepage) = &pkg.homepage {
-                output.push_str(&format!("PackageHomePage: {}\n", homepage));
+                output.push_str(&format!("PackageHomePage: {homepage}\n"));
             }
 
             if let Some(license) = &pkg.license_concluded {
-                output.push_str(&format!("PackageLicenseConcluded: {}\n", license));
+                output.push_str(&format!("PackageLicenseConcluded: {license}\n"));
             }
 
             if let Some(license) = &pkg.license_declared {
-                output.push_str(&format!("PackageLicenseDeclared: {}\n", license));
+                output.push_str(&format!("PackageLicenseDeclared: {license}\n"));
             }
 
             if let Some(copyright) = &pkg.copyright_text {
-                output.push_str(&format!("PackageCopyrightText: {}\n", copyright));
+                output.push_str(&format!("PackageCopyrightText: {copyright}\n"));
             }
 
             if let Some(purpose) = &pkg.primary_package_purpose {
-                output.push_str(&format!("PrimaryPackagePurpose: {}\n", purpose));
+                output.push_str(&format!("PrimaryPackagePurpose: {purpose}\n"));
             }
 
             for ext_ref in &pkg.external_refs {
@@ -371,7 +372,7 @@ impl SpdxGenerator {
             }
 
             if let Some(desc) = &pkg.description {
-                output.push_str(&format!("PackageDescription: <text>{}</text>\n", desc));
+                output.push_str(&format!("PackageDescription: <text>{desc}</text>\n"));
             }
 
             output.push('\n');

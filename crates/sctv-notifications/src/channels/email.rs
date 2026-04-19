@@ -39,11 +39,11 @@ pub struct EmailConfig {
     pub enabled: bool,
 }
 
-fn default_tls() -> bool {
+const fn default_tls() -> bool {
     true
 }
 
-fn default_enabled() -> bool {
+const fn default_enabled() -> bool {
     true
 }
 
@@ -87,7 +87,7 @@ impl EmailConfigBuilder {
 
     /// Sets the SMTP server port.
     #[must_use]
-    pub fn smtp_port(mut self, port: u16) -> Self {
+    pub const fn smtp_port(mut self, port: u16) -> Self {
         self.config.smtp_port = port;
         self
     }
@@ -126,14 +126,14 @@ impl EmailConfigBuilder {
 
     /// Sets whether to use TLS.
     #[must_use]
-    pub fn use_tls(mut self, use_tls: bool) -> Self {
+    pub const fn use_tls(mut self, use_tls: bool) -> Self {
         self.config.use_tls = use_tls;
         self
     }
 
     /// Sets whether the channel is enabled.
     #[must_use]
-    pub fn enabled(mut self, enabled: bool) -> Self {
+    pub const fn enabled(mut self, enabled: bool) -> Self {
         self.config.enabled = enabled;
         self
     }
@@ -153,7 +153,7 @@ pub struct EmailChannel {
 impl EmailChannel {
     /// Creates a new email channel with the given configuration.
     #[must_use]
-    pub fn new(config: EmailConfig) -> Self {
+    pub const fn new(config: EmailConfig) -> Self {
         Self { config }
     }
 

@@ -22,7 +22,7 @@ pub struct ScanProjectExecutor;
 impl ScanProjectExecutor {
     /// Creates a new scan project executor.
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self
     }
 
@@ -41,7 +41,7 @@ impl ScanProjectExecutor {
         let project = project_repo
             .find_by_id(payload.project_id)
             .await
-            .map_err(|e| WorkerError::Execution(format!("Failed to fetch project: {}", e)))?
+            .map_err(|e| WorkerError::Execution(format!("Failed to fetch project: {e}")))?
             .ok_or_else(|| WorkerError::Execution("Project not found".into()))?;
 
         tracing::info!(
@@ -51,7 +51,7 @@ impl ScanProjectExecutor {
         );
 
         // Determine which ecosystems to scan
-        let ecosystems = if payload.ecosystems.is_empty() {
+        let _ecosystems = if payload.ecosystems.is_empty() {
             project.ecosystems.clone()
         } else {
             payload.ecosystems.clone()
@@ -61,7 +61,7 @@ impl ScanProjectExecutor {
         let existing_deps = dependency_repo
             .find_by_project(payload.project_id)
             .await
-            .map_err(|e| WorkerError::Execution(format!("Failed to fetch dependencies: {}", e)))?;
+            .map_err(|e| WorkerError::Execution(format!("Failed to fetch dependencies: {e}")))?;
 
         tracing::debug!(count = existing_deps.len(), "Found existing dependencies");
 

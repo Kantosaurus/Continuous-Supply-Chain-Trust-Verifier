@@ -39,7 +39,7 @@ mod npm_client {
 
         let result = client.get_package("lodash").await;
 
-        assert!(result.is_ok(), "Expected successful response: {:?}", result);
+        assert!(result.is_ok(), "Expected successful response: {result:?}");
         let metadata = result.unwrap();
 
         assert_eq!(metadata.package.name, "lodash");
@@ -61,7 +61,7 @@ mod npm_client {
 
         let result = client.get_package("@babel/core").await;
 
-        assert!(result.is_ok(), "Expected successful response: {:?}", result);
+        assert!(result.is_ok(), "Expected successful response: {result:?}");
         let metadata = result.unwrap();
 
         assert_eq!(metadata.package.name, "@babel/core");
@@ -126,7 +126,7 @@ mod npm_client {
 
         let result = client.get_version("express", "4.18.2").await;
 
-        assert!(result.is_ok(), "Expected successful response: {:?}", result);
+        assert!(result.is_ok(), "Expected successful response: {result:?}");
         let version_meta = result.unwrap();
 
         assert_eq!(version_meta.version.version.to_string(), "4.18.2");
@@ -224,7 +224,7 @@ mod npm_client {
 
         let result = client.download_package("test-pkg", "1.0.0").await;
 
-        assert!(result.is_ok(), "Expected successful download: {:?}", result);
+        assert!(result.is_ok(), "Expected successful download: {result:?}");
         let bytes = result.unwrap();
         assert_eq!(bytes.as_ref(), tarball_content);
     }
@@ -448,7 +448,7 @@ mod cache_tests {
             latest_version: Some("2.0.0".to_string()),
         };
 
-        cache.set_package(PackageEcosystem::Npm, "test-pkg", metadata.clone());
+        cache.set_package(PackageEcosystem::Npm, "test-pkg", metadata);
 
         let cached = cache.get_package(PackageEcosystem::Npm, "test-pkg");
         assert!(cached.is_some());
@@ -581,7 +581,7 @@ mod integrity_tests {
             &base64::engine::general_purpose::STANDARD,
             hasher.finalize(),
         );
-        let integrity = format!("sha512-{}", hash_base64);
+        let integrity = format!("sha512-{hash_base64}");
 
         let checksums = PackageChecksums {
             sha1: None,
@@ -695,7 +695,7 @@ mod concurrent_tests {
 
         // Mount responses for multiple packages
         for i in 0..5 {
-            let name = format!("pkg-{}", i);
+            let name = format!("pkg-{i}");
             mount_npm_package(&server, &name, &["1.0.0"]).await;
         }
 
@@ -706,7 +706,7 @@ mod concurrent_tests {
         let mut handles = vec![];
         for i in 0..5 {
             let client_clone = client.clone();
-            let name = format!("pkg-{}", i);
+            let name = format!("pkg-{i}");
             handles.push(tokio::spawn(async move {
                 client_clone.get_package(&name).await
             }));

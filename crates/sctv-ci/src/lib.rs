@@ -23,11 +23,9 @@ pub struct SarifReport {
 
 impl SarifReport {
     /// Create a SARIF report from alerts.
+    #[must_use]
     pub fn from_alerts(alerts: &[Alert]) -> Self {
-        let results: Vec<SarifResult> = alerts
-            .iter()
-            .map(|alert| SarifResult::from_alert(alert))
-            .collect();
+        let results: Vec<SarifResult> = alerts.iter().map(SarifResult::from_alert).collect();
 
         // Collect unique rules
         let mut rules_map: HashMap<String, SarifRule> = HashMap::new();
@@ -185,7 +183,7 @@ impl SarifRule {
             },
             help: SarifHelp {
                 text: help_text.to_string(),
-                markdown: format!("**Recommendation:** {}", help_text),
+                markdown: format!("**Recommendation:** {help_text}"),
             },
             default_configuration: SarifDefaultConfiguration {
                 level: match alert_type.default_severity() {
@@ -299,7 +297,7 @@ impl SarifResult {
             partial_fingerprints: SarifPartialFingerprints {
                 primary_location_line_hash: format!(
                     "{:x}",
-                    md5_hash(&format!("{}:{}:{}", package_name, ecosystem, version))
+                    md5_hash(&format!("{package_name}:{ecosystem}:{version}"))
                 ),
             },
             properties: SarifResultProperties {
@@ -430,6 +428,7 @@ impl Default for CiConfig {
 }
 
 /// Determines CI exit code based on alerts.
+#[must_use]
 pub fn determine_exit_code(alerts: &[Alert], config: &CiConfig) -> i32 {
     for alert in alerts {
         match alert.severity {

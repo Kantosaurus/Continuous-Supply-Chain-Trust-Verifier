@@ -92,6 +92,7 @@ impl RegistryCache {
     }
 
     /// Gets a cached package if not expired.
+    #[must_use]
     pub fn get_package(&self, ecosystem: PackageEcosystem, name: &str) -> Option<PackageMetadata> {
         let key = PackageCacheKey {
             ecosystem,
@@ -118,6 +119,7 @@ impl RegistryCache {
     }
 
     /// Gets a cached version if not expired.
+    #[must_use]
     pub fn get_version(
         &self,
         ecosystem: PackageEcosystem,

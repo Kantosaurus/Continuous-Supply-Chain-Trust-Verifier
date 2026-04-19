@@ -14,7 +14,8 @@ pub struct Repositories {
 }
 
 impl Repositories {
-    /// Creates a new repository container with PostgreSQL implementations.
+    /// Creates a new repository container with `PostgreSQL` implementations.
+    #[must_use]
     pub fn new_pg(pool: sqlx::PgPool) -> Self {
         use sctv_db::{
             PgAlertRepository, PgDependencyRepository, PgPolicyRepository, PgProjectRepository,
@@ -44,6 +45,7 @@ pub struct AppState {
 
 impl AppState {
     /// Creates a new application state without database.
+    #[must_use]
     pub fn new(jwt_secret: String) -> Self {
         Self {
             jwt_secret,
@@ -55,6 +57,7 @@ impl AppState {
     }
 
     /// Creates application state with database connection.
+    #[must_use]
     pub fn with_database(jwt_secret: String, pool: sqlx::PgPool) -> Self {
         let repositories = Repositories::new_pg(pool.clone());
         Self {
@@ -67,12 +70,14 @@ impl AppState {
     }
 
     /// Returns a reference to the database pool, if available.
-    pub fn pool(&self) -> Option<&sqlx::PgPool> {
+    #[must_use]
+    pub const fn pool(&self) -> Option<&sqlx::PgPool> {
         self.db_pool.as_ref()
     }
 
     /// Returns a reference to the repositories, if available.
-    pub fn repos(&self) -> Option<&Repositories> {
+    #[must_use]
+    pub const fn repos(&self) -> Option<&Repositories> {
         self.repositories.as_ref()
     }
 
