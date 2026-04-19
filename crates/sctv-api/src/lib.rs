@@ -8,7 +8,6 @@
 pub mod auth;
 pub mod error;
 pub mod graphql;
-pub mod middleware;
 pub mod rest;
 pub mod state;
 
