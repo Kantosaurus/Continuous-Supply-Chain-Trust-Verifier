@@ -131,6 +131,7 @@ pub fn create_test_tenant() -> sctv_core::Tenant {
 }
 
 /// Creates a test user for use in tests.
+#[allow(dead_code)] // helper for planned user repository tests
 pub fn create_test_user(tenant_id: sctv_core::TenantId) -> sctv_core::User {
     sctv_core::User::new(
         tenant_id,
@@ -139,6 +140,7 @@ pub fn create_test_user(tenant_id: sctv_core::TenantId) -> sctv_core::User {
 }
 
 /// Creates a test project for use in tests.
+#[allow(dead_code)] // used in sbom_repo_tests; flagged per-binary by clippy
 pub fn create_test_project(tenant_id: sctv_core::TenantId) -> sctv_core::Project {
     sctv_core::Project::new(tenant_id, format!("test-project-{}", uuid::Uuid::new_v4()))
 }

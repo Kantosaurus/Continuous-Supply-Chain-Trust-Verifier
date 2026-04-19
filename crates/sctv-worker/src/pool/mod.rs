@@ -149,6 +149,9 @@ impl<Q: JobQueue + 'static> WorkerPool<Q> {
     }
 
     /// Starts the worker pool and returns a handle.
+    // Worker startup is an inherently sequential pipeline; splitting it would
+    // spread tightly-coupled setup logic across multiple functions unnecessarily.
+    #[allow(clippy::too_many_lines)]
     pub fn start(self) -> WorkerPoolHandle {
         let worker_count = self.config.worker_count;
         let stats = self.stats.clone();
@@ -270,9 +273,9 @@ impl<Q: JobQueue + 'static> WorkerPool<Q> {
             worker_handles.push(handle);
         }
 
-        // Spawn stale job checker
+        // Spawn stale job checker (job_types consumed by previous workers; drop it here)
+        drop(job_types);
         let stale_pool = pool.clone();
-        let _stale_job_types = job_types;
         let stale_handle = tokio::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_secs(
                 stale_pool.config.stale_check_interval_secs,
@@ -343,6 +346,11 @@ impl WorkerPoolHandle {
     }
 
     /// Waits for all workers to stop.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WorkerError::Timeout`] if graceful shutdown does not complete within the
+    /// configured timeout.
     pub async fn wait(self) -> WorkerResult<()> {
         if self.config.graceful_shutdown {
             let timeout = Duration::from_secs(self.config.shutdown_timeout_secs);
@@ -374,6 +382,10 @@ impl WorkerPoolHandle {
     }
 
     /// Initiates shutdown and waits for completion.
+    ///
+    /// # Errors
+    ///
+    /// Propagates any error from [`WorkerPoolHandle::wait`].
     pub async fn stop(self) -> WorkerResult<()> {
         self.shutdown();
         self.wait().await

@@ -70,6 +70,13 @@ impl JobStatus {
     }
 
     /// Parses from database string.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WorkerError::InvalidJobStatus`] if the string does not match a known status.
+    // Implementing `FromStr` would change the error type from `WorkerError` to a trait-mandated
+    // type, breaking the existing public API; suppress the lint at the item level.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Result<Self, WorkerError> {
         match s {
             "pending" => Ok(Self::Pending),
@@ -110,6 +117,13 @@ impl JobType {
     }
 
     /// Parses from database string.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WorkerError::InvalidJobType`] if the string does not match a known job type.
+    // Implementing `FromStr` would change the error type from `WorkerError` to a trait-mandated
+    // type, breaking the existing public API; suppress the lint at the item level.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Result<Self, WorkerError> {
         match s {
             "scan_project" => Ok(Self::ScanProject),

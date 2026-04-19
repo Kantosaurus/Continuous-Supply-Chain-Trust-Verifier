@@ -101,7 +101,8 @@ impl SendNotificationExecutor {
                 Ok(SendNotificationResult {
                     sent: true,
                     response: Some(response),
-                    send_duration_ms: duration.as_millis() as u64,
+                    // as_millis() returns u128; notification duration won't exceed u64::MAX ms.
+                    send_duration_ms: u64::try_from(duration.as_millis()).unwrap_or(u64::MAX),
                 })
             }
             Err(e) => {
@@ -119,7 +120,8 @@ impl SendNotificationExecutor {
                         "error": e.to_string(),
                         "channel": format!("{:?}", payload.channel),
                     })),
-                    send_duration_ms: duration.as_millis() as u64,
+                    // as_millis() returns u128; notification duration won't exceed u64::MAX ms.
+                    send_duration_ms: u64::try_from(duration.as_millis()).unwrap_or(u64::MAX),
                 })
             }
         }
@@ -355,13 +357,10 @@ impl JobExecutor for SendNotificationExecutor {
     }
 
     async fn execute(&self, job: &Job, ctx: &ExecutionContext) -> WorkerResult<JobResult> {
-        let payload = match &job.payload {
-            JobPayload::SendNotification(p) => p,
-            _ => {
-                return Err(WorkerError::Execution(
-                    "Invalid payload type for SendNotification".into(),
-                ))
-            }
+        let JobPayload::SendNotification(payload) = &job.payload else {
+            return Err(WorkerError::Execution(
+                "Invalid payload type for SendNotification".into(),
+            ));
         };
 
         let result = self.execute_send(payload, ctx).await?;

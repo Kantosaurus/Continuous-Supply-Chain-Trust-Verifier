@@ -6,7 +6,7 @@ use sctv_core::PackageEcosystem;
 use sctv_detectors::typosquatting::TyposquattingDetector;
 use std::str::FromStr;
 
-pub async fn run(name: &str, ecosystem: &str, format: OutputFormat) -> anyhow::Result<()> {
+pub fn run(name: &str, ecosystem: &str, format: OutputFormat) -> anyhow::Result<()> {
     let ecosystem = PackageEcosystem::from_str(ecosystem)
         .map_err(|_| anyhow::anyhow!("Unknown ecosystem: {ecosystem}"))?;
 

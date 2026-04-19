@@ -95,12 +95,12 @@ async fn test_find_sboms_by_project() {
         .await
         .expect("Failed to create SBOM 2");
 
-    let sboms = sbom_repo
+    let found_sboms = sbom_repo
         .find_by_project(project.id)
         .await
         .expect("Failed to find SBOMs");
 
-    assert_eq!(sboms.len(), 2);
+    assert_eq!(found_sboms.len(), 2);
 }
 
 #[tokio::test]

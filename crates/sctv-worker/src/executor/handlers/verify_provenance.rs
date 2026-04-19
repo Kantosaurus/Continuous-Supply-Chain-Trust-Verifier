@@ -55,26 +55,26 @@ impl VerifyProvenanceExecutor {
 
         // Verify SLSA attestations
         if payload.verify_slsa {
-            let (status, level) = self.verify_slsa(payload, ctx).await?;
+            let (status, level) = Self::verify_slsa(payload, ctx);
             slsa_status = Some(status);
             slsa_level = level;
         }
 
         // Verify Sigstore signatures
         if payload.verify_sigstore {
-            let (status, details) = self.verify_sigstore(payload, ctx).await?;
+            let (status, details) = Self::verify_sigstore(payload, ctx);
             sigstore_status = Some(status);
             sigstore_details = details;
         }
 
         // Verify in-toto attestations
         if payload.verify_intoto {
-            let status = self.verify_intoto(payload, ctx).await?;
+            let status = Self::verify_intoto(payload, ctx);
             intoto_status = Some(status);
         }
 
         // Determine overall provenance status
-        let overall_status = self.determine_overall_status(
+        let overall_status = Self::determine_overall_status(
             slsa_status.as_ref(),
             sigstore_status.as_ref(),
             intoto_status.as_ref(),
@@ -90,7 +90,8 @@ impl VerifyProvenanceExecutor {
 
         // Create alert if verification failed
         if overall_status == ProvenanceStatus::Failed {
-            let alert = self.create_failure_alert(payload, &slsa_status, &sigstore_status)?;
+            let alert =
+                Self::create_failure_alert(payload, slsa_status.as_ref(), sigstore_status.as_ref());
             if let Err(e) = alert_repo.create(&alert).await {
                 tracing::warn!(error = %e, "Failed to create provenance alert");
             } else {
@@ -122,11 +123,10 @@ impl VerifyProvenanceExecutor {
         })
     }
 
-    async fn verify_slsa(
-        &self,
+    fn verify_slsa(
         payload: &VerifyProvenancePayload,
         _ctx: &ExecutionContext,
-    ) -> WorkerResult<(ProvenanceVerificationStatus, Option<u8>)> {
+    ) -> (ProvenanceVerificationStatus, Option<u8>) {
         // In a real implementation, this would:
         // 1. Fetch attestations from the registry or transparency log
         // 2. Verify the SLSA provenance attestation
@@ -139,14 +139,13 @@ impl VerifyProvenanceExecutor {
 
         // For now, return NoAttestations as we don't have real verification
         // In production, this would use the sigstore crate or similar
-        Ok((ProvenanceVerificationStatus::NoAttestations, None))
+        (ProvenanceVerificationStatus::NoAttestations, None)
     }
 
-    async fn verify_sigstore(
-        &self,
+    fn verify_sigstore(
         payload: &VerifyProvenancePayload,
         _ctx: &ExecutionContext,
-    ) -> WorkerResult<(ProvenanceVerificationStatus, Option<SigstoreDetails>)> {
+    ) -> (ProvenanceVerificationStatus, Option<SigstoreDetails>) {
         // In a real implementation, this would:
         // 1. Query Rekor transparency log for the package
         // 2. Verify the Sigstore signature
@@ -158,14 +157,13 @@ impl VerifyProvenanceExecutor {
         );
 
         // For now, return NoAttestations as we don't have real verification
-        Ok((ProvenanceVerificationStatus::NoAttestations, None))
+        (ProvenanceVerificationStatus::NoAttestations, None)
     }
 
-    async fn verify_intoto(
-        &self,
+    fn verify_intoto(
         payload: &VerifyProvenancePayload,
         _ctx: &ExecutionContext,
-    ) -> WorkerResult<ProvenanceVerificationStatus> {
+    ) -> ProvenanceVerificationStatus {
         // In a real implementation, this would:
         // 1. Fetch in-toto link metadata
         // 2. Verify the supply chain layout
@@ -177,11 +175,10 @@ impl VerifyProvenanceExecutor {
         );
 
         // For now, return NoAttestations as we don't have real verification
-        Ok(ProvenanceVerificationStatus::NoAttestations)
+        ProvenanceVerificationStatus::NoAttestations
     }
 
     fn determine_overall_status(
-        &self,
         slsa: Option<&ProvenanceVerificationStatus>,
         sigstore: Option<&ProvenanceVerificationStatus>,
         intoto: Option<&ProvenanceVerificationStatus>,
@@ -209,11 +206,10 @@ impl VerifyProvenanceExecutor {
     }
 
     fn create_failure_alert(
-        &self,
         payload: &VerifyProvenancePayload,
-        slsa_status: &Option<ProvenanceVerificationStatus>,
-        sigstore_status: &Option<ProvenanceVerificationStatus>,
-    ) -> WorkerResult<Alert> {
+        slsa_status: Option<&ProvenanceVerificationStatus>,
+        sigstore_status: Option<&ProvenanceVerificationStatus>,
+    ) -> Alert {
         let mut attestation_errors = Vec::new();
 
         if matches!(slsa_status, Some(ProvenanceVerificationStatus::Failed)) {
@@ -237,7 +233,7 @@ impl VerifyProvenanceExecutor {
         // For now, we'll create a placeholder project ID.
         let project_id = sctv_core::ProjectId::new();
 
-        Ok(Alert {
+        Alert {
             id: AlertId::new(),
             tenant_id: payload.tenant_id,
             project_id,
@@ -268,7 +264,7 @@ impl VerifyProvenanceExecutor {
             acknowledged_by: None,
             resolved_at: None,
             resolved_by: None,
-        })
+        }
     }
 }
 
@@ -285,13 +281,10 @@ impl JobExecutor for VerifyProvenanceExecutor {
     }
 
     async fn execute(&self, job: &Job, ctx: &ExecutionContext) -> WorkerResult<JobResult> {
-        let payload = match &job.payload {
-            JobPayload::VerifyProvenance(p) => p,
-            _ => {
-                return Err(WorkerError::Execution(
-                    "Invalid payload type for VerifyProvenance".into(),
-                ))
-            }
+        let JobPayload::VerifyProvenance(payload) = &job.payload else {
+            return Err(WorkerError::Execution(
+                "Invalid payload type for VerifyProvenance".into(),
+            ));
         };
 
         let result = self.execute_verify(payload, ctx).await?;

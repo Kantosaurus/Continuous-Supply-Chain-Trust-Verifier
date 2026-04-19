@@ -66,12 +66,13 @@ impl ScanProjectExecutor {
         tracing::debug!(count = existing_deps.len(), "Found existing dependencies");
 
         let mut alerts_created = 0u32;
-        let dependencies_found = existing_deps.len() as u32;
+        // dependency count is bounded by project size; truncation to u32 is safe in practice.
+        let dependencies_found = u32::try_from(existing_deps.len()).unwrap_or(u32::MAX);
 
         // Run detectors on dependencies
         for dep in &existing_deps {
             // Check for typosquatting
-            if let Some(alert) = self.check_typosquatting(dep, payload).await? {
+            if let Some(alert) = Self::check_typosquatting(dep, payload) {
                 if let Err(e) = alert_repo.create(&alert).await {
                     tracing::warn!(error = %e, "Failed to create typosquatting alert");
                 } else {
@@ -80,7 +81,7 @@ impl ScanProjectExecutor {
             }
 
             // Check for tampering (if hashes available)
-            if let Some(alert) = self.check_tampering(dep, payload).await? {
+            if let Some(alert) = Self::check_tampering(dep, payload) {
                 if let Err(e) = alert_repo.create(&alert).await {
                     tracing::warn!(error = %e, "Failed to create tampering alert");
                 } else {
@@ -109,98 +110,80 @@ impl ScanProjectExecutor {
         Ok(ScanProjectResult {
             dependencies_found,
             alerts_created,
-            scan_duration_ms: duration.as_millis() as u64,
+            // as_millis() returns u128; a scan duration won't exceed u64::MAX milliseconds (~585M years).
+            scan_duration_ms: u64::try_from(duration.as_millis()).unwrap_or(u64::MAX),
         })
     }
 
-    async fn check_typosquatting(
-        &self,
-        dep: &Dependency,
-        payload: &ScanProjectPayload,
-    ) -> WorkerResult<Option<Alert>> {
+    fn check_typosquatting(dep: &Dependency, payload: &ScanProjectPayload) -> Option<Alert> {
         use sctv_detectors::typosquatting::{Confidence, TyposquattingDetector};
 
         let detector = TyposquattingDetector::new();
         let candidates = detector.check(dep.ecosystem, &dep.package_name);
 
-        if candidates.is_empty() {
-            return Ok(None);
-        }
-
-        // Get the highest confidence finding
         let finding = candidates.into_iter().max_by_key(|c| match c.confidence {
             Confidence::High => 3,
             Confidence::Medium => 2,
             Confidence::Low => 1,
-        });
+        })?;
 
-        if let Some(finding) = finding {
-            let severity = match finding.confidence {
-                Confidence::High => Severity::High,
-                Confidence::Medium => Severity::Medium,
-                Confidence::Low => Severity::Low,
-            };
+        let severity = match finding.confidence {
+            Confidence::High => Severity::High,
+            Confidence::Medium => Severity::Medium,
+            Confidence::Low => Severity::Low,
+        };
 
-            let details = TyposquattingDetails {
-                suspicious_package: dep.package_name.clone(),
-                ecosystem: dep.ecosystem,
-                similar_popular_package: finding.popular_name.clone(),
-                similarity_score: finding.similarity_score,
-                detection_method: finding.detection_method,
-                popular_package_downloads: None,
-            };
+        let details = TyposquattingDetails {
+            suspicious_package: dep.package_name.clone(),
+            ecosystem: dep.ecosystem,
+            similar_popular_package: finding.popular_name.clone(),
+            similarity_score: finding.similarity_score,
+            detection_method: finding.detection_method,
+            popular_package_downloads: None,
+        };
 
-            let alert = Alert {
-                id: AlertId::new(),
-                tenant_id: payload.tenant_id,
-                project_id: payload.project_id,
-                dependency_id: Some(dep.id),
-                alert_type: AlertType::Typosquatting(details),
-                severity,
-                title: format!(
-                    "Potential typosquatting: {} similar to {}",
+        Some(Alert {
+            id: AlertId::new(),
+            tenant_id: payload.tenant_id,
+            project_id: payload.project_id,
+            dependency_id: Some(dep.id),
+            alert_type: AlertType::Typosquatting(details),
+            severity,
+            title: format!(
+                "Potential typosquatting: {} similar to {}",
+                dep.package_name, finding.popular_name
+            ),
+            description: format!(
+                "The package '{}' has a name similar to the popular package '{}'. \
+                 This could indicate a typosquatting attack. \
+                 Similarity score: {:.2}, Detection method: {:?}",
+                dep.package_name,
+                finding.popular_name,
+                finding.similarity_score,
+                finding.detection_method
+            ),
+            status: AlertStatus::Open,
+            remediation: Some(Remediation {
+                action_taken: format!(
+                    "Verify that '{}' is the intended package. If not, replace it with '{}'.",
                     dep.package_name, finding.popular_name
                 ),
-                description: format!(
-                    "The package '{}' has a name similar to the popular package '{}'. \
-                     This could indicate a typosquatting attack. \
-                     Similarity score: {:.2}, Detection method: {:?}",
-                    dep.package_name,
-                    finding.popular_name,
-                    finding.similarity_score,
-                    finding.detection_method
-                ),
-                status: AlertStatus::Open,
-                remediation: Some(Remediation {
-                    action_taken: format!(
-                        "Verify that '{}' is the intended package. If not, replace it with '{}'.",
-                        dep.package_name, finding.popular_name
-                    ),
-                    new_version: None,
-                    notes: Some("Review the package source and maintainers".to_string()),
-                }),
-                metadata: AlertMetadata::default(),
-                created_at: chrono::Utc::now(),
-                acknowledged_at: None,
-                acknowledged_by: None,
-                resolved_at: None,
-                resolved_by: None,
-            };
-
-            return Ok(Some(alert));
-        }
-
-        Ok(None)
+                new_version: None,
+                notes: Some("Review the package source and maintainers".to_string()),
+            }),
+            metadata: AlertMetadata::default(),
+            created_at: chrono::Utc::now(),
+            acknowledged_at: None,
+            acknowledged_by: None,
+            resolved_at: None,
+            resolved_by: None,
+        })
     }
 
-    async fn check_tampering(
-        &self,
-        dep: &Dependency,
-        payload: &ScanProjectPayload,
-    ) -> WorkerResult<Option<Alert>> {
-        // Skip if no hash is available or signature is not invalid
+    fn check_tampering(dep: &Dependency, payload: &ScanProjectPayload) -> Option<Alert> {
+        // Skip if signature is not marked as invalid
         if dep.integrity.signature_status != SignatureStatus::Invalid {
-            return Ok(None);
+            return None;
         }
 
         let details = TamperingDetails {
@@ -213,7 +196,7 @@ impl ScanProjectExecutor {
             registry_source: "unknown".to_string(),
         };
 
-        let alert = Alert {
+        Some(Alert {
             id: AlertId::new(),
             tenant_id: payload.tenant_id,
             project_id: payload.project_id,
@@ -243,9 +226,7 @@ impl ScanProjectExecutor {
             acknowledged_by: None,
             resolved_at: None,
             resolved_by: None,
-        };
-
-        Ok(Some(alert))
+        })
     }
 }
 
@@ -262,13 +243,10 @@ impl JobExecutor for ScanProjectExecutor {
     }
 
     async fn execute(&self, job: &Job, ctx: &ExecutionContext) -> WorkerResult<JobResult> {
-        let payload = match &job.payload {
-            JobPayload::ScanProject(p) => p,
-            _ => {
-                return Err(WorkerError::Execution(
-                    "Invalid payload type for ScanProject".into(),
-                ))
-            }
+        let JobPayload::ScanProject(payload) = &job.payload else {
+            return Err(WorkerError::Execution(
+                "Invalid payload type for ScanProject".into(),
+            ));
         };
 
         let result = self.execute_scan(payload, ctx).await?;

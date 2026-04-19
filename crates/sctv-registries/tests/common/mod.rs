@@ -118,6 +118,7 @@ pub fn npm_version_metadata(name: &str, version: &str) -> serde_json::Value {
 }
 
 /// Test fixture for `PyPI` package metadata.
+#[allow(dead_code)] // helper for planned PyPI integration tests
 pub fn pypi_package_metadata(name: &str, version: &str) -> serde_json::Value {
     json!({
         "info": {
@@ -155,6 +156,7 @@ pub fn pypi_package_metadata(name: &str, version: &str) -> serde_json::Value {
 }
 
 /// Test fixture for Maven POM metadata.
+#[allow(dead_code)] // helper for planned Maven integration tests
 pub fn maven_pom_metadata(group_id: &str, artifact_id: &str, version: &str) -> String {
     format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -179,6 +181,7 @@ pub fn maven_pom_metadata(group_id: &str, artifact_id: &str, version: &str) -> S
 }
 
 /// Test fixture for Maven metadata.xml.
+#[allow(dead_code)] // helper for planned Maven integration tests
 pub fn maven_metadata(group_id: &str, artifact_id: &str, versions: &[&str]) -> String {
     let versions_xml: String = versions
         .iter()
@@ -300,6 +303,7 @@ pub async fn mount_npm_rate_limit(server: &MockServer, name: &str, retry_after: 
 }
 
 /// Mounts a tarball download response.
+#[allow(dead_code)] // helper for planned npm integration tests
 pub async fn mount_npm_tarball(server: &MockServer, name: &str, version: &str, content: &[u8]) {
     Mock::given(method("GET"))
         .and(path(format!("/{name}/-/{name}-{version}.tgz")))
@@ -313,11 +317,13 @@ pub async fn mount_npm_tarball(server: &MockServer, name: &str, version: &str, c
 }
 
 /// Sets up a mock `PyPI` server.
+#[allow(dead_code)] // helper for planned PyPI integration tests
 pub async fn setup_pypi_mock_server() -> MockServer {
     MockServer::start().await
 }
 
 /// Mounts `PyPI` package metadata.
+#[allow(dead_code)] // helper for planned PyPI integration tests
 pub async fn mount_pypi_package(server: &MockServer, name: &str, version: &str) {
     Mock::given(method("GET"))
         .and(path(format!("/pypi/{name}/json")))
@@ -329,11 +335,13 @@ pub async fn mount_pypi_package(server: &MockServer, name: &str, version: &str) 
 }
 
 /// Sets up a mock Maven server.
+#[allow(dead_code)] // helper for planned Maven integration tests
 pub async fn setup_maven_mock_server() -> MockServer {
     MockServer::start().await
 }
 
 /// Mounts Maven metadata response.
+#[allow(dead_code)] // helper for planned Maven integration tests
 pub async fn mount_maven_metadata(
     server: &MockServer,
     group_id: &str,
@@ -356,6 +364,7 @@ pub async fn mount_maven_metadata(
 }
 
 /// Mounts Maven POM response.
+#[allow(dead_code)] // helper for planned Maven integration tests
 pub async fn mount_maven_pom(
     server: &MockServer,
     group_id: &str,
@@ -420,6 +429,7 @@ pub fn create_test_version(version_str: &str) -> PackageVersion {
 }
 
 /// Test helper to verify integrity results.
+#[allow(dead_code)] // helper for planned integrity verification tests
 pub fn assert_integrity_valid(checksums: &PackageChecksums) {
     assert!(
         checksums.sha256.is_some() || checksums.sha512.is_some() || checksums.integrity.is_some(),

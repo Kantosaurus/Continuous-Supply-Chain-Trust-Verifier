@@ -55,6 +55,11 @@ impl ExecutorRegistry {
     }
 
     /// Executes a job using the appropriate executor.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no executor is registered for the job type, or if the
+    /// executor itself returns an error.
     pub async fn execute(&self, job: &Job, ctx: &ExecutionContext) -> WorkerResult<JobResult> {
         let executor = self.executors.get(&job.job_type).ok_or_else(|| {
             WorkerError::Execution(format!(

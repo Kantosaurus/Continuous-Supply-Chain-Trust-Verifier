@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sqlx::{PgPool, Row};
 use std::collections::HashMap;
+use std::fmt::Write as _;
 
 use crate::error::{WorkerError, WorkerResult};
 use crate::jobs::{Job, JobId, JobPayload, JobPriority, JobResult, JobStatus, JobType};
@@ -57,8 +58,8 @@ impl PgJobQueue {
             payload,
             result,
             error_message,
-            attempts: attempts as u32,
-            max_attempts: max_attempts as u32,
+            attempts: attempts.cast_unsigned(),
+            max_attempts: max_attempts.cast_unsigned(),
             scheduled_at,
             started_at,
             completed_at,
@@ -75,7 +76,7 @@ impl JobQueue for PgJobQueue {
         let now = Utc::now();
 
         let priority: i32 = options.priority.unwrap_or_default().into();
-        let max_attempts = options.max_attempts.unwrap_or(3) as i32;
+        let max_attempts = options.max_attempts.unwrap_or(3).cast_signed();
         let scheduled_at = options.scheduled_at.unwrap_or(now);
         let status = if options.scheduled_at.is_some() && options.scheduled_at.unwrap() > now {
             JobStatus::Scheduled
@@ -127,7 +128,7 @@ impl JobQueue for PgJobQueue {
             let job_type = payload.job_type();
 
             let priority: i32 = options.priority.unwrap_or_default().into();
-            let max_attempts = options.max_attempts.unwrap_or(3) as i32;
+            let max_attempts = options.max_attempts.unwrap_or(3).cast_signed();
             let scheduled_at = options.scheduled_at.unwrap_or(now);
             let status = if options.scheduled_at.is_some() && options.scheduled_at.unwrap() > now {
                 JobStatus::Scheduled
@@ -406,39 +407,41 @@ impl JobQueue for PgJobQueue {
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ANY(${param_count})"));
+            write!(query, " AND status = ANY(${param_count})").unwrap();
         }
 
         if filter.job_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND job_type = ANY(${param_count})"));
+            write!(query, " AND job_type = ANY(${param_count})").unwrap();
         }
 
         if filter.tenant_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND tenant_id = ${param_count}"));
+            write!(query, " AND tenant_id = ${param_count}").unwrap();
         }
 
         if filter.min_priority.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND priority >= ${param_count}"));
+            write!(query, " AND priority >= ${param_count}").unwrap();
         }
 
         if filter.scheduled_before.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND scheduled_at <= ${param_count}"));
+            write!(query, " AND scheduled_at <= ${param_count}").unwrap();
         }
 
         if filter.created_after.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${param_count}"));
+            write!(query, " AND created_at >= ${param_count}").unwrap();
         }
 
-        query.push_str(&format!(
+        write!(
+            query,
             " ORDER BY priority DESC, created_at DESC LIMIT ${} OFFSET ${}",
             param_count + 1,
             param_count + 2
-        ));
+        )
+        .unwrap();
 
         let mut query_builder = sqlx::query(&query);
 
@@ -493,15 +496,18 @@ impl JobQueue for PgJobQueue {
         let mut stats = QueueStats::default();
 
         for row in &status_counts {
-            let status: String = row.get("status");
+            let job_status: String = row.get("status");
             let count: i64 = row.get("count");
 
-            match status.as_str() {
-                "pending" => stats.pending = count as u64,
-                "running" => stats.running = count as u64,
-                "completed" => stats.completed = count as u64,
-                "failed" => stats.failed = count as u64,
-                "scheduled" => stats.scheduled = count as u64,
+            // COUNT() in SQL always returns non-negative values even though sqlx
+            // maps it to i64; unwrap_or(0) handles the theoretical negative case.
+            let count_u64 = u64::try_from(count).unwrap_or(0);
+            match job_status.as_str() {
+                "pending" => stats.pending = count_u64,
+                "running" => stats.running = count_u64,
+                "completed" => stats.completed = count_u64,
+                "failed" => stats.failed = count_u64,
+                "scheduled" => stats.scheduled = count_u64,
                 _ => {}
             }
         }
@@ -522,7 +528,8 @@ impl JobQueue for PgJobQueue {
         for row in type_counts {
             let job_type: String = row.get("job_type");
             let count: i64 = row.get("count");
-            by_type.insert(job_type, count as u64);
+            // COUNT() is always non-negative; unwrap_or(0) handles the theoretical edge case.
+            by_type.insert(job_type, u64::try_from(count).unwrap_or(0));
         }
         stats.by_type = by_type;
 
@@ -552,7 +559,8 @@ impl JobQueue for PgJobQueue {
             );
         }
 
-        Ok(rows_affected as u32)
+        // rows_affected is u64 from sqlx; saturate to u32::MAX on overflow (astronomically unlikely).
+        Ok(u32::try_from(rows_affected).unwrap_or(u32::MAX))
     }
 
     async fn cleanup_old_jobs(&self, retention_days: u32) -> WorkerResult<u32> {
@@ -578,7 +586,8 @@ impl JobQueue for PgJobQueue {
             );
         }
 
-        Ok(rows_affected as u32)
+        // rows_affected is u64 from sqlx; saturate to u32::MAX on overflow (astronomically unlikely).
+        Ok(u32::try_from(rows_affected).unwrap_or(u32::MAX))
     }
 
     async fn has_pending(&self, job_types: &[JobType]) -> WorkerResult<bool> {

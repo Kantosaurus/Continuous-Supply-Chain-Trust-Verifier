@@ -36,6 +36,10 @@ impl RubyGemsClient {
     }
 
     /// Creates a client with custom URL and cache.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the HTTP client cannot be built or if `registry_url` is not a valid URL.
     #[must_use]
     pub fn with_config(registry_url: &str, cache: Arc<RegistryCache>) -> Self {
         let http = Client::builder()

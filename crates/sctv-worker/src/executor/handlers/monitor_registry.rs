@@ -25,6 +25,8 @@ impl MonitorRegistryExecutor {
         Self
     }
 
+    // Monitoring logic is a sequential pipeline; splitting it would obscure the flow.
+    #[allow(clippy::too_many_lines)]
     async fn execute_monitor(
         &self,
         payload: &MonitorRegistryPayload,
@@ -170,13 +172,10 @@ impl JobExecutor for MonitorRegistryExecutor {
     }
 
     async fn execute(&self, job: &Job, ctx: &ExecutionContext) -> WorkerResult<JobResult> {
-        let payload = match &job.payload {
-            JobPayload::MonitorRegistry(p) => p,
-            _ => {
-                return Err(WorkerError::Execution(
-                    "Invalid payload type for MonitorRegistry".into(),
-                ))
-            }
+        let JobPayload::MonitorRegistry(payload) = &job.payload else {
+            return Err(WorkerError::Execution(
+                "Invalid payload type for MonitorRegistry".into(),
+            ));
         };
 
         let result = self.execute_monitor(payload, ctx).await?;

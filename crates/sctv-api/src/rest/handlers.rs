@@ -172,6 +172,10 @@ fn rule_request_to_policy_rule(request: &PolicyRuleRequest) -> Result<PolicyRule
 // ==================== Projects ====================
 
 /// List all projects for the authenticated user's tenant.
+///
+/// # Errors
+///
+/// Returns an error if the database query fails or the user is not authenticated.
 pub async fn list_projects(
     user: AuthUser,
     Query(pagination): Query<PaginationParams>,
@@ -187,9 +191,10 @@ pub async fn list_projects(
 
     // Calculate pagination
     let total_items = projects.len() as u64;
-    let total_pages = ((total_items as f64) / f64::from(pagination.per_page)).ceil() as u32;
-    let offset = pagination.offset() as usize;
-    let limit = pagination.per_page as usize;
+    let per_page_u64 = u64::from(pagination.per_page.max(1));
+    let total_pages = u32::try_from(total_items.div_ceil(per_page_u64).max(1)).unwrap_or(u32::MAX);
+    let offset = usize::try_from(pagination.offset()).unwrap_or(0);
+    let limit = usize::try_from(pagination.per_page).unwrap_or(0);
 
     // Paginate results
     let paginated: Vec<_> = projects.into_iter().skip(offset).take(limit).collect();
@@ -201,7 +206,7 @@ pub async fn list_projects(
         let alert_count = alert_repo.count_open_by_project(project.id).await?;
         responses.push(project_to_response(
             &project,
-            deps.len() as u32,
+            u32::try_from(deps.len()).unwrap_or(u32::MAX),
             alert_count,
         ));
     }
@@ -218,6 +223,10 @@ pub async fn list_projects(
 }
 
 /// Create a new project.
+///
+/// # Errors
+///
+/// Returns an error if the database query fails or the request is invalid.
 pub async fn create_project(
     user: AuthUser,
     State(state): State<Arc<AppState>>,
@@ -242,6 +251,10 @@ pub async fn create_project(
 }
 
 /// Get a specific project.
+///
+/// # Errors
+///
+/// Returns an error if the project is not found or the user lacks access.
 pub async fn get_project(
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -266,12 +279,16 @@ pub async fn get_project(
 
     Ok(Json(project_to_response(
         &project,
-        deps.len() as u32,
+        u32::try_from(deps.len()).unwrap_or(u32::MAX),
         alert_count,
     )))
 }
 
 /// Update a project.
+///
+/// # Errors
+///
+/// Returns an error if the project is not found, the user lacks access, or the update fails.
 pub async fn update_project(
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -315,12 +332,16 @@ pub async fn update_project(
 
     Ok(Json(project_to_response(
         &project,
-        deps.len() as u32,
+        u32::try_from(deps.len()).unwrap_or(u32::MAX),
         alert_count,
     )))
 }
 
 /// Delete a project.
+///
+/// # Errors
+///
+/// Returns an error if the project is not found, the user lacks access, or the deletion fails.
 pub async fn delete_project(
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -344,6 +365,10 @@ pub async fn delete_project(
 }
 
 /// Trigger a scan for a project.
+///
+/// # Errors
+///
+/// Returns an error if the project is not found, the user lacks access, or enqueueing fails.
 pub async fn trigger_scan(
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -383,6 +408,10 @@ pub async fn trigger_scan(
 }
 
 /// List dependencies for a project.
+///
+/// # Errors
+///
+/// Returns an error if the project is not found, the user lacks access, or the query fails.
 pub async fn list_project_dependencies(
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -406,9 +435,10 @@ pub async fn list_project_dependencies(
 
     // Calculate pagination
     let total_items = dependencies.len() as u64;
-    let total_pages = ((total_items as f64) / f64::from(pagination.per_page)).ceil() as u32;
-    let offset = pagination.offset() as usize;
-    let limit = pagination.per_page as usize;
+    let per_page_u64 = u64::from(pagination.per_page.max(1));
+    let total_pages = u32::try_from(total_items.div_ceil(per_page_u64).max(1)).unwrap_or(u32::MAX);
+    let offset = usize::try_from(pagination.offset()).unwrap_or(0);
+    let limit = usize::try_from(pagination.per_page).unwrap_or(0);
 
     // Paginate and convert
     let responses: Vec<_> = dependencies
@@ -432,6 +462,10 @@ pub async fn list_project_dependencies(
 // ==================== Alerts ====================
 
 /// List all alerts.
+///
+/// # Errors
+///
+/// Returns an error if the database query fails or the user is not authenticated.
 pub async fn list_alerts(
     user: AuthUser,
     Query(pagination): Query<PaginationParams>,
@@ -471,8 +505,8 @@ pub async fn list_alerts(
         responses.push(alert_to_response(alert, project_name));
     }
 
-    let per_page = u64::from(pagination.per_page.max(1));
-    let total_pages = total_items.div_ceil(per_page) as u32;
+    let per_page_u64 = u64::from(pagination.per_page.max(1));
+    let total_pages = u32::try_from(total_items.div_ceil(per_page_u64)).unwrap_or(u32::MAX);
 
     Ok(Json(PaginatedResponse {
         data: responses,
@@ -486,6 +520,10 @@ pub async fn list_alerts(
 }
 
 /// Get a specific alert.
+///
+/// # Errors
+///
+/// Returns an error if the alert is not found or the user lacks access.
 pub async fn get_alert(
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -513,6 +551,10 @@ pub async fn get_alert(
 }
 
 /// Acknowledge an alert.
+///
+/// # Errors
+///
+/// Returns an error if the alert is not found, the user lacks access, or the update fails.
 pub async fn acknowledge_alert(
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -545,6 +587,10 @@ pub async fn acknowledge_alert(
 }
 
 /// Resolve an alert.
+///
+/// # Errors
+///
+/// Returns an error if the alert is not found, the user lacks access, or the update fails.
 pub async fn resolve_alert(
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -584,6 +630,10 @@ pub async fn resolve_alert(
 }
 
 /// Suppress an alert.
+///
+/// # Errors
+///
+/// Returns an error if the alert is not found, the user lacks access, or the update fails.
 pub async fn suppress_alert(
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -618,6 +668,10 @@ pub async fn suppress_alert(
 // ==================== Policies ====================
 
 /// List all policies.
+///
+/// # Errors
+///
+/// Returns an error if the database query fails or the user is not authenticated.
 pub async fn list_policies(
     user: AuthUser,
     Query(pagination): Query<PaginationParams>,
@@ -629,9 +683,10 @@ pub async fn list_policies(
 
     // Calculate pagination
     let total_items = policies.len() as u64;
-    let total_pages = ((total_items as f64) / f64::from(pagination.per_page)).ceil() as u32;
-    let offset = pagination.offset() as usize;
-    let limit = pagination.per_page as usize;
+    let per_page_u64 = u64::from(pagination.per_page.max(1));
+    let total_pages = u32::try_from(total_items.div_ceil(per_page_u64).max(1)).unwrap_or(u32::MAX);
+    let offset = usize::try_from(pagination.offset()).unwrap_or(0);
+    let limit = usize::try_from(pagination.per_page).unwrap_or(0);
 
     // Paginate and convert
     let responses: Vec<_> = policies
@@ -653,6 +708,10 @@ pub async fn list_policies(
 }
 
 /// Create a new policy.
+///
+/// # Errors
+///
+/// Returns an error if the request is invalid or the database operation fails.
 pub async fn create_policy(
     user: AuthUser,
     State(state): State<Arc<AppState>>,
@@ -688,6 +747,10 @@ pub async fn create_policy(
 }
 
 /// Get a specific policy.
+///
+/// # Errors
+///
+/// Returns an error if the policy is not found or the user lacks access.
 pub async fn get_policy(
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -709,6 +772,10 @@ pub async fn get_policy(
 }
 
 /// Update a policy.
+///
+/// # Errors
+///
+/// Returns an error if the policy is not found, the user lacks access, or the update fails.
 pub async fn update_policy(
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -750,6 +817,10 @@ pub async fn update_policy(
 }
 
 /// Delete a policy.
+///
+/// # Errors
+///
+/// Returns an error if the policy is not found, the user lacks access, or the deletion fails.
 pub async fn delete_policy(
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -775,6 +846,10 @@ pub async fn delete_policy(
 // ==================== Dependencies ====================
 
 /// Get a specific dependency.
+///
+/// # Errors
+///
+/// Returns an error if the dependency is not found or the user lacks access.
 pub async fn get_dependency(
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -802,12 +877,18 @@ pub async fn get_dependency(
 }
 
 /// Verify a dependency.
+///
+/// # Errors
+///
+/// Returns an error if the dependency is not found or the user lacks access.
 pub async fn verify_dependency(
     user: AuthUser,
     Path(id): Path<Uuid>,
     State(state): State<Arc<AppState>>,
     Json(_request): Json<VerifyDependencyRequest>,
 ) -> ApiResult<Json<VerificationResponse>> {
+    use sctv_core::{ProvenanceStatus, SignatureStatus};
+
     let dep_repo = state.dependency_repo()?;
     let project_repo = state.project_repo()?;
 
@@ -841,7 +922,6 @@ pub async fn verify_dependency(
     }
 
     // Signature check
-    use sctv_core::SignatureStatus;
     let sig_passed = matches!(
         dependency.integrity.signature_status,
         SignatureStatus::Verified
@@ -862,7 +942,6 @@ pub async fn verify_dependency(
     });
 
     // Provenance check
-    use sctv_core::ProvenanceStatus;
     let prov_passed = matches!(
         dependency.integrity.provenance_status,
         ProvenanceStatus::SlsaLevel1 | ProvenanceStatus::SlsaLevel2 | ProvenanceStatus::SlsaLevel3
@@ -891,6 +970,10 @@ pub async fn verify_dependency(
 // ==================== Scans ====================
 
 /// List scans (backed by the jobs table; each `ScanProject` job is one scan).
+///
+/// # Errors
+///
+/// Returns an error if the database is not configured or the query fails.
 pub async fn list_scans(
     user: AuthUser,
     Query(pagination): Query<PaginationParams>,
@@ -923,8 +1006,8 @@ pub async fn list_scans(
     // We cannot cheaply count filtered jobs without an extra trait method;
     // use the returned count as a minimum and infer whether more pages exist.
     let total_items = responses.len() as u64;
-    let per_page = u64::from(pagination.per_page.max(1));
-    let total_pages = total_items.div_ceil(per_page).max(1) as u32;
+    let per_page_u64 = u64::from(pagination.per_page.max(1));
+    let total_pages = u32::try_from(total_items.div_ceil(per_page_u64).max(1)).unwrap_or(u32::MAX);
 
     Ok(Json(PaginatedResponse {
         data: responses,
@@ -938,6 +1021,10 @@ pub async fn list_scans(
 }
 
 /// Get a specific scan by ID (backed by the jobs table).
+///
+/// # Errors
+///
+/// Returns an error if the scan is not found or the user lacks access.
 pub async fn get_scan(
     user: AuthUser,
     Path(id): Path<Uuid>,
@@ -978,12 +1065,16 @@ fn job_to_scan_response(job: &sctv_core::Job) -> Option<ScanResponse> {
         .result
         .as_ref()
         .and_then(|v| {
-            let deps = v
-                .get("dependencies_found")
-                .and_then(serde_json::Value::as_u64)? as u32;
-            let alerts = v
-                .get("alerts_created")
-                .and_then(serde_json::Value::as_u64)? as u32;
+            let deps = u32::try_from(
+                v.get("dependencies_found")
+                    .and_then(serde_json::Value::as_u64)?,
+            )
+            .unwrap_or(u32::MAX);
+            let alerts = u32::try_from(
+                v.get("alerts_created")
+                    .and_then(serde_json::Value::as_u64)?,
+            )
+            .unwrap_or(u32::MAX);
             Some((deps, alerts))
         })
         .unwrap_or((0, 0));
@@ -1003,6 +1094,10 @@ fn job_to_scan_response(job: &sctv_core::Job) -> Option<ScanResponse> {
 // ==================== Webhooks ====================
 
 /// Handle GitHub webhook.
+///
+/// # Errors
+///
+/// Returns an error if the payload is invalid or processing fails.
 pub async fn github_webhook(
     State(_state): State<Arc<AppState>>,
     Json(payload): Json<GitHubWebhookPayload>,
@@ -1025,6 +1120,10 @@ pub async fn github_webhook(
 }
 
 /// Handle GitLab webhook.
+///
+/// # Errors
+///
+/// Returns an error if the payload is invalid or processing fails.
 pub async fn gitlab_webhook(
     State(_state): State<Arc<AppState>>,
     Json(payload): Json<GitLabWebhookPayload>,

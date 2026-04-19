@@ -447,13 +447,6 @@ mod tests {
 
     #[test]
     fn test_build_message() {
-        let config = TeamsConfig::builder()
-            .webhook_url("https://outlook.office.com/webhook/test")
-            .enabled(true)
-            .build();
-
-        let channel = TeamsChannel::new(config);
-
         let notification = Notification::new(
             Severity::Critical,
             "Supply Chain Alert",
@@ -466,7 +459,7 @@ mod tests {
                 .with_dashboard_url("https://sctv.example.com/alerts/123"),
         );
 
-        let message = channel.build_message(&notification);
+        let message = TeamsChannel::build_message(&notification);
 
         assert_eq!(message.message_type, "message");
         assert_eq!(message.attachments.len(), 1);

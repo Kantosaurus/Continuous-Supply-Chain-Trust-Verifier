@@ -729,7 +729,7 @@ mod job_id {
 
     #[test]
     fn test_job_id_default() {
-        let id: JobId = Default::default();
+        let id = JobId::default();
 
         // Should create a new random ID
         assert!(!id.0.is_nil());

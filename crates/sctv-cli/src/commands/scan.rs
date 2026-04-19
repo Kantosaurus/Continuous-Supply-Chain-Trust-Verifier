@@ -9,14 +9,14 @@ use sctv_core::PackageEcosystem;
 use sctv_detectors::typosquatting::TyposquattingDetector;
 use std::path::{Path, PathBuf};
 
-pub async fn run(
+pub fn run(
     path: Option<PathBuf>,
-    ecosystem: Option<String>,
+    ecosystem: Option<&str>,
     format: OutputFormat,
 ) -> anyhow::Result<()> {
     let project_path = path.unwrap_or_else(|| PathBuf::from("."));
 
-    let (names, detected_ecosystem) = load_dependency_names(&project_path, ecosystem.as_deref())?;
+    let (names, detected_ecosystem) = load_dependency_names(&project_path, ecosystem)?;
 
     let detector = TyposquattingDetector::new();
     let mut all_candidates = Vec::new();

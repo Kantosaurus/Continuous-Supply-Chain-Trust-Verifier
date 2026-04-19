@@ -205,13 +205,8 @@ impl PyPiClient {
             result.sha256_match = Some(expected_sha256.to_lowercase() == sha256_hash);
         }
 
-        // Check against integrity field (might contain blake2b)
-        if let Some(integrity) = &expected.integrity {
-            if let Some(_expected_blake) = integrity.strip_prefix("blake2b_256:") {
-                // Would need to compute blake2b - for now just store
-                result.blake2b_256_match = Some(false); // Placeholder
-            }
-        }
+        // blake2b_256 verification is not yet implemented; leave blake2b_256_match as None
+        // so that is_valid() treats missing checks as "not checked" rather than "failed".
 
         result
     }

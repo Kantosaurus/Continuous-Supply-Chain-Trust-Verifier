@@ -349,21 +349,21 @@ mod npm_client {
         // Should have both regular and dev dependencies
         assert_eq!(version.version.dependencies.len(), 4);
 
-        let regular_deps: Vec<_> = version
+        let regular_dep_count = version
             .version
             .dependencies
             .iter()
             .filter(|d| !d.is_dev)
-            .collect();
-        let dev_deps: Vec<_> = version
+            .count();
+        let dev_dep_count = version
             .version
             .dependencies
             .iter()
             .filter(|d| d.is_dev)
-            .collect();
+            .count();
 
-        assert_eq!(regular_deps.len(), 2);
-        assert_eq!(dev_deps.len(), 2);
+        assert_eq!(regular_dep_count, 2);
+        assert_eq!(dev_dep_count, 2);
     }
 
     /// Test malformed JSON response handling.

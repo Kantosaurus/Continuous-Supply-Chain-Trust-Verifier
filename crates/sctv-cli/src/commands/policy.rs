@@ -9,7 +9,7 @@ use crate::OutputFormat;
 use sctv_core::Policy;
 use std::path::{Path, PathBuf};
 
-pub async fn run(
+pub fn run(
     policy_path: &Path,
     project_path: Option<PathBuf>,
     format: OutputFormat,

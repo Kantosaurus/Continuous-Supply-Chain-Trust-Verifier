@@ -169,17 +169,18 @@ impl PyPiDependency {
             },
         );
 
-        let (name, extras) = if let Some(idx) = rest.find('[') {
-            let end_idx = rest.find(']').unwrap_or(rest.len());
-            let extras: Vec<String> = rest[idx + 1..end_idx]
-                .split(',')
-                .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty())
-                .collect();
-            (&rest[..idx], extras)
-        } else {
-            (rest, Vec::new())
-        };
+        let (name, extras) = rest.find('[').map_or_else(
+            || (rest, Vec::new()),
+            |idx| {
+                let end_idx = rest.find(']').unwrap_or(rest.len());
+                let extras: Vec<String> = rest[idx + 1..end_idx]
+                    .split(',')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect();
+                (&rest[..idx], extras)
+            },
+        );
 
         let name = name.trim().to_string();
         if name.is_empty() {

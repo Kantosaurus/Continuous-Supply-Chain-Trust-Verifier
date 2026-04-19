@@ -376,15 +376,6 @@ mod tests {
 
     #[test]
     fn test_format_body() {
-        let config = EmailConfig::builder()
-            .smtp_host("smtp.example.com")
-            .from("alerts@example.com", "SCTV")
-            .to("admin@example.com")
-            .enabled(true)
-            .build();
-
-        let channel = EmailChannel::new(config);
-
         let notification = Notification::new(
             Severity::High,
             "Security Alert",
