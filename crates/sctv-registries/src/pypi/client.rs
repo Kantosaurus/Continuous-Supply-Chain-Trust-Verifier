@@ -38,6 +38,10 @@ impl PyPiClient {
     }
 
     /// Creates a client with custom registry URL and cache.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the HTTP client cannot be built or if `registry_url` is not a valid URL.
     #[must_use]
     pub fn with_config(registry_url: &str, cache: Arc<RegistryCache>) -> Self {
         let http = Client::builder()
@@ -134,6 +138,10 @@ impl PyPiClient {
     }
 
     /// Fetches attestations for a specific file (PEP 740).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the HTTP request fails or the response cannot be parsed.
     pub async fn fetch_attestations(
         &self,
         name: &str,
@@ -209,10 +217,7 @@ impl PyPiClient {
     }
 
     /// Finds the best release file for a version (prefers wheel, then sdist).
-    fn select_best_release_file<'a>(
-        &self,
-        files: &'a [PyPiReleaseFile],
-    ) -> Option<&'a PyPiReleaseFile> {
+    fn select_best_release_file(files: &[PyPiReleaseFile]) -> Option<&PyPiReleaseFile> {
         // Prefer wheels, then source distributions
         // Among wheels, prefer universal (py3-none-any)
         let mut best: Option<&PyPiReleaseFile> = None;
@@ -399,11 +404,9 @@ impl RegistryClient for PyPiClient {
             .map_err(|e| RegistryError::Parse(format!("Invalid version: {e}")))?;
 
         // Select best release file
-        let release_file = self
-            .select_best_release_file(&pypi_version.urls)
-            .ok_or_else(|| {
-                RegistryError::Unavailable(format!("No release files for {name}=={version}"))
-            })?;
+        let release_file = Self::select_best_release_file(&pypi_version.urls).ok_or_else(|| {
+            RegistryError::Unavailable(format!("No release files for {name}=={version}"))
+        })?;
 
         let checksums = PackageChecksums {
             sha1: None,

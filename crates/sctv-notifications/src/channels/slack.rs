@@ -1,5 +1,6 @@
 //! Slack notification channel using webhooks.
 
+use std::fmt::Write as _;
 use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
@@ -157,6 +158,10 @@ pub struct SlackChannel {
 
 impl SlackChannel {
     /// Creates a new Slack channel with the given configuration.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the HTTP client cannot be built (e.g. invalid TLS configuration).
     #[must_use]
     pub fn new(config: SlackConfig) -> Self {
         let client = Client::builder()
@@ -235,11 +240,12 @@ impl SlackChannel {
         let mut text = notification.message.clone();
 
         if let Some(remediation) = &notification.context.remediation {
-            text.push_str(&format!("\n\n*Remediation:*\n{remediation}"));
+            write!(text, "\n\n*Remediation:*\n{remediation}")
+                .expect("write to String is infallible");
         }
 
         if let Some(url) = &notification.context.dashboard_url {
-            text.push_str(&format!("\n\n<{url}|View in Dashboard>"));
+            write!(text, "\n\n<{url}|View in Dashboard>").expect("write to String is infallible");
         }
 
         let attachment = SlackAttachment {
@@ -292,7 +298,8 @@ impl NotificationChannel for SlackChannel {
             .send()
             .await?;
 
-        let duration_ms = start.elapsed().as_millis() as u64;
+        // as_millis() returns u128; elapsed time in ms will never exceed u64::MAX (~585M years).
+        let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
         let status = response.status();
 
         if status.is_success() {

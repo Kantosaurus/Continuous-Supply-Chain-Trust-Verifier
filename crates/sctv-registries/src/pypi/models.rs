@@ -149,23 +149,25 @@ impl PyPiDependency {
         }
 
         // Parse format: "name[extra1,extra2] (>=1.0,<2.0); marker"
-        let (rest, markers) = if let Some(idx) = spec.find(';') {
+        let (rest, markers) = spec.find(';').map_or((spec, None), |idx| {
             (&spec[..idx], Some(spec[idx + 1..].trim().to_string()))
-        } else {
-            (spec, None)
-        };
+        });
 
-        let (rest, version_constraint) = if let Some(idx) = rest.find('(') {
-            let end_idx = rest.rfind(')').unwrap_or(rest.len());
-            (
-                &rest[..idx],
-                Some(rest[idx + 1..end_idx].trim().to_string()),
-            )
-        } else if let Some(idx) = rest.find(['<', '>', '=', '~', '!']) {
-            (&rest[..idx], Some(rest[idx..].trim().to_string()))
-        } else {
-            (rest, None)
-        };
+        let (rest, version_constraint) = rest.find('(').map_or_else(
+            || {
+                rest.find(['<', '>', '=', '~', '!'])
+                    .map_or((rest, None), |idx| {
+                        (&rest[..idx], Some(rest[idx..].trim().to_string()))
+                    })
+            },
+            |idx| {
+                let end_idx = rest.rfind(')').unwrap_or(rest.len());
+                (
+                    &rest[..idx],
+                    Some(rest[idx + 1..end_idx].trim().to_string()),
+                )
+            },
+        );
 
         let (name, extras) = if let Some(idx) = rest.find('[') {
             let end_idx = rest.find(']').unwrap_or(rest.len());

@@ -222,12 +222,21 @@ impl SigstoreVerifier {
     }
 
     /// Parses a Sigstore bundle from JSON.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the data is not valid JSON or does not match the bundle schema.
     pub fn parse_bundle(data: &[u8]) -> Result<SigstoreBundle, SigstoreError> {
         let bundle: SigstoreBundle = serde_json::from_slice(data)?;
         Ok(bundle)
     }
 
     /// Verifies a Sigstore bundle.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if certificate decoding, Rekor entry parsing, or inclusion proof
+    /// verification fails.
     pub fn verify_bundle(
         &self,
         bundle: &SigstoreBundle,
@@ -241,17 +250,17 @@ impl SigstoreVerifier {
             // 1. Parse the X.509 certificate
             // 2. Verify it chains to a trusted Fulcio root
             // 3. Extract the identity claims
-            result.certificate_verified = self.verify_certificate(cert)?;
+            result.certificate_verified = Self::verify_certificate(cert)?;
         }
 
         // Verify transparency log entries
         if let Some(tlog_entries) = &bundle.verification_material.tlog_entries {
             for entry in tlog_entries {
                 result.has_tlog_entry = true;
-                result.rekor_entry = Some(self.extract_rekor_info(entry)?);
+                result.rekor_entry = Some(Self::extract_rekor_info(entry)?);
 
                 if self.verify_inclusion {
-                    result.inclusion_verified = self.verify_inclusion_proof(entry)?;
+                    result.inclusion_verified = Self::verify_inclusion_proof(entry)?;
                 }
             }
         }
@@ -271,7 +280,7 @@ impl SigstoreVerifier {
     }
 
     /// Verifies a certificate chain.
-    fn verify_certificate(&self, cert: &Certificate) -> Result<bool, SigstoreError> {
+    fn verify_certificate(cert: &Certificate) -> Result<bool, SigstoreError> {
         // Decode the certificate
         let cert_bytes = BASE64
             .decode(&cert.raw_bytes)
@@ -288,7 +297,7 @@ impl SigstoreVerifier {
     }
 
     /// Extracts Rekor entry info from a tlog entry.
-    fn extract_rekor_info(&self, entry: &TlogEntry) -> Result<RekorEntryInfo, SigstoreError> {
+    fn extract_rekor_info(entry: &TlogEntry) -> Result<RekorEntryInfo, SigstoreError> {
         let log_index = entry
             .log_index
             .parse::<u64>()
@@ -310,10 +319,12 @@ impl SigstoreVerifier {
     }
 
     /// Verifies an inclusion proof.
-    fn verify_inclusion_proof(&self, entry: &TlogEntry) -> Result<bool, SigstoreError> {
-        let proof = match &entry.inclusion_proof {
-            Some(p) => p,
-            None => return Ok(false),
+    // Result<bool> is kept for API consistency: a real implementation will return
+    // Err when cryptographic verification fails (e.g. signature mismatch).
+    #[allow(clippy::unnecessary_wraps)]
+    fn verify_inclusion_proof(entry: &TlogEntry) -> Result<bool, SigstoreError> {
+        let Some(proof) = &entry.inclusion_proof else {
+            return Ok(false);
         };
 
         // In a real implementation, we would:
@@ -344,7 +355,7 @@ impl SigstoreVerifier {
 
     /// Computes a leaf hash for Merkle tree verification (reserved for future use).
     #[allow(dead_code)]
-    fn compute_leaf_hash(&self, data: &[u8]) -> Vec<u8> {
+    fn compute_leaf_hash(data: &[u8]) -> Vec<u8> {
         let mut hasher = Sha256::new();
         hasher.update([0x00]); // Leaf node prefix
         hasher.update(data);
@@ -359,6 +370,9 @@ impl Default for SigstoreVerifier {
 }
 
 /// Result of bundle verification.
+// Six boolean fields accurately model independent binary verification outcomes;
+// splitting them into a bitflag or nested struct would hurt readability.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, Default)]
 pub struct BundleVerificationResult {
     pub has_certificate: bool,

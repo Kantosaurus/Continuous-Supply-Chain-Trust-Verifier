@@ -36,10 +36,11 @@ impl ProvenanceVerifier {
     }
 
     /// Verifies provenance for a dependency.
-    pub async fn verify(
-        &self,
-        dependency: &Dependency,
-    ) -> DetectorResult<ProvenanceVerificationResult> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying Sigstore verification or bundle parsing fails.
+    pub fn verify(&self, dependency: &Dependency) -> DetectorResult<ProvenanceVerificationResult> {
         debug!(
             package = %dependency.package_name,
             version = %dependency.resolved_version,
@@ -53,28 +54,24 @@ impl ProvenanceVerifier {
 
         // If we already have verified provenance, use it
         if let Some(level) = existing_status.level() {
-            return Ok(self.build_result_from_existing(level, existing_details));
+            return Ok(self.build_result_from_existing(level, existing_details.as_ref()));
         }
 
         // Attempt to fetch and verify provenance based on ecosystem
-        let result = match dependency.ecosystem {
-            PackageEcosystem::Npm => self.verify_npm_provenance(dependency).await,
-            PackageEcosystem::PyPi => self.verify_pypi_provenance(dependency).await,
-            PackageEcosystem::Cargo => self.verify_cargo_provenance(dependency).await,
+        match dependency.ecosystem {
+            PackageEcosystem::Npm => Self::verify_npm_provenance(dependency),
+            PackageEcosystem::PyPi => Self::verify_pypi_provenance(dependency),
+            PackageEcosystem::Cargo => Self::verify_cargo_provenance(dependency),
             _ => Ok(ProvenanceVerificationResult::no_provenance()),
-        };
-
-        result
+        }
     }
 
     /// Builds a verification result from existing provenance data.
     fn build_result_from_existing(
         &self,
         level: u8,
-        details: &Option<ProvenanceDetails>,
+        details: Option<&ProvenanceDetails>,
     ) -> ProvenanceVerificationResult {
-        let details = details.as_ref();
-
         let builder_id = details.and_then(|d| d.builder_id.clone());
         let builder_trusted = builder_id
             .as_ref()
@@ -95,8 +92,8 @@ impl ProvenanceVerifier {
     }
 
     /// Verifies provenance for an npm package.
-    async fn verify_npm_provenance(
-        &self,
+    #[allow(clippy::unnecessary_wraps)]
+    fn verify_npm_provenance(
         dependency: &Dependency,
     ) -> DetectorResult<ProvenanceVerificationResult> {
         // npm packages can have provenance attached via Sigstore
@@ -117,8 +114,8 @@ impl ProvenanceVerifier {
     }
 
     /// Verifies provenance for a `PyPI` package.
-    async fn verify_pypi_provenance(
-        &self,
+    #[allow(clippy::unnecessary_wraps)]
+    fn verify_pypi_provenance(
         dependency: &Dependency,
     ) -> DetectorResult<ProvenanceVerificationResult> {
         // PyPI packages can have provenance via PEP 740 (attestations)
@@ -136,8 +133,8 @@ impl ProvenanceVerifier {
     }
 
     /// Verifies provenance for a Cargo crate.
-    async fn verify_cargo_provenance(
-        &self,
+    #[allow(clippy::unnecessary_wraps)]
+    fn verify_cargo_provenance(
         dependency: &Dependency,
     ) -> DetectorResult<ProvenanceVerificationResult> {
         // Cargo crates don't have native provenance support yet
@@ -152,6 +149,11 @@ impl ProvenanceVerifier {
     }
 
     /// Verifies a Sigstore bundle and extracts provenance.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if DSSE envelope extraction or SLSA provenance parsing fails
+    /// at the structural level (soft failures are returned as verification results).
     pub fn verify_sigstore_bundle(
         &self,
         bundle_data: &[u8],
@@ -202,7 +204,7 @@ impl ProvenanceVerifier {
         };
 
         // Determine SLSA level
-        let slsa_level = self.determine_slsa_level(&verification, &parsed);
+        let slsa_level = Self::determine_slsa_level(&verification, &parsed);
 
         // Check if builder is trusted
         let builder_trusted = self.config.trusted_builders.contains(&parsed.builder_id);
@@ -237,7 +239,6 @@ impl ProvenanceVerifier {
 
     /// Determines the SLSA level based on verification results.
     fn determine_slsa_level(
-        &self,
         verification: &super::sigstore::BundleVerificationResult,
         parsed: &super::attestation::ParsedProvenance,
     ) -> u8 {
@@ -252,7 +253,7 @@ impl ProvenanceVerifier {
         // Level 2 requirements:
         // - Authenticated provenance (signed)
         // - Hosted build service
-        let is_hosted_builder = self.is_hosted_build_service(&parsed.builder_id);
+        let is_hosted_builder = Self::is_hosted_build_service(&parsed.builder_id);
         let is_signed = verification.signature_verified;
 
         if is_hosted_builder && is_signed {
@@ -271,7 +272,7 @@ impl ProvenanceVerifier {
     }
 
     /// Checks if a builder ID represents a hosted build service.
-    fn is_hosted_build_service(&self, builder_id: &str) -> bool {
+    fn is_hosted_build_service(builder_id: &str) -> bool {
         let hosted_patterns = [
             "github.com/",
             "gitlab.com/",
@@ -384,21 +385,28 @@ mod tests {
 
     #[test]
     fn test_is_hosted_build_service() {
-        let verifier = ProvenanceVerifier::new();
+        let _verifier = ProvenanceVerifier::new();
 
-        assert!(verifier
-            .is_hosted_build_service("https://github.com/slsa-framework/slsa-github-generator"));
-        assert!(verifier.is_hosted_build_service("https://gitlab.com/runner"));
-        assert!(verifier.is_hosted_build_service("https://cloud.google.com/build"));
-        assert!(!verifier.is_hosted_build_service("local-builder"));
+        assert!(ProvenanceVerifier::is_hosted_build_service(
+            "https://github.com/slsa-framework/slsa-github-generator"
+        ));
+        assert!(ProvenanceVerifier::is_hosted_build_service(
+            "https://gitlab.com/runner"
+        ));
+        assert!(ProvenanceVerifier::is_hosted_build_service(
+            "https://cloud.google.com/build"
+        ));
+        assert!(!ProvenanceVerifier::is_hosted_build_service(
+            "local-builder"
+        ));
     }
 
-    #[tokio::test]
-    async fn test_verify_returns_no_provenance_for_unknown() {
+    #[test]
+    fn test_verify_returns_no_provenance_for_unknown() {
         let verifier = ProvenanceVerifier::new();
         let dependency = create_test_dependency();
 
-        let result = verifier.verify(&dependency).await.unwrap();
+        let result = verifier.verify(&dependency).unwrap();
         assert!(!result.has_provenance);
     }
 
@@ -417,7 +425,7 @@ mod tests {
             attestation_time: None,
         });
 
-        let result = verifier.build_result_from_existing(2, &details);
+        let result = verifier.build_result_from_existing(2, details.as_ref());
 
         assert!(result.has_provenance);
         assert_eq!(result.slsa_level, Some(2));

@@ -93,11 +93,12 @@ impl TamperingType {
     #[must_use]
     pub const fn severity(&self) -> Severity {
         match self {
-            Self::HashMismatch => Severity::Critical,
-            Self::SignatureInvalid => Severity::Critical,
+            // Three distinct tampering types are all critical
+            Self::HashMismatch | Self::SignatureInvalid | Self::ModifiedSinceVerification => {
+                Severity::Critical
+            }
             Self::SignatureMissing => Severity::Medium,
             Self::ChecksumMissing => Severity::Low,
-            Self::ModifiedSinceVerification => Severity::Critical,
             Self::UntrustedSource => Severity::High,
         }
     }
@@ -243,16 +244,15 @@ impl TamperingDetector {
         let provider = self.registry_provider.as_ref().unwrap();
 
         // Get expected checksums from registry
-        let registry_checksums = match provider
+        let Ok(registry_checksums) = provider
             .get_checksums(
                 dependency.ecosystem,
                 &dependency.package_name,
                 &dependency.resolved_version.to_string(),
             )
             .await
-        {
-            Ok(c) => c,
-            Err(_) => return findings,
+        else {
+            return findings;
         };
 
         let registry_url = self
@@ -322,22 +322,20 @@ impl TamperingDetector {
             return findings;
         }
 
-        let provider = match &self.registry_provider {
-            Some(p) => p,
-            None => return findings,
+        let Some(provider) = &self.registry_provider else {
+            return findings;
         };
 
         // Download package
-        let bytes = match provider
+        let Ok(bytes) = provider
             .download_package(
                 dependency.ecosystem,
                 &dependency.package_name,
                 &dependency.resolved_version.to_string(),
             )
             .await
-        {
-            Ok(b) => b,
-            Err(_) => return findings,
+        else {
+            return findings;
         };
 
         // Compute hashes
@@ -452,7 +450,7 @@ impl Detector for TamperingDetector {
         results
             .iter()
             .filter(|r| r.detected)
-            .filter_map(|result| {
+            .map(|result| {
                 let details_value = &result.details;
 
                 let algorithm = details_value
@@ -519,7 +517,7 @@ impl Detector for TamperingDetector {
                 );
                 alert.dependency_id = Some(dependency.id);
 
-                Some(alert)
+                alert
             })
             .collect()
     }

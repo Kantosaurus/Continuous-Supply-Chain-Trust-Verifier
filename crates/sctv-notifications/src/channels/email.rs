@@ -1,5 +1,6 @@
 //! Email notification channel using SMTP.
 
+use std::fmt::Write as _;
 use std::time::Instant;
 
 use async_trait::async_trait;
@@ -116,6 +117,9 @@ impl EmailConfigBuilder {
     }
 
     /// Adds multiple recipient addresses.
+    // Builder methods consume `self` to enable method chaining; the `to_*` naming
+    // convention for builder setters is idiomatic here even on non-Copy types.
+    #[allow(clippy::wrong_self_convention)]
     #[must_use]
     pub fn to_many(mut self, addresses: impl IntoIterator<Item = impl Into<String>>) -> Self {
         self.config
@@ -206,7 +210,7 @@ impl EmailChannel {
             builder = builder.to(to_mailbox);
         }
 
-        let body = self.format_body(notification);
+        let body = Self::format_body(notification);
 
         builder
             .header(ContentType::TEXT_PLAIN)
@@ -215,32 +219,34 @@ impl EmailChannel {
     }
 
     /// Formats the email body.
-    fn format_body(&self, notification: &Notification) -> String {
+    fn format_body(notification: &Notification) -> String {
         let mut body = String::new();
 
-        body.push_str(&format!("Severity: {}\n", notification.severity));
-        body.push_str(&format!("Time: {}\n\n", notification.created_at));
+        writeln!(body, "Severity: {}", notification.severity)
+            .expect("write to String is infallible");
+        write!(body, "Time: {}\n\n", notification.created_at)
+            .expect("write to String is infallible");
         body.push_str(&notification.message);
         body.push_str("\n\n");
 
         if let Some(project) = &notification.context.project_name {
-            body.push_str(&format!("Project: {project}\n"));
+            writeln!(body, "Project: {project}").expect("write to String is infallible");
         }
 
         if let Some(package) = &notification.context.package_name {
-            body.push_str(&format!("Package: {package}"));
+            write!(body, "Package: {package}").expect("write to String is infallible");
             if let Some(version) = &notification.context.package_version {
-                body.push_str(&format!("@{version}"));
+                write!(body, "@{version}").expect("write to String is infallible");
             }
             body.push('\n');
         }
 
         if let Some(url) = &notification.context.dashboard_url {
-            body.push_str(&format!("\nView in dashboard: {url}\n"));
+            write!(body, "\nView in dashboard: {url}\n").expect("write to String is infallible");
         }
 
         if let Some(remediation) = &notification.context.remediation {
-            body.push_str(&format!("\nRemediation:\n{remediation}\n"));
+            write!(body, "\nRemediation:\n{remediation}\n").expect("write to String is infallible");
         }
 
         body.push_str("\n---\nSupply Chain Trust Verifier\n");
@@ -284,7 +290,8 @@ impl NotificationChannel for EmailChannel {
 
         match transport.send(message).await {
             Ok(response) => {
-                let duration_ms = start.elapsed().as_millis() as u64;
+                // as_millis() returns u128; elapsed time in ms will never exceed u64::MAX (~585M years).
+                let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
                 info!(
                     notification_id = %notification.id,
                     duration_ms,
@@ -300,7 +307,8 @@ impl NotificationChannel for EmailChannel {
                 ))
             }
             Err(e) => {
-                let duration_ms = start.elapsed().as_millis() as u64;
+                // as_millis() returns u128; elapsed time in ms will never exceed u64::MAX (~585M years).
+                let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
                 error!(
                     notification_id = %notification.id,
                     error = %e,
@@ -388,7 +396,7 @@ mod tests {
                 .with_package("lodash-utils", "1.0.0"),
         );
 
-        let body = channel.format_body(&notification);
+        let body = EmailChannel::format_body(&notification);
 
         assert!(body.contains("Severity: High"));
         assert!(body.contains("Project: my-project"));

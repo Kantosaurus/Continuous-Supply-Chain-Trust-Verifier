@@ -191,17 +191,17 @@ impl DowngradeDetector {
         let previous_version = self.history_store.get_latest_version(&key);
 
         // Compare versions
-        let result = match previous_version {
-            Some(prev) => self.compare_versions(&prev, &dependency.resolved_version),
-            None => DowngradeAnalysisResult::no_downgrade(&dependency.resolved_version),
-        };
+        let result = previous_version.map_or_else(
+            || DowngradeAnalysisResult::no_downgrade(&dependency.resolved_version),
+            |prev| self.compare_versions(&prev, &dependency.resolved_version),
+        );
 
         // Update history with current version
         self.history_store
             .record_version(&key, &dependency.resolved_version);
 
         // Enhance result with additional analysis
-        self.enhance_result(result, dependency)
+        Self::enhance_result(result, dependency)
     }
 
     /// Compares two versions and determines if there's a downgrade.
@@ -212,7 +212,7 @@ impl DowngradeDetector {
         }
 
         // Determine downgrade severity
-        let severity = self.determine_severity(previous, current);
+        let severity = Self::determine_severity(previous, current);
 
         // Check if this severity level should be reported
         if severity < self.config.minimum_severity {
@@ -228,7 +228,7 @@ impl DowngradeDetector {
     }
 
     /// Determines the severity of a version downgrade.
-    const fn determine_severity(&self, previous: &Version, current: &Version) -> DowngradeSeverity {
+    const fn determine_severity(previous: &Version, current: &Version) -> DowngradeSeverity {
         if previous.major != current.major {
             DowngradeSeverity::Major
         } else if previous.minor != current.minor {
@@ -266,7 +266,6 @@ impl DowngradeDetector {
 
     /// Enhances the analysis result with additional checks.
     fn enhance_result(
-        &self,
         mut result: DowngradeAnalysisResult,
         dependency: &Dependency,
     ) -> DowngradeAnalysisResult {
@@ -278,7 +277,7 @@ impl DowngradeDetector {
         if let Some(prev_str) = &result.previous_version {
             if let Ok(prev) = Version::parse(prev_str) {
                 // Suspicious: Major or minor downgrade with significant version gap
-                let version_gap = self.calculate_version_gap(&prev, &dependency.resolved_version);
+                let version_gap = Self::calculate_version_gap(&prev, &dependency.resolved_version);
                 if version_gap > 5 {
                     result.is_suspicious = true;
                     result.suspicious_reason =
@@ -294,7 +293,7 @@ impl DowngradeDetector {
     }
 
     /// Calculates the "gap" between two versions (rough estimate).
-    const fn calculate_version_gap(&self, previous: &Version, current: &Version) -> u64 {
+    const fn calculate_version_gap(previous: &Version, current: &Version) -> u64 {
         let prev_score = (previous.major * 10000) + (previous.minor * 100) + previous.patch;
         let curr_score = (current.major * 10000) + (current.minor * 100) + current.patch;
         prev_score.saturating_sub(curr_score)

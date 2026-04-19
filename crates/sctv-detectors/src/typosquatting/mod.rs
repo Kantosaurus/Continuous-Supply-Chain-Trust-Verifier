@@ -55,6 +55,9 @@ impl Default for PopularPackagesStore {
 
 impl PopularPackagesStore {
     /// Creates a new store with default popular packages.
+    // The length comes entirely from static package-name list literals; extracting
+    // them would add indirection without improving readability.
+    #[allow(clippy::too_many_lines)]
     #[must_use]
     pub fn new() -> Self {
         let mut packages = HashMap::new();
@@ -239,6 +242,10 @@ impl TyposquattingDetector {
     }
 
     /// Checks a package name for potential typosquatting.
+    // The usize→f64 casts in this function are for a similarity ratio on package name
+    // lengths (< 1000 chars). All values fit exactly in f64 (< 2^53), so no precision
+    // is lost.
+    #[allow(clippy::cast_precision_loss)]
     pub fn check(&self, ecosystem: PackageEcosystem, name: &str) -> Vec<TyposquatCandidate> {
         if name.len() < self.config.min_name_length {
             return Vec::new();
@@ -262,7 +269,7 @@ impl TyposquattingDetector {
                 let max_len = normalized.len().max(popular_normalized.len());
                 let similarity = 1.0 - (distance as f64 / max_len as f64);
                 let confidence =
-                    self.calculate_confidence(distance, &normalized, &popular_normalized);
+                    Self::calculate_confidence(distance, &normalized, &popular_normalized);
 
                 candidates.push(TyposquatCandidate {
                     suspicious_name: name.to_string(),
@@ -290,7 +297,7 @@ impl TyposquattingDetector {
             }
 
             // Check for combosquatting (word order swapping)
-            if self.is_combosquat(&normalized, &popular_normalized) {
+            if Self::is_combosquat(&normalized, &popular_normalized) {
                 candidates.push(TyposquatCandidate {
                     suspicious_name: name.to_string(),
                     popular_name: popular_name.clone(),
@@ -311,11 +318,11 @@ impl TyposquattingDetector {
     }
 
     /// Calculates confidence based on edit distance and name characteristics.
-    fn calculate_confidence(&self, distance: usize, suspicious: &str, popular: &str) -> Confidence {
+    fn calculate_confidence(distance: usize, suspicious: &str, popular: &str) -> Confidence {
         // Single character difference is very suspicious
         if distance == 1 {
             // Check if it's a common typo pattern
-            if self.is_common_typo(suspicious, popular) {
+            if Self::is_common_typo(suspicious, popular) {
                 return Confidence::High;
             }
             return Confidence::High;
@@ -324,7 +331,7 @@ impl TyposquattingDetector {
         // Two character differences
         if distance == 2 {
             // Transposition is common
-            if self.has_transposition(suspicious, popular) {
+            if Self::has_transposition(suspicious, popular) {
                 return Confidence::High;
             }
             return Confidence::Medium;
@@ -334,7 +341,7 @@ impl TyposquattingDetector {
     }
 
     /// Checks if the difference looks like a common typo.
-    fn is_common_typo(&self, suspicious: &str, popular: &str) -> bool {
+    fn is_common_typo(suspicious: &str, popular: &str) -> bool {
         // Common typo patterns:
         // - Adjacent key typos (e.g., 'a' -> 's')
         // - Missing/extra character
@@ -368,7 +375,7 @@ impl TyposquattingDetector {
     }
 
     /// Checks if there's a character transposition.
-    fn has_transposition(&self, suspicious: &str, popular: &str) -> bool {
+    fn has_transposition(suspicious: &str, popular: &str) -> bool {
         if suspicious.len() != popular.len() {
             return false;
         }
@@ -393,7 +400,7 @@ impl TyposquattingDetector {
     }
 
     /// Checks if names are combosquatting variants.
-    fn is_combosquat(&self, suspicious: &str, popular: &str) -> bool {
+    fn is_combosquat(suspicious: &str, popular: &str) -> bool {
         let s_parts: Vec<&str> = suspicious.split(['-', '_']).collect();
         let p_parts: Vec<&str> = popular.split(['-', '_']).collect();
 

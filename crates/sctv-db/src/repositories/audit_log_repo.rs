@@ -7,6 +7,7 @@ use sctv_core::{
     AuditAction, AuditLog, AuditLogFilter, AuditLogId, ResourceType, TenantId, UserId,
 };
 use sqlx::{PgPool, Row};
+use std::fmt::Write as _;
 use std::net::IpAddr;
 
 /// `PostgreSQL` implementation of the audit log repository.
@@ -102,39 +103,46 @@ impl AuditLogRepository for PgAuditLogRepository {
 
         if filter.user_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND user_id = ${param_count}"));
+            write!(query, " AND user_id = ${param_count}").expect("write to String is infallible");
         }
 
         if filter.action.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND action = ANY(${param_count})"));
+            write!(query, " AND action = ANY(${param_count})")
+                .expect("write to String is infallible");
         }
 
         if filter.resource_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND resource_type = ${param_count}"));
+            write!(query, " AND resource_type = ${param_count}")
+                .expect("write to String is infallible");
         }
 
         if filter.resource_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND resource_id = ${param_count}"));
+            write!(query, " AND resource_id = ${param_count}")
+                .expect("write to String is infallible");
         }
 
         if filter.from_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at >= ${param_count}"));
+            write!(query, " AND created_at >= ${param_count}")
+                .expect("write to String is infallible");
         }
 
         if filter.to_date.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND created_at <= ${param_count}"));
+            write!(query, " AND created_at <= ${param_count}")
+                .expect("write to String is infallible");
         }
 
-        query.push_str(&format!(
+        write!(
+            query,
             " ORDER BY created_at DESC LIMIT ${} OFFSET ${}",
             param_count + 1,
             param_count + 2
-        ));
+        )
+        .expect("write to String is infallible");
 
         let mut query_builder = sqlx::query(&query).bind(tenant_id.0);
 
@@ -221,7 +229,8 @@ impl AuditLogRepository for PgAuditLogRepository {
         .await
         .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
-        Ok(result.rows_affected() as u32)
+        // rows_affected() fits in u32 for any realistic number of deleted rows.
+        Ok(u32::try_from(result.rows_affected()).unwrap_or(u32::MAX))
     }
 
     async fn count_by_tenant(&self, tenant_id: TenantId) -> RepositoryResult<u32> {
@@ -232,6 +241,7 @@ impl AuditLogRepository for PgAuditLogRepository {
             .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
         let count: i64 = record.get("count");
-        Ok(count as u32)
+        // SQL COUNT() is non-negative and bounded by row count; safe cast.
+        Ok(u32::try_from(count.max(0)).unwrap_or(u32::MAX))
     }
 }

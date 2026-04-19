@@ -52,7 +52,8 @@ impl PgPackageRepository {
             description,
             homepage,
             repository,
-            popularity_rank: popularity_rank.map(|r| r as u32),
+            // DB stores popularity_rank as i32; it is always non-negative.
+            popularity_rank: popularity_rank.map(|r| u32::try_from(r).unwrap_or(0)),
             is_popular,
             maintainers,
             first_published,
@@ -139,7 +140,12 @@ impl PackageRepository for PgPackageRepository {
         .bind(&package.description)
         .bind(package.homepage.as_ref().map(url::Url::as_str))
         .bind(package.repository.as_ref().map(url::Url::as_str))
-        .bind(package.popularity_rank.map(|r| r as i32))
+        // Popularity rank fits in i32; u32::MAX would be unusual but we clamp.
+        .bind(
+            package
+                .popularity_rank
+                .map(|r| i32::try_from(r).unwrap_or(i32::MAX)),
+        )
         .bind(package.is_popular)
         .bind(maintainers)
         .bind(package.first_published)
@@ -224,6 +230,10 @@ impl PgPackageVersionRepository {
     }
 
     /// Finds a specific version of a package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the database query or deserialization fails.
     pub async fn find_version(
         &self,
         package_id: PackageId,
@@ -283,7 +293,8 @@ impl PgPackageVersionRepository {
                     deprecation_message,
                     checksums,
                     download_url,
-                    size_bytes: size_bytes.map(|s| s as u64),
+                    // DB stores size_bytes as i64; it is always non-negative for real files.
+                    size_bytes: size_bytes.map(|s| u64::try_from(s).unwrap_or(0)),
                     attestations,
                     dependencies,
                     cached_at,
@@ -294,6 +305,10 @@ impl PgPackageVersionRepository {
     }
 
     /// Upserts a package version.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if serialization or the database query fails.
     pub async fn upsert(&self, version: &sctv_core::PackageVersion) -> RepositoryResult<()> {
         let checksums = serde_json::to_value(&version.checksums)
             .map_err(|e| RepositoryError::Serialization(e.to_string()))?;
@@ -332,7 +347,12 @@ impl PgPackageVersionRepository {
         .bind(&version.deprecation_message)
         .bind(checksums)
         .bind(version.download_url.as_ref().map(url::Url::as_str))
-        .bind(version.size_bytes.map(|s| s as i64))
+        // File sizes fit in i64 (max ~9.2 EB); any valid package is well within range.
+        .bind(
+            version
+                .size_bytes
+                .map(|s| i64::try_from(s).unwrap_or(i64::MAX)),
+        )
         .bind(attestations)
         .bind(dependencies)
         .bind(version.cached_at)
@@ -344,6 +364,10 @@ impl PgPackageVersionRepository {
     }
 
     /// Lists all versions for a package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the database query or deserialization fails.
     pub async fn list_versions(
         &self,
         package_id: PackageId,
@@ -400,7 +424,8 @@ impl PgPackageVersionRepository {
                     deprecation_message,
                     checksums,
                     download_url,
-                    size_bytes: size_bytes.map(|s| s as u64),
+                    // DB stores size_bytes as i64; it is always non-negative for real files.
+                    size_bytes: size_bytes.map(|s| u64::try_from(s).unwrap_or(0)),
                     attestations,
                     dependencies,
                     cached_at,

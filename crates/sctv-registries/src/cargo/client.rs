@@ -44,6 +44,10 @@ impl CargoClient {
     }
 
     /// Creates a client with custom URLs and cache.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the HTTP client cannot be built (e.g. invalid TLS configuration).
     #[must_use]
     pub fn with_config(api_url: &str, static_url: &str, cache: Arc<RegistryCache>) -> Self {
         let http = Client::builder()

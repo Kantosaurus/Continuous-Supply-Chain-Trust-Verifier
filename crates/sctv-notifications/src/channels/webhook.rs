@@ -311,6 +311,10 @@ pub struct WebhookChannel {
 
 impl WebhookChannel {
     /// Creates a new webhook channel with the given configuration.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the HTTP client cannot be built (e.g. invalid TLS configuration).
     #[must_use]
     pub fn new(config: WebhookConfig) -> Self {
         let client = Client::builder()
@@ -349,7 +353,7 @@ impl WebhookChannel {
     }
 
     /// Computes HMAC signature for the payload.
-    fn compute_signature(&self, payload: &[u8], secret: &str, algorithm: HmacAlgorithm) -> String {
+    fn compute_signature(payload: &[u8], secret: &str, algorithm: HmacAlgorithm) -> String {
         use hmac::{Hmac, Mac};
         use sha1::Sha1;
         use sha2::Sha256;
@@ -412,7 +416,9 @@ impl WebhookChannel {
                         retryable,
                         "Webhook request failed"
                     );
-                    let duration_ms = start.elapsed().as_millis() as u64;
+                    // as_millis() returns u128; elapsed time in ms will never exceed u64::MAX (~585M years).
+                    let duration_ms =
+                        u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
                     if !retryable {
                         return Ok(DeliveryResult::failure(duration_ms, e.to_string()));
                     }
@@ -450,7 +456,7 @@ impl WebhookChannel {
                 secret,
                 algorithm,
             } => {
-                let signature = self.compute_signature(payload, secret, *algorithm);
+                let signature = Self::compute_signature(payload, secret, *algorithm);
                 request.header(header_name, signature)
             }
         };
@@ -462,7 +468,8 @@ impl WebhookChannel {
 
         let response = request.body(payload.to_vec()).send().await?;
 
-        let duration_ms = start.elapsed().as_millis() as u64;
+        // as_millis() returns u128; elapsed time in ms will never exceed u64::MAX (~585M years).
+        let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
         let status = response.status();
 
         if status.is_success() {

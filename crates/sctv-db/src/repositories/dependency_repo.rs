@@ -86,7 +86,8 @@ impl PgDependencyRepository {
             resolved_version,
             is_direct,
             is_dev_dependency,
-            depth: depth as u32,
+            // DB stores depth as i32; it is always non-negative in valid data.
+            depth: u32::try_from(depth).unwrap_or(0),
             parent_id: parent_id.map(DependencyId),
             integrity,
             first_seen_at,
@@ -213,7 +214,8 @@ impl DependencyRepository for PgDependencyRepository {
         .bind(dependency.resolved_version.to_string())
         .bind(dependency.is_direct)
         .bind(dependency.is_dev_dependency)
-        .bind(dependency.depth as i32)
+        // Dependency nesting depth fits comfortably in i32 (never > a few hundred).
+        .bind(i32::try_from(dependency.depth).unwrap_or(i32::MAX))
         .bind(dependency.parent_id.map(|p| p.0))
         .bind(&dependency.integrity.hash_sha256)
         .bind(&dependency.integrity.hash_sha512)
@@ -287,7 +289,8 @@ impl DependencyRepository for PgDependencyRepository {
             .bind(dependency.resolved_version.to_string())
             .bind(dependency.is_direct)
             .bind(dependency.is_dev_dependency)
-            .bind(dependency.depth as i32)
+            // Dependency nesting depth fits comfortably in i32 (never > a few hundred).
+        .bind(i32::try_from(dependency.depth).unwrap_or(i32::MAX))
             .bind(dependency.parent_id.map(|p| p.0))
             .bind(&dependency.integrity.hash_sha256)
             .bind(&dependency.integrity.hash_sha512)
@@ -339,7 +342,8 @@ impl DependencyRepository for PgDependencyRepository {
         .bind(dependency.resolved_version.to_string())
         .bind(dependency.is_direct)
         .bind(dependency.is_dev_dependency)
-        .bind(dependency.depth as i32)
+        // Dependency nesting depth fits comfortably in i32 (never > a few hundred).
+        .bind(i32::try_from(dependency.depth).unwrap_or(i32::MAX))
         .bind(dependency.parent_id.map(|p| p.0))
         .bind(&dependency.integrity.hash_sha256)
         .bind(&dependency.integrity.hash_sha512)
@@ -383,7 +387,8 @@ impl DependencyRepository for PgDependencyRepository {
             .await
             .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
-        Ok(result.rows_affected() as u32)
+        // rows_affected() fits in u32 for any realistic number of deleted rows.
+        Ok(u32::try_from(result.rows_affected()).unwrap_or(u32::MAX))
     }
 
     async fn find_by_package(

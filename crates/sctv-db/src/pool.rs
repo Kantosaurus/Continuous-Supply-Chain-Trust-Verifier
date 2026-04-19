@@ -73,6 +73,10 @@ pub struct TenantAwarePool {
 
 impl TenantAwarePool {
     /// Creates a new tenant-aware pool with the given configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the database connection cannot be established.
     pub async fn new(config: DbConfig) -> Result<Self, DbError> {
         let pool = PgPoolOptions::new()
             .max_connections(config.max_connections)
@@ -86,6 +90,11 @@ impl TenantAwarePool {
     }
 
     /// Acquires a connection with tenant context set.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a connection cannot be acquired from the pool or the
+    /// tenant context query fails.
     pub async fn acquire(&self, tenant_id: TenantId) -> Result<TenantConnection, DbError> {
         let mut conn = self.pool.acquire().await?;
 
@@ -99,6 +108,10 @@ impl TenantAwarePool {
     }
 
     /// Gets a raw connection without tenant context (for admin operations).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a connection cannot be acquired from the pool.
     pub async fn acquire_admin(
         &self,
     ) -> Result<sqlx::pool::PoolConnection<sqlx::Postgres>, DbError> {
@@ -114,9 +127,14 @@ impl TenantAwarePool {
     /// Runs pending database migrations.
     /// Note: This requires sqlx-cli to prepare migrations first.
     /// Run: cargo sqlx prepare --database-url <url>
-    pub async fn run_migrations(&self) -> Result<(), DbError> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if migrations fail to apply.
+    pub fn run_migrations(&self) -> Result<(), DbError> {
         // Migration support requires sqlx-cli preparation.
         // Use sqlx::migrate!("../../migrations") when database is available.
+        // async removed: no await points in this stub implementation.
         tracing::warn!("Migrations not available - run sqlx prepare first");
         Ok(())
     }

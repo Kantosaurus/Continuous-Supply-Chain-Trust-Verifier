@@ -271,7 +271,7 @@ impl NotificationService {
             .channels
             .iter()
             .filter_map(|entry| {
-                if !self.should_send(entry, notification.severity) {
+                if !Self::should_send(entry, notification.severity) {
                     return None;
                 }
 
@@ -288,7 +288,7 @@ impl NotificationService {
 
         // Track skipped channels
         for entry in &self.channels {
-            if !self.should_send(entry, notification.severity) {
+            if !Self::should_send(entry, notification.severity) {
                 let reason = if entry.enabled {
                     "severity below threshold"
                 } else {
@@ -317,7 +317,7 @@ impl NotificationService {
         for entry in &self.channels {
             let channel_name = entry.channel.name().to_string();
 
-            if !self.should_send(entry, notification.severity) {
+            if !Self::should_send(entry, notification.severity) {
                 let reason = if entry.enabled {
                     "severity below threshold"
                 } else {
@@ -354,7 +354,7 @@ impl NotificationService {
     }
 
     /// Checks if a notification should be sent to a channel.
-    fn should_send(&self, entry: &ChannelEntry, severity: Severity) -> bool {
+    fn should_send(entry: &ChannelEntry, severity: Severity) -> bool {
         if !entry.enabled || !entry.channel.is_enabled() {
             return false;
         }

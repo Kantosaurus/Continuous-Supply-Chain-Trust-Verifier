@@ -1,5 +1,7 @@
 //! Maven Central API and XML response models.
 
+use std::fmt;
+
 use serde::Deserialize;
 
 /// Maven coordinate (groupId:artifactId).
@@ -50,11 +52,11 @@ impl MavenCoordinate {
             extension
         )
     }
+}
 
-    /// Returns the full coordinate string.
-    #[must_use]
-    pub fn to_string(&self) -> String {
-        format!("{}:{}", self.group_id, self.artifact_id)
+impl fmt::Display for MavenCoordinate {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}:{}", self.group_id, self.artifact_id)
     }
 }
 

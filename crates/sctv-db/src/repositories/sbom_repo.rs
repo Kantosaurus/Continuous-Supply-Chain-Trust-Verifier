@@ -202,6 +202,7 @@ impl SbomRepository for PgSbomRepository {
         .await
         .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
-        Ok(result.rows_affected() as u32)
+        // rows_affected() fits in u32 for any realistic number of deleted rows.
+        Ok(u32::try_from(result.rows_affected()).unwrap_or(u32::MAX))
     }
 }

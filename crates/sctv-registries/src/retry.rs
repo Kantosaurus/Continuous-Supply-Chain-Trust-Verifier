@@ -32,6 +32,10 @@ impl Default for RetryConfig {
 
 /// Runs the given HTTP send closure with exponential backoff on transient
 /// failures. Returns the first non-retryable outcome (success or 4xx).
+///
+/// # Errors
+///
+/// Returns the last `reqwest::Error` if all retry attempts fail.
 pub async fn retry_http<F, Fut>(config: &RetryConfig, mut op: F) -> Result<Response, reqwest::Error>
 where
     F: FnMut() -> Fut,
@@ -44,7 +48,8 @@ where
         if attempt > 0 {
             tracing::debug!(
                 attempt,
-                delay_ms = delay.as_millis() as u64,
+                // as_millis() returns u128; delay in ms will never exceed u64::MAX (~585M years).
+                delay_ms = u64::try_from(delay.as_millis()).unwrap_or(u64::MAX),
                 "Retrying HTTP request"
             );
             tokio::time::sleep(delay).await;

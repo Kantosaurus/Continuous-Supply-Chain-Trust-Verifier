@@ -9,6 +9,7 @@ use sctv_core::{
 };
 use sqlx::{PgPool, Row};
 use std::collections::HashMap;
+use std::fmt::Write as _;
 
 /// `PostgreSQL` implementation of the alert repository.
 pub struct PgAlertRepository {
@@ -50,12 +51,12 @@ impl PgAlertRepository {
         };
 
         let status = match status_str.as_str() {
-            "open" => AlertStatus::Open,
             "acknowledged" => AlertStatus::Acknowledged,
             "investigating" => AlertStatus::Investigating,
             "false_positive" => AlertStatus::FalsePositive,
             "resolved" => AlertStatus::Resolved,
             "suppressed" => AlertStatus::Suppressed,
+            // "open" and any unknown status default to Open
             _ => AlertStatus::Open,
         };
 
@@ -229,29 +230,35 @@ impl AlertRepository for PgAlertRepository {
 
         if filter.project_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND project_id = ${param_count}"));
+            write!(query, " AND project_id = ${param_count}")
+                .expect("write to String is infallible");
         }
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ANY(${param_count})"));
+            write!(query, " AND status = ANY(${param_count})")
+                .expect("write to String is infallible");
         }
 
         if filter.severity.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND severity = ANY(${param_count})"));
+            write!(query, " AND severity = ANY(${param_count})")
+                .expect("write to String is infallible");
         }
 
         if filter.alert_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND alert_type = ANY(${param_count})"));
+            write!(query, " AND alert_type = ANY(${param_count})")
+                .expect("write to String is infallible");
         }
 
-        query.push_str(&format!(
+        write!(
+            query,
             " ORDER BY created_at DESC LIMIT ${} OFFSET ${}",
             param_count + 1,
             param_count + 2
-        ));
+        )
+        .expect("write to String is infallible");
 
         // Execute with appropriate bindings
         let mut query_builder = sqlx::query(&query).bind(tenant_id.0);
@@ -297,22 +304,26 @@ impl AlertRepository for PgAlertRepository {
 
         if filter.project_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND project_id = ${param_count}"));
+            write!(query, " AND project_id = ${param_count}")
+                .expect("write to String is infallible");
         }
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ANY(${param_count})"));
+            write!(query, " AND status = ANY(${param_count})")
+                .expect("write to String is infallible");
         }
 
         if filter.severity.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND severity = ANY(${param_count})"));
+            write!(query, " AND severity = ANY(${param_count})")
+                .expect("write to String is infallible");
         }
 
         if filter.alert_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND alert_type = ANY(${param_count})"));
+            write!(query, " AND alert_type = ANY(${param_count})")
+                .expect("write to String is infallible");
         }
 
         let mut query_builder = sqlx::query_scalar::<_, i64>(&query).bind(tenant_id.0);
@@ -343,7 +354,8 @@ impl AlertRepository for PgAlertRepository {
             .await
             .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
-        Ok(total.max(0) as u64)
+        // SQL COUNT() is always non-negative; saturating cast is safe here.
+        Ok(u64::try_from(total.max(0)).unwrap_or(u64::MAX))
     }
 
     async fn create(&self, alert: &Alert) -> RepositoryResult<()> {
@@ -451,7 +463,8 @@ impl AlertRepository for PgAlertRepository {
         .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
         let count: i64 = record.get("count");
-        Ok(count as u32)
+        // SQL COUNT() is always non-negative and bounded by row count; safe cast.
+        Ok(u32::try_from(count.max(0)).unwrap_or(u32::MAX))
     }
 
     async fn count_by_severity(
@@ -483,7 +496,8 @@ impl AlertRepository for PgAlertRepository {
                 _ => Severity::Info,
             };
 
-            result.insert(severity, count as u32);
+            // SQL COUNT() is non-negative and fits in u32 for any realistic dataset.
+            result.insert(severity, u32::try_from(count.max(0)).unwrap_or(u32::MAX));
         }
 
         Ok(result)

@@ -186,6 +186,10 @@ impl ProvenanceDetector {
     }
 
     /// Verifies provenance for a dependency.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the underlying Sigstore verification fails.
     pub async fn verify_provenance(
         &self,
         dependency: &Dependency,
@@ -220,7 +224,7 @@ impl ProvenanceDetector {
         match provenance_status {
             ProvenanceStatus::Unknown => {
                 // Need to fetch and verify provenance
-                self.verifier.verify(dependency).await
+                self.verifier.verify(dependency)
             }
             ProvenanceStatus::Failed => {
                 Ok(ProvenanceVerificationResult::verification_failed(vec![
@@ -253,7 +257,7 @@ impl ProvenanceDetector {
 
     /// Determines the SLSA level based on attestation contents.
     #[allow(dead_code)]
-    fn determine_slsa_level(&self, result: &ProvenanceVerificationResult) -> u8 {
+    fn determine_slsa_level(result: &ProvenanceVerificationResult) -> u8 {
         // SLSA Level requirements:
         // Level 1: Documentation of build process
         // Level 2: Hosted build platform with authenticated provenance
@@ -263,12 +267,12 @@ impl ProvenanceDetector {
             return 0;
         }
 
-        let mut level = 1; // Has provenance = at least level 1
-
-        // Level 2: Hosted build with authenticated provenance
-        if result.builder_trusted && result.sigstore_verified {
-            level = 2;
-        }
+        // Level 2: Hosted build with authenticated provenance (at least level 1 if provenance exists)
+        let mut level = if result.builder_trusted && result.sigstore_verified {
+            2
+        } else {
+            1
+        };
 
         // Level 3: Rekor transparency log with inclusion proof
         if level >= 2

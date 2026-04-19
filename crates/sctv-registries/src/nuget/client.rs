@@ -38,6 +38,10 @@ impl NuGetClient {
     }
 
     /// Creates a client with custom URL and cache.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the HTTP client cannot be built or if `service_url` is not a valid URL.
     #[must_use]
     pub fn with_config(service_url: &str, cache: Arc<RegistryCache>) -> Self {
         let http = Client::builder()
@@ -345,11 +349,10 @@ impl RegistryClient for NuGetClient {
             .unwrap_or_default();
 
         // Check deprecation
-        let (deprecated, deprecation_message) = if let Some(dep) = &entry.deprecation {
-            (true, dep.message.clone())
-        } else {
-            (false, None)
-        };
+        let (deprecated, deprecation_message) = entry
+            .deprecation
+            .as_ref()
+            .map_or((false, None), |dep| (true, dep.message.clone()));
 
         let published_at = entry
             .published

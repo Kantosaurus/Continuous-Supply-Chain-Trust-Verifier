@@ -246,6 +246,10 @@ pub struct PagerDutyChannel {
 
 impl PagerDutyChannel {
     /// Creates a new `PagerDuty` channel with the given configuration.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the HTTP client cannot be built (e.g. invalid TLS configuration).
     #[must_use]
     pub fn new(config: PagerDutyConfig) -> Self {
         let client = Client::builder()
@@ -367,7 +371,8 @@ impl PagerDutyChannel {
 
         let response = self.client.post(api_url).json(&event).send().await?;
 
-        let duration_ms = start.elapsed().as_millis() as u64;
+        // as_millis() returns u128; elapsed time in ms will never exceed u64::MAX (~585M years).
+        let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
         let status = response.status();
 
         if status.is_success() {

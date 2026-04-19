@@ -268,6 +268,7 @@ impl ProjectRepository for PgProjectRepository {
             .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
         let count: i64 = record.get("count");
-        Ok(count as u32)
+        // SQL COUNT() is non-negative and bounded by row count; safe cast.
+        Ok(u32::try_from(count.max(0)).unwrap_or(u32::MAX))
     }
 }

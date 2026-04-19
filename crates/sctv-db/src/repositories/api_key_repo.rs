@@ -17,6 +17,9 @@ impl PgApiKeyRepository {
         Self { pool }
     }
 
+    // Result<> is intentional: callers use this fn pointer with .map(...).transpose()
+    // and .collect::<Result<_, _>>(), so the signature must match RepositoryResult<T>.
+    #[allow(clippy::unnecessary_wraps)]
     fn row_to_api_key(row: &sqlx::postgres::PgRow) -> RepositoryResult<ApiKey> {
         let id: uuid::Uuid = row.get("id");
         let tenant_id: uuid::Uuid = row.get("tenant_id");

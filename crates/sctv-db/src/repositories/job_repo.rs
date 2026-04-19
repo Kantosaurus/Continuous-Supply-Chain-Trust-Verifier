@@ -6,6 +6,7 @@ use sctv_core::traits::{JobFilter, JobRepository, RepositoryError, RepositoryRes
 use sctv_core::{Job, JobId, JobPriority, JobStatus, JobType, TenantId};
 use sqlx::{PgPool, Row};
 use std::collections::HashMap;
+use std::fmt::Write as _;
 
 /// `PostgreSQL` implementation of the job repository.
 pub struct PgJobRepository {
@@ -54,8 +55,9 @@ impl PgJobRepository {
             payload,
             result,
             error_message,
-            attempts: attempts as u32,
-            max_attempts: max_attempts as u32,
+            // DB stores attempts/max_attempts as i32; values are always non-negative.
+            attempts: u32::try_from(attempts).unwrap_or(0),
+            max_attempts: u32::try_from(max_attempts).unwrap_or(0),
             scheduled_at,
             started_at,
             completed_at,
@@ -118,24 +120,29 @@ impl JobRepository for PgJobRepository {
 
         if tenant_id.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND tenant_id = ${param_count}"));
+            write!(query, " AND tenant_id = ${param_count}")
+                .expect("write to String is infallible");
         }
 
         if filter.status.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND status = ANY(${param_count})"));
+            write!(query, " AND status = ANY(${param_count})")
+                .expect("write to String is infallible");
         }
 
         if filter.job_type.is_some() {
             param_count += 1;
-            query.push_str(&format!(" AND job_type = ANY(${param_count})"));
+            write!(query, " AND job_type = ANY(${param_count})")
+                .expect("write to String is infallible");
         }
 
-        query.push_str(&format!(
+        write!(
+            query,
             " ORDER BY priority DESC, scheduled_at ASC LIMIT ${} OFFSET ${}",
             param_count + 1,
             param_count + 2
-        ));
+        )
+        .expect("write to String is infallible");
 
         let mut query_builder = sqlx::query(&query);
 
@@ -183,8 +190,9 @@ impl JobRepository for PgJobRepository {
         .bind(payload)
         .bind(&job.result)
         .bind(&job.error_message)
-        .bind(job.attempts as i32)
-        .bind(job.max_attempts as i32)
+        // Job attempt counts fit comfortably in i32 (bounded by max_attempts config).
+        .bind(i32::try_from(job.attempts).unwrap_or(i32::MAX))
+        .bind(i32::try_from(job.max_attempts).unwrap_or(i32::MAX))
         .bind(job.scheduled_at)
         .bind(job.started_at)
         .bind(job.completed_at)
@@ -215,7 +223,8 @@ impl JobRepository for PgJobRepository {
         .bind(payload)
         .bind(&job.result)
         .bind(&job.error_message)
-        .bind(job.attempts as i32)
+        // Job attempt count fits comfortably in i32 (bounded by max_attempts config).
+        .bind(i32::try_from(job.attempts).unwrap_or(i32::MAX))
         .bind(job.scheduled_at)
         .bind(job.started_at)
         .bind(job.completed_at)
@@ -321,7 +330,8 @@ impl JobRepository for PgJobRepository {
         .await
         .map_err(|e| RepositoryError::Database(e.to_string()))?;
 
-        Ok(result.rows_affected() as u32)
+        // rows_affected() fits in u32 for any realistic number of deleted rows.
+        Ok(u32::try_from(result.rows_affected()).unwrap_or(u32::MAX))
     }
 
     async fn count_by_status(&self) -> RepositoryResult<HashMap<JobStatus, u32>> {
@@ -342,7 +352,8 @@ impl JobRepository for PgJobRepository {
             let count: i64 = row.get("count");
 
             if let Ok(status) = status_str.parse::<JobStatus>() {
-                result.insert(status, count as u32);
+                // SQL COUNT() is non-negative and fits in u32 for any realistic dataset.
+                result.insert(status, u32::try_from(count.max(0)).unwrap_or(u32::MAX));
             }
         }
 

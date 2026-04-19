@@ -36,6 +36,10 @@ impl GoModulesClient {
     }
 
     /// Creates a client with custom URL and cache.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the HTTP client cannot be built or if `proxy_url` is not a valid URL.
     #[must_use]
     pub fn with_config(proxy_url: &str, cache: Arc<RegistryCache>) -> Self {
         let http = Client::builder()
@@ -381,13 +385,12 @@ impl RegistryClient for GoModulesClient {
         // Check if version is retracted
         let (yanked, deprecation_message) = go_mod.as_ref().map_or((false, None), |gm| {
             let retracted = gm.retract.iter().any(|r| {
-                if let Some(high) = &r.high {
-                    // Range retraction
-                    version >= r.low.as_str() && version <= high.as_str()
-                } else {
+                r.high.as_ref().map_or_else(
                     // Single version retraction
-                    version == r.low
-                }
+                    || version == r.low,
+                    // Range retraction
+                    |high| version >= r.low.as_str() && version <= high.as_str(),
+                )
             });
 
             if retracted {

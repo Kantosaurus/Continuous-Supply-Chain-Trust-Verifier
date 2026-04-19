@@ -166,6 +166,10 @@ pub struct TeamsChannel {
 
 impl TeamsChannel {
     /// Creates a new Teams channel with the given configuration.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the HTTP client cannot be built (e.g. invalid TLS configuration).
     #[must_use]
     pub fn new(config: TeamsConfig) -> Self {
         let client = Client::builder()
@@ -180,8 +184,8 @@ impl TeamsChannel {
     const fn severity_color(severity: Severity) -> &'static str {
         match severity {
             Severity::Critical => "attention",
-            Severity::High => "warning",
-            Severity::Medium => "warning",
+            // High and Medium both map to "warning" (Teams color token)
+            Severity::High | Severity::Medium => "warning",
             Severity::Low => "accent",
             Severity::Info => "default",
         }
@@ -198,50 +202,21 @@ impl TeamsChannel {
         }
     }
 
-    /// Builds the Teams Adaptive Card message.
-    fn build_message(&self, notification: &Notification) -> TeamsMessage {
-        let mut body = Vec::new();
-
-        // Header with severity indicator
-        body.push(CardElement::TextBlock {
-            text: format!(
-                "{} {} - {}",
-                Self::severity_indicator(notification.severity),
-                notification.severity,
-                notification.title
-            ),
-            size: Some("Large"),
-            weight: Some("Bolder"),
-            color: Some(Self::severity_color(notification.severity)),
-            wrap: Some(true),
-            spacing: None,
-        });
-
-        // Main message
-        body.push(CardElement::TextBlock {
-            text: notification.message.clone(),
-            size: None,
-            weight: None,
-            color: None,
-            wrap: Some(true),
-            spacing: Some("Medium"),
-        });
-
-        // Facts section
-        let mut facts = Vec::new();
-
-        facts.push(Fact {
-            title: "Severity".to_string(),
-            value: notification.severity.to_string(),
-        });
-
-        facts.push(Fact {
-            title: "Time".to_string(),
-            value: notification
-                .created_at
-                .format("%Y-%m-%d %H:%M:%S UTC")
-                .to_string(),
-        });
+    /// Builds the fact list for the adaptive card.
+    fn build_facts(notification: &Notification) -> Vec<Fact> {
+        let mut facts = vec![
+            Fact {
+                title: "Severity".to_string(),
+                value: notification.severity.to_string(),
+            },
+            Fact {
+                title: "Time".to_string(),
+                value: notification
+                    .created_at
+                    .format("%Y-%m-%d %H:%M:%S UTC")
+                    .to_string(),
+            },
+        ];
 
         if let Some(project) = &notification.context.project_name {
             facts.push(Fact {
@@ -269,9 +244,38 @@ impl TeamsChannel {
             });
         }
 
-        body.push(CardElement::FactSet { facts });
+        facts
+    }
 
-        // Remediation if present
+    /// Builds the Teams Adaptive Card message.
+    fn build_message(notification: &Notification) -> TeamsMessage {
+        let mut body = vec![
+            CardElement::TextBlock {
+                text: format!(
+                    "{} {} - {}",
+                    Self::severity_indicator(notification.severity),
+                    notification.severity,
+                    notification.title
+                ),
+                size: Some("Large"),
+                weight: Some("Bolder"),
+                color: Some(Self::severity_color(notification.severity)),
+                wrap: Some(true),
+                spacing: None,
+            },
+            CardElement::TextBlock {
+                text: notification.message.clone(),
+                size: None,
+                weight: None,
+                color: None,
+                wrap: Some(true),
+                spacing: Some("Medium"),
+            },
+            CardElement::FactSet {
+                facts: Self::build_facts(notification),
+            },
+        ];
+
         if let Some(remediation) = &notification.context.remediation {
             body.push(CardElement::Container {
                 style: Some("emphasis"),
@@ -296,7 +300,6 @@ impl TeamsChannel {
             });
         }
 
-        // Actions
         let mut actions = Vec::new();
         if let Some(url) = &notification.context.dashboard_url {
             actions.push(CardAction::OpenUrl {
@@ -346,7 +349,7 @@ impl NotificationChannel for TeamsChannel {
             "Sending Teams notification"
         );
 
-        let message = self.build_message(notification);
+        let message = Self::build_message(notification);
 
         let response = self
             .client
@@ -355,7 +358,8 @@ impl NotificationChannel for TeamsChannel {
             .send()
             .await?;
 
-        let duration_ms = start.elapsed().as_millis() as u64;
+        // as_millis() returns u128; elapsed time in ms will never exceed u64::MAX (~585M years).
+        let duration_ms = u64::try_from(start.elapsed().as_millis()).unwrap_or(u64::MAX);
         let status = response.status();
 
         if status.is_success() {

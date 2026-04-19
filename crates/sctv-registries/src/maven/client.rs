@@ -43,6 +43,10 @@ impl MavenClient {
     }
 
     /// Creates a client with custom registry URL and cache.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the HTTP client cannot be built or if a URL argument is invalid.
     #[must_use]
     pub fn with_config(registry_url: &str, cache: Arc<RegistryCache>) -> Self {
         let http = Client::builder()
@@ -172,6 +176,10 @@ impl MavenClient {
     }
 
     /// Searches Maven Central for artifacts.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the HTTP request fails or the response cannot be parsed.
     pub async fn search(&self, query: &str, limit: usize) -> RegistryResult<Vec<MavenSearchDoc>> {
         let url = format!("{}?q={}&rows={}&wt=json", self.search_url, query, limit);
 
@@ -253,7 +261,7 @@ impl MavenClient {
     }
 
     /// Determines the best artifact extension (jar, war, pom-only, etc.).
-    fn get_artifact_extension(&self, pom: &MavenPom) -> &'static str {
+    fn get_artifact_extension(pom: &MavenPom) -> &'static str {
         match pom.packaging.as_deref() {
             Some("war") => "war",
             Some("ear") => "ear",
@@ -388,7 +396,7 @@ impl RegistryClient for MavenClient {
             .map_err(|e| RegistryError::Parse(format!("Invalid version: {e}")))?;
 
         // Determine artifact extension
-        let extension = self.get_artifact_extension(&pom);
+        let extension = Self::get_artifact_extension(&pom);
         let artifact_path = coord.artifact_path(version, extension);
 
         // Fetch checksums in parallel
@@ -494,9 +502,8 @@ impl RegistryClient for MavenClient {
     }
 
     async fn package_exists(&self, name: &str) -> RegistryResult<bool> {
-        let coord = match MavenCoordinate::parse(name) {
-            Some(c) => c,
-            None => return Ok(false),
+        let Some(coord) = MavenCoordinate::parse(name) else {
+            return Ok(false);
         };
 
         match self.fetch_metadata(&coord).await {
