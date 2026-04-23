@@ -147,7 +147,7 @@ jobs:
         run: cargo build --release --workspace
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: binaries-${{ matrix.target }}
           path: |
